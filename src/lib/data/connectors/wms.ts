@@ -11,6 +11,7 @@ import type { DaneDzialki } from "../../types";
 import type { Konektor, Teren, WynikKonektora } from "./types";
 import { brakWyniku } from "./types";
 import { fetchTekst } from "./net";
+import { logDebug, skrot } from "../debug";
 import { KONFIG_KONEKTORY } from "../connectorsConfig";
 
 export type WynikWms = "obecny" | "pusty" | "blad";
@@ -80,6 +81,7 @@ function urlGetFeatureInfo(cfg: KonfiguracjaWms, warstwa: string, c: [number, nu
     SRS: "EPSG:2180",
     LAYERS: warstwa,
     QUERY_LAYERS: warstwa,
+    STYLES: "",
     BBOX: `${x - d},${y - d},${x + d},${y + d}`,
     WIDTH: "101",
     HEIGHT: "101",
@@ -105,9 +107,11 @@ function utworzKonektorWms(cfg: KonfiguracjaWms): Konektor {
       const c = teren.centroid2180;
       if (!c) return brakWyniku(this.klucz, this.zrodlo, czas, "Brak centroidu (brak geometrii).");
       const warstwa = await ustalWarstwe(cfg); // auto-odkrycie nazwy warstwy (GetCapabilities)
-      // Krótki timeout, bez retry — niedostępne WMS nie mają spowalniać analizy.
-      const tekst = await fetchTekst(urlGetFeatureInfo(cfg, warstwa, c), { timeoutMs: 4500, proby: 1 });
+      const url = urlGetFeatureInfo(cfg, warstwa, c);
+      logDebug(`WMS ${cfg.klucz} → ${url}`);
+      const tekst = await fetchTekst(url, { timeoutMs: 7000, proby: 1 });
       if (tekst === null) return brakWyniku(this.klucz, this.zrodlo, czas, "Brak odpowiedzi WMS.");
+      logDebug(`WMS ${cfg.klucz} ← ${skrot(tekst, 400)}`);
       const ocena = ocenOdpowiedzWms(tekst);
       if (ocena === "blad") return brakWyniku(this.klucz, this.zrodlo, czas, "Wyjątek WMS (sprawdź warstwę/endpoint).");
       const obecny = ocena === "obecny";
