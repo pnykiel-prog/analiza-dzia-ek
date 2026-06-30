@@ -18,3 +18,7 @@ body {
 .badge {
   @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
 }
+
+.inp {
+  @apply w-full border border-slate-200 rounded px-2 py-1.5 text-sm;
+}

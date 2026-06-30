@@ -71,6 +71,27 @@ src/
 6. **Parametry w konfiguracji, nie w kodzie** — `lib/config.ts` + edytor `/konfiguracja`.
 7. **Wynik poziomu = wejście następnego**; **pętla zwrotna P3 → P2**, gdy program nie domyka.
 
+## Panel wprowadzania działek — kreator 3-poziomowy
+
+Zgodnie z dokumentem „Katalog danych i tryby pól" panel `/nowa` odsłania pola
+stopniowo wraz z poziomem (tryby **R / R? / A / A° / A± / S**):
+
+- **Poziom 1 — identyfikacja:** widoczna wyłącznie identyfikacja działek
+  (kaskada TERYT województwo → powiat → gmina → obręb → numer; tryb hybrydowy:
+  lista 16 województw + podpowiedzi z mini-słownika + wpis własny). Obsługa
+  **wielu działek** (repeater) ze scaleniem geometrii w jeden „teren inwestycji"
+  i walidacją przylegania. Całe scoringowanie liczy się automatycznie (ukryte).
+- **Poziom 2 — ocena działki:** odsłaniają się wskaźniki planistyczne (**A±**,
+  z override i śladem audytowym „✎ skorygowane ręcznie"), uwarunkowania terenu/
+  środowiska (**A°**, tylko odczyt), pola rynkowe (**A± → R dynamicznie** wg
+  liczby ofert `N`: ≥30 wiarygodne, 10–29 szacunek, <10 fallback regionalny/
+  ręczne) oraz dane ręczne / wąskie gardła (własność, przyłączenia, geotechnika).
+- **Poziom 3 — model finansowy:** parametry reżimu i montażu (**A±/R**):
+  oprocentowanie, okres kredytu, grant, fazy osi czasu, indeksy, koszt budowy,
+  cena gruntu, partycypacje.
+
+Brak danej w polu A/A°/A± nie blokuje — obniża pewność (zasada „brak danych ≠ nie").
+
 ## Warstwa danych
 
 Na tym etapie warstwa zwraca **dane przykładowe** (3 działki, w tym przypadek z białymi plamami).
