@@ -32,6 +32,11 @@ export default async function Home() {
           <span className="badge bg-slate-100 text-slate-600">🔴 ręczne / zewnętrzne</span>
           <span className="badge bg-slate-100 text-slate-600">„brak danych ≠ nie"</span>
         </div>
+        <div className="mt-5">
+          <Link href="/nowa" className="inline-flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-lg hover:bg-slate-700 text-sm font-medium">
+            ＋ Analizuj nową działkę
+          </Link>
+        </div>
       </section>
 
       <section>

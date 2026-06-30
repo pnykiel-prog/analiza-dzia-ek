@@ -2,10 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { pobierzDaneDzialki, raportPokrycia } from "@/lib/data/service";
 import { uruchomAnalize } from "@/lib/engine";
-import { Sekcja } from "@/components/ui";
-import { Poziom1View } from "@/components/Poziom1View";
-import { Poziom2View } from "@/components/Poziom2View";
-import { Poziom3View } from "@/components/Poziom3View";
+import { WynikiPoziomow } from "@/components/WynikiPoziomow";
 import { liczba } from "@/lib/format";
 
 export default async function AnalizaPage({ params }: { params: { id: string } }) {
@@ -50,24 +47,7 @@ export default async function AnalizaPage({ params }: { params: { id: string } }
         )}
       </div>
 
-      {/* Nawigacja kotwicowa */}
-      <div className="flex gap-2 text-sm sticky top-0 bg-[#f8fafc] py-2 z-10">
-        <a href="#poziom-1" className="badge bg-slate-200 text-slate-700 hover:bg-slate-300">1 · Przesiew</a>
-        <a href="#poziom-2" className="badge bg-slate-200 text-slate-700 hover:bg-slate-300">2 · Zabudowa</a>
-        <a href="#poziom-3" className="badge bg-slate-200 text-slate-700 hover:bg-slate-300">3 · Finanse</a>
-      </div>
-
-      <Sekcja numer="1" tytul="Poziom 1 — szybki przesiew" opis="Bramki + scoring 5 wymiarów dla dwóch profili (dane automatyczne)">
-        <Poziom1View p1={poziom1} />
-      </Sekcja>
-
-      <Sekcja numer="2" tytul="Poziom 2 — ocena działki i model zabudowy" opis="Obwiednia → typologia → program pod profil (bez finansów)">
-        <Poziom2View p2={poziom2} />
-      </Sekcja>
-
-      <Sekcja numer="3" tytul="Poziom 3 — model finansowy SIM" opis="Montaż, oś czasu, reżim as-of, domknięcie i wymagana dotacja">
-        <Poziom3View p3={poziom3} />
-      </Sekcja>
+      <WynikiPoziomow p1={poziom1} p2={poziom2} p3={poziom3} />
     </div>
   );
 }
