@@ -110,10 +110,10 @@ function utworzKonektorWms(cfg: KonfiguracjaWms): Konektor {
       const url = urlGetFeatureInfo(cfg, warstwa, c);
       logDebug(`WMS ${cfg.klucz} → ${url}`);
       const tekst = await fetchTekst(url, { timeoutMs: 7000, proby: 1 });
-      if (tekst === null) return brakWyniku(this.klucz, this.zrodlo, czas, "Brak odpowiedzi WMS.");
+      if (tekst === null) return brakWyniku(this.klucz, this.zrodlo, czas, "Brak odpowiedzi WMS (timeout/HTTP).");
       logDebug(`WMS ${cfg.klucz} ← ${skrot(tekst, 400)}`);
       const ocena = ocenOdpowiedzWms(tekst);
-      if (ocena === "blad") return brakWyniku(this.klucz, this.zrodlo, czas, "Wyjątek WMS (sprawdź warstwę/endpoint).");
+      if (ocena === "blad") return brakWyniku(this.klucz, this.zrodlo, czas, `Wyjątek WMS: ${skrot(tekst, 200)}`);
       const obecny = ocena === "obecny";
       const dane: Partial<DaneDzialki> = { [cfg.pole]: obecny } as Partial<DaneDzialki>;
       return {

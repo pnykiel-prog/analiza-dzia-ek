@@ -678,6 +678,18 @@ function PotwierdzenieDanych({ dane, meta }: { dane: DaneDzialki; meta: MetaRozw
               );
             })}
           </div>
+          {/* Powody „brak"/„błąd" wprost w UI — diagnostyka bez logów serwera. */}
+          {meta.raportZrodel.some((r) => r.status !== "ok" && r.debug) && (
+            <ul className="mt-2 space-y-1">
+              {meta.raportZrodel
+                .filter((r) => r.status !== "ok" && r.debug)
+                .map((r, i) => (
+                  <li key={i} className="text-[11px] text-slate-500 break-all">
+                    <span className="font-medium text-slate-600">{r.zrodlo}:</span> {r.debug}
+                  </li>
+                ))}
+            </ul>
+          )}
         </div>
       )}
       {meta.bledy.length > 0 && (
