@@ -12,6 +12,7 @@ import { DZIALKI_PRZYKLADOWE } from "../../data/sample";
 import { ocenOdpowiedzWms, znajdzWarstwe } from "../../data/connectors/wms";
 import { klasyfikujPoi } from "../../data/connectors/overpass";
 import { terytGminy, powiaty } from "../../teryt";
+import { wartoscOdtworzeniowaDla, medianaRynkowa } from "../../config-rynek";
 
 const KW = (x0: number, y0: number, b: number) =>
   `POLYGON((${x0} ${y0},${x0 + b} ${y0},${x0 + b} ${y0 + b},${x0} ${y0 + b},${x0} ${y0}))`;
@@ -90,6 +91,19 @@ test("teryt: pełny słownik — Głuchołazy (obszar wiejski) = 160701_5", () =
   assert.equal(terytGminy("opolskie", "nyski", "Głuchołazy (obszar wiejski)"), "160701_5");
   assert.ok(powiaty("opolskie").includes("nyski"));
   assert.ok(powiaty("mazowieckie").length > 30); // pełny słownik, nie mini
+});
+
+test("M3: wartość odtworzeniowa — miasto wojewódzkie vs reszta", () => {
+  const stolica = wartoscOdtworzeniowaDla("opolskie", "Opole");
+  const wies = wartoscOdtworzeniowaDla("opolskie", "Głuchołazy (obszar wiejski)");
+  assert.equal(stolica.obszar, "miasto wojewódzkie");
+  assert.equal(wies.obszar, "reszta województwa");
+  assert.ok(stolica.wartosc > wies.wartosc);
+});
+
+test("M3: mediana rynkowa zwraca czynsz i cenę dla województwa", () => {
+  const m = medianaRynkowa("mazowieckie");
+  assert.ok(m.czynsz > 0 && m.cenaNowych > 0);
 });
 
 test("runner: brak konfiguracji/geometrii → status brak, raport pełny, bez wyjątku", async () => {

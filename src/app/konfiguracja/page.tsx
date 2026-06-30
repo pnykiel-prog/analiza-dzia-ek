@@ -20,6 +20,7 @@ export default function KonfiguracjaPage() {
   const [wybranaDzialka, setWybranaDzialka] = useState<string>("");
   const [wynik, setWynik] = useState<WynikAnalizy | null>(null);
   const [licze, setLicze] = useState(false);
+  const [wartoscOdtw, setWartoscOdtw] = useState<Record<string, { miasto: number; reszta: number }>>({});
 
   useEffect(() => {
     fetch("/api/konfiguracja")
@@ -27,6 +28,7 @@ export default function KonfiguracjaPage() {
       .then((d) => {
         setKonfig(d.konfiguracja);
         setZrodla(d.zrodla);
+        setWartoscOdtw(d.wartoscOdtworzeniowa ?? {});
       });
     fetch("/api/dzialki")
       .then((r) => r.json())
@@ -202,6 +204,32 @@ export default function KonfiguracjaPage() {
             </table>
           </div>
         )}
+      </Karta>
+
+      {/* Wartość odtworzeniowa (M3) */}
+      <Karta tytul="Wartość odtworzeniowa (M3)" podtytul="Wskaźnik wojewody/BGK [zł/m²] → podstawa pułapu czynszu SIM. Aktualizacja ~2×/rok.">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-slate-500 border-b">
+                <th className="py-1 pr-3">Województwo</th>
+                <th className="py-1 px-3 text-right">Miasto wojewódzkie</th>
+                <th className="py-1 px-3 text-right">Reszta województwa</th>
+                <th className="py-1 pl-3 text-right">Pułap czynszu (miasto, 5%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(wartoscOdtw).map(([woj, v]) => (
+                <tr key={woj} className="border-b border-slate-100">
+                  <td className="py-1 pr-3">{woj}</td>
+                  <td className="py-1 px-3 text-right">{liczba(v.miasto, " zł")}</td>
+                  <td className="py-1 px-3 text-right">{liczba(v.reszta, " zł")}</td>
+                  <td className="py-1 pl-3 text-right text-slate-500">{liczba((v.miasto * 0.05) / 12, " zł/m²", 1)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Karta>
 
       {/* Katalog źródeł danych */}

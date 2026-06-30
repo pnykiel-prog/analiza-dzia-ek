@@ -10,8 +10,17 @@ import { konektorGUS } from "./gus";
 import { konektorKIMPZP } from "./kimpzp";
 import { konektoryWms } from "./wms";
 import { konektorOverpass } from "./overpass";
+import { konektorWartoscOdtworzeniowa } from "./wartosc";
+import { konektorRynek } from "./rynek";
 
-const REJESTR: Konektor[] = [konektorGUS, konektorKIMPZP, ...konektoryWms, konektorOverpass];
+const REJESTR: Konektor[] = [
+  konektorGUS,
+  konektorKIMPZP,
+  ...konektoryWms,
+  konektorOverpass,
+  konektorWartoscOdtworzeniowa,
+  konektorRynek,
+];
 
 export interface RaportKonektorow {
   dane: Partial<DaneDzialki>;

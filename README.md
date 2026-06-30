@@ -120,6 +120,8 @@ Zgodnie z briefem wdrożeniowym warstwa danych używa **wzorca konektora**
 | PIG-PIB SOPO | M2 | bramka: osuwiska | obecność WMS w punkcie |
 | NID | M2 | flaga: strefa konserwatorska | obecność WMS w punkcie |
 | OSM / Overpass | M2 | W3: przystanek, usługi pieszo, POZ, szkoły/żłobki | zapytanie `around` (proxy dostępności) |
+| Wartość odtworzeniowa | M3 | pułap czynszu SIM (W5/P3) | tabela wojewoda/BGK (woj × miasto/reszta), `config-rynek.ts` |
+| Dane rynkowe | M3 | czynsz rynkowy, ceny nowych (W5) | mediana regionalna (fallback, reguła wystarczalności `N`) |
 
 Konektory środowiskowe (M2) działają wzorcem „obecność obiektu w punkcie" (WMS
 GetFeatureInfo w centroidzie). Adresy WMS i nazwy warstw w `connectorsConfig.ts`
