@@ -82,16 +82,18 @@ export interface PozycjaDzialki {
   gmina: string;
   obreb: string;
   numer: string;
+  /** Kod TERYT gminy z kaskady ULDK (gdy dostępny — ma pierwszeństwo nad mini-słownikiem). */
+  gminaTeryt?: string;
 }
 
 /**
  * Składa identyfikator działki dla ULDK: `${terytGminy}.${obreb}.${numer}`.
- * Gdy gmina nie ma znanego TERYT w mini-słowniku, używa wpisanego tekstu jako
- * pseudo-tokenu (fallback) — pozwala działać offline i ostrzega niżej w resolverze.
+ * Priorytet TERYT: kod z kaskady ULDK → mini-słownik → pseudo-token (fallback
+ * offline, sygnalizowany w resolverze).
  */
 export function skomponujId(p: PozycjaDzialki): { id: string; znanyTeryt: boolean } {
-  const teryt = terytGminy(p.wojewodztwo, p.powiat, p.gmina);
-  const token = teryt ?? `${p.wojewodztwo}/${p.gmina}`;
+  const teryt = (p.gminaTeryt && p.gminaTeryt.trim()) || terytGminy(p.wojewodztwo, p.powiat, p.gmina);
+  const token = teryt || `${p.wojewodztwo}/${p.gmina}`;
   const id = `${token}.${p.obreb}.${p.numer}`.trim();
-  return { id, znanyTeryt: teryt !== null };
+  return { id, znanyTeryt: !!teryt };
 }

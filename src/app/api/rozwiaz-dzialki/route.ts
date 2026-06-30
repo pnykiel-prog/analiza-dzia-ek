@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ blad: "Brak pozycji identyfikacyjnych." }, { status: 400 });
   }
 
-  const wynik = rozwiazDzialki(pozycje);
+  const wynik = await rozwiazDzialki(pozycje);
   const woj = pozycje[0]?.wojewodztwo ?? "";
   return NextResponse.json({ ...wynik, medianaRegionalna: medianaRegionalna(woj) });
 }

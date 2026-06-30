@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { DaneDzialki, WynikAnalizy } from "@/lib/types";
 import { domyslnaKonfiguracja, type Konfiguracja } from "@/lib/config";
-import { WOJEWODZTWA, powiaty, gminy, obreby, type PozycjaDzialki } from "@/lib/teryt";
+import { WOJEWODZTWA, type PozycjaDzialki } from "@/lib/teryt";
 import { OPIS_TRYBU, trybRynkowy, type Tryb } from "@/lib/fieldModes";
 import { Karta } from "@/components/ui";
 import { Poziom1View } from "@/components/Poziom1View";
@@ -12,7 +12,7 @@ import { Poziom3View } from "@/components/Poziom3View";
 import { liczba } from "@/lib/format";
 
 interface MetaRozw {
-  pozycje: { id: string; znaleziona: boolean; znanyTeryt: boolean }[];
+  pozycje: { id: string; znaleziona: boolean; znanyTeryt: boolean; zrodlo: "demo" | "uldk" | "brak" }[];
   przylegajace: boolean;
   bledy: string[];
   poleAutomatyczne: string[];
@@ -21,12 +21,23 @@ interface MetaRozw {
 
 const pustaPozycja = (): PozycjaDzialki => ({ wojewodztwo: "", powiat: "", gmina: "", obreb: "", numer: "" });
 
-/** Działki demonstracyjne dostępne w przykładowym providerze ULDK. */
+/** Działki demonstracyjne (z mini-słownika; gminaTeryt zapewnia trafienie w provider demo). */
 const DZIALKI_DEMO: { label: string; p: PozycjaDzialki }[] = [
-  { label: "Lesznowola (wzorcowa, młodzi)", p: { wojewodztwo: "mazowieckie", powiat: "piaseczyński", gmina: "Lesznowola", obreb: "0012", numer: "123/4" } },
-  { label: "Kórnik (senioralna)", p: { wojewodztwo: "wielkopolskie", powiat: "poznański", gmina: "Kórnik", obreb: "0005", numer: "88/2" } },
-  { label: "Janów Podlaski (białe plamy)", p: { wojewodztwo: "lubelskie", powiat: "bialski", gmina: "Janów Podlaski", obreb: "0011", numer: "45" } },
+  { label: "Lesznowola (wzorcowa, młodzi)", p: { wojewodztwo: "mazowieckie", powiat: "piaseczyński", gmina: "Lesznowola", obreb: "0012", numer: "123/4", gminaTeryt: "146509_8" } },
+  { label: "Kórnik (senioralna)", p: { wojewodztwo: "wielkopolskie", powiat: "poznański", gmina: "Kórnik", obreb: "0005", numer: "88/2", gminaTeryt: "300108_4" } },
+  { label: "Janów Podlaski (białe plamy)", p: { wojewodztwo: "lubelskie", powiat: "bialski", gmina: "Janów Podlaski", obreb: "0011", numer: "45", gminaTeryt: "061702_2" } },
 ];
+
+/** Pobiera opcje kaskady z /api/teryt (ULDK z fallbackiem do mini-słownika). */
+async function pobierzOpcjeTeryt(params: Record<string, string>): Promise<{ teryt: string; nazwa: string }[]> {
+  try {
+    const r = await fetch(`/api/teryt?${new URLSearchParams(params).toString()}`);
+    const d = await r.json();
+    return Array.isArray(d.pozycje) ? d.pozycje : [];
+  } catch {
+    return [];
+  }
+}
 
 export default function NowaAnalizaPage() {
   const [krok, setKrok] = useState<1 | 2 | 3>(1);
@@ -46,22 +57,16 @@ export default function NowaAnalizaPage() {
   const [p3, setP3] = useState<Record<string, string>>({});
 
   // ── Krok 1: identyfikacja → rozwiązanie → P1 ──────────────────────────────
-  function aktualizujPozycje(i: number, pole: keyof PozycjaDzialki, v: string) {
-    setPozycje((ps) =>
-      ps.map((p, idx) => {
-        if (idx !== i) return p;
-        const np = { ...p, [pole]: v };
-        if (pole === "wojewodztwo") Object.assign(np, { powiat: "", gmina: "", obreb: "" });
-        if (pole === "powiat") Object.assign(np, { gmina: "", obreb: "" });
-        if (pole === "gmina") Object.assign(np, { obreb: "" });
-        return np;
-      })
-    );
+  function patchPozycje(i: number, patch: Partial<PozycjaDzialki>) {
+    setPozycje((ps) => ps.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
   }
   function dodajPozycje() {
     setPozycje((ps) => {
       const pierwsza = ps[0];
-      return [...ps, { ...pustaPozycja(), wojewodztwo: pierwsza.wojewodztwo, powiat: pierwsza.powiat, gmina: pierwsza.gmina, obreb: pierwsza.obreb }];
+      return [
+        ...ps,
+        { ...pustaPozycja(), wojewodztwo: pierwsza.wojewodztwo, powiat: pierwsza.powiat, gmina: pierwsza.gmina, obreb: pierwsza.obreb, gminaTeryt: pierwsza.gminaTeryt },
+      ];
     });
   }
   function usunPozycje(i: number) {
@@ -273,7 +278,7 @@ export default function NowaAnalizaPage() {
                   i={i}
                   p={p}
                   pierwsza={i === 0}
-                  onZmiana={aktualizujPozycje}
+                  onPatch={patchPozycje}
                   onUsun={() => usunPozycje(i)}
                   mozeUsunac={pozycje.length > 1}
                 />
@@ -488,48 +493,103 @@ function Kroki({ krok, maPoziom2 }: { krok: number; maPoziom2: boolean }) {
   );
 }
 
+type OpcjaT = { teryt: string; nazwa: string };
+
 function PozycjaWiersz({
   i,
   p,
   pierwsza,
-  onZmiana,
+  onPatch,
   onUsun,
   mozeUsunac,
 }: {
   i: number;
   p: PozycjaDzialki;
   pierwsza: boolean;
-  onZmiana: (i: number, pole: keyof PozycjaDzialki, v: string) => void;
+  onPatch: (i: number, patch: Partial<PozycjaDzialki>) => void;
   onUsun: () => void;
   mozeUsunac: boolean;
 }) {
-  const listaPow = p.wojewodztwo ? powiaty(p.wojewodztwo) : [];
-  const listaGmin = p.wojewodztwo && p.powiat ? gminy(p.wojewodztwo, p.powiat) : [];
-  const listaObr = p.wojewodztwo && p.powiat && p.gmina ? obreby(p.wojewodztwo, p.powiat, p.gmina) : [];
+  const [wojOpts, setWojOpts] = useState<OpcjaT[]>(WOJEWODZTWA.map((w) => ({ teryt: w.kod, nazwa: w.nazwa })));
+  const [powOpts, setPowOpts] = useState<OpcjaT[]>([]);
+  const [gmOpts, setGmOpts] = useState<OpcjaT[]>([]);
+  const [obrOpts, setObrOpts] = useState<OpcjaT[]>([]);
+  const [wojTeryt, setWojTeryt] = useState("");
+  const [powiatTeryt, setPowiatTeryt] = useState("");
+
+  // Kaskada z ULDK (z fallbackiem). Każdy poziom dociąga się po wyborze rodzica.
+  useEffect(() => {
+    pobierzOpcjeTeryt({ poziom: "wojewodztwa" }).then((o) => o.length && setWojOpts(o));
+  }, []);
+  useEffect(() => {
+    if (!wojTeryt) return setPowOpts([]);
+    pobierzOpcjeTeryt({ poziom: "powiaty", wojTeryt, wojNazwa: p.wojewodztwo }).then(setPowOpts);
+  }, [wojTeryt, p.wojewodztwo]);
+  useEffect(() => {
+    if (!powiatTeryt) return setGmOpts([]);
+    pobierzOpcjeTeryt({ poziom: "gminy", powiatTeryt, wojNazwa: p.wojewodztwo, powiatNazwa: p.powiat }).then(setGmOpts);
+  }, [powiatTeryt, p.wojewodztwo, p.powiat]);
+  useEffect(() => {
+    if (!p.gminaTeryt) return setObrOpts([]);
+    pobierzOpcjeTeryt({ poziom: "obreby", gminaTeryt: p.gminaTeryt, wojNazwa: p.wojewodztwo, powiatNazwa: p.powiat, gminaNazwa: p.gmina }).then(setObrOpts);
+  }, [p.gminaTeryt, p.wojewodztwo, p.powiat, p.gmina]);
+
   return (
     <div className="grid grid-cols-2 lg:grid-cols-6 gap-2 items-end border border-slate-100 rounded-lg p-3">
       <Lab label="Województwo *">
-        <select value={p.wojewodztwo} onChange={(e) => onZmiana(i, "wojewodztwo", e.target.value)} className="inp bg-white">
+        <select
+          value={p.wojewodztwo}
+          onChange={(e) => {
+            const opt = wojOpts.find((o) => o.nazwa === e.target.value);
+            setWojTeryt(opt?.teryt ?? "");
+            setPowiatTeryt("");
+            onPatch(i, { wojewodztwo: e.target.value, powiat: "", gmina: "", obreb: "", gminaTeryt: undefined });
+          }}
+          className="inp bg-white"
+        >
           <option value="">—</option>
-          {WOJEWODZTWA.map((w) => (
-            <option key={w.kod} value={w.nazwa}>{w.nazwa}</option>
+          {wojOpts.map((w) => (
+            <option key={w.teryt} value={w.nazwa}>{w.nazwa}</option>
           ))}
         </select>
       </Lab>
       <Lab label="Powiat">
-        <input list={`pow-${i}`} value={p.powiat} onChange={(e) => onZmiana(i, "powiat", e.target.value)} className="inp" />
-        <datalist id={`pow-${i}`}>{listaPow.map((x) => <option key={x} value={x} />)}</datalist>
+        <input
+          list={`pow-${i}`}
+          value={p.powiat}
+          onChange={(e) => {
+            const opt = powOpts.find((o) => o.nazwa === e.target.value);
+            setPowiatTeryt(opt?.teryt ?? "");
+            onPatch(i, { powiat: e.target.value, gmina: "", obreb: "", gminaTeryt: undefined });
+          }}
+          className="inp"
+        />
+        <datalist id={`pow-${i}`}>{powOpts.map((x) => <option key={x.teryt} value={x.nazwa} />)}</datalist>
       </Lab>
       <Lab label="Gmina">
-        <input list={`gm-${i}`} value={p.gmina} onChange={(e) => onZmiana(i, "gmina", e.target.value)} className="inp" />
-        <datalist id={`gm-${i}`}>{listaGmin.map((x) => <option key={x} value={x} />)}</datalist>
+        <input
+          list={`gm-${i}`}
+          value={p.gmina}
+          onChange={(e) => {
+            const opt = gmOpts.find((o) => o.nazwa === e.target.value);
+            onPatch(i, { gmina: e.target.value, obreb: "", gminaTeryt: opt?.teryt });
+          }}
+          className="inp"
+        />
+        <datalist id={`gm-${i}`}>{gmOpts.map((x) => <option key={x.teryt} value={x.nazwa} />)}</datalist>
       </Lab>
       <Lab label="Obręb">
-        <input list={`ob-${i}`} value={p.obreb} onChange={(e) => onZmiana(i, "obreb", e.target.value)} className="inp" placeholder="np. 0012" />
-        <datalist id={`ob-${i}`}>{listaObr.map((x) => <option key={x} value={x} />)}</datalist>
+        <input
+          list={`ob-${i}`}
+          value={p.obreb}
+          onChange={(e) => onPatch(i, { obreb: e.target.value })}
+          className="inp"
+          placeholder="np. 0012"
+        />
+        <datalist id={`ob-${i}`}>{obrOpts.map((x) => <option key={x.teryt} value={x.teryt}>{x.nazwa}</option>)}</datalist>
       </Lab>
       <Lab label="Numer działki *">
-        <input value={p.numer} onChange={(e) => onZmiana(i, "numer", e.target.value)} className="inp" placeholder="np. 123/4" />
+        <input value={p.numer} onChange={(e) => onPatch(i, { numer: e.target.value })} className="inp" placeholder="np. 123/4" />
       </Lab>
       <div>
         {!pierwsza && mozeUsunac && (
@@ -548,7 +608,7 @@ function PotwierdzenieDanych({ dane, meta }: { dane: DaneDzialki; meta: MetaRozw
       <div className="flex flex-wrap gap-2 mb-3 text-xs">
         {meta.pozycje.map((p, i) => (
           <span key={i} className={`badge ${p.znaleziona ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
-            {p.id} {p.znaleziona ? "✓ ULDK" : "· brak w ULDK"}
+            {p.id} {p.zrodlo === "uldk" ? "✓ ULDK" : p.zrodlo === "demo" ? "✓ demo" : "· nie znaleziono"}
           </span>
         ))}
       </div>

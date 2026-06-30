@@ -92,9 +92,28 @@ stopniowo wraz z poziomem (tryby **R / R? / A / A° / A± / S**):
 
 Brak danej w polu A/A°/A± nie blokuje — obniża pewność (zasada „brak danych ≠ nie").
 
+## Integracja ULDK (geometria + kaskada TERYT)
+
+Panel `/nowa` korzysta z **realnego ULDK** (GUGiK):
+
+- **Kaskada TERYT** (`/api/teryt`) pobiera województwa/powiaty/gminy/obręby z ULDK
+  (realne kody TERYT dla całej Polski), z **fallbackiem do mini-słownika**, gdy
+  ULDK jest niedostępny.
+- **Geometria działki** (`src/lib/data/uldk.ts` → `GetParcelById`): z WKT
+  (EPSG:2180) liczona jest powierzchnia (formuła Gaussa), front i proporcja boków
+  (`src/lib/geo.ts`, testowane offline).
+- Resolver pobiera dane w kolejności: provider demonstracyjny (3 działki) →
+  **ULDK** (dla dowolnej realnej działki) → szkielet z ręczną powierzchnią.
+
+> **Sieć:** ULDK wymaga dostępu wychodzącego do `uldk.gugik.gov.pl`. Działa na
+> hostingu z otwartą siecią (np. Vercel). W środowiskach z polityką egress
+> blokującą ten host wywołania degradują się gracefully do fallbacku.
+
 ## Warstwa danych
 
-Na tym etapie warstwa zwraca **dane przykładowe** (3 działki, w tym przypadek z białymi plamami).
+Provider demonstracyjny zwraca **dane przykładowe** (3 działki, w tym przypadek z białymi plamami);
+dla pozostałych działek geometria pochodzi z ULDK, a atrybuty scoringowe pozostają do uzupełnienia
+ręcznego na Poziomie 2 (do czasu podpięcia GUS/MPZP/OSM).
 Architektura adapterów (`lib/data/adapters.ts`) opisuje realne źródła i ich endpointy
 (ULDK, EGiB, KIMPZP/Rejestr Urbanistyczny, NMT, ISOK, GUS BDL, OSM, GDOŚ, RSPO/RPWDL, RCiWN, BGK/KZN) —
 podpięcie realnych API nie wymaga zmian w silnikach. Dane planistyczne migrują 🔴/🟡 → 🟢 wraz

@@ -11,6 +11,9 @@ import type { DaneDzialki } from "../types";
 import { DZIALKI_PRZYKLADOWE } from "./sample";
 import { skomponujId, type PozycjaDzialki } from "../teryt";
 import { statusRynkowy } from "../fieldModes";
+import { pobierzDzialkePoId } from "./uldk";
+
+export type ZrodloDanych = "demo" | "uldk" | "brak";
 
 /** Orientacyjne mediany regionalne (fallback rynkowy, zł/m²). */
 const MEDIANA_REGIONALNA: Record<string, { czynsz: number; cenaNowych: number; wartoscOdtworzeniowa: number }> = {
@@ -32,6 +35,7 @@ export interface WynikPozycji {
   id: string;
   znaleziona: boolean;
   znanyTeryt: boolean;
+  zrodlo: ZrodloDanych;
 }
 
 export interface MetaRozwiazania {
@@ -83,7 +87,60 @@ const POLA_AUTO: (keyof DaneDzialki)[] = [
   "pustostanyPct",
 ];
 
-export function rozwiazDzialki(pozycje: PozycjaDzialki[]): RozwiazanieDzialek {
+/** Pusty szkielet danych z samej identyfikacji (reszta = białe plamy). */
+function szkieletDanych(id: string, p: PozycjaDzialki): DaneDzialki {
+  return {
+    id,
+    teryt: p.gminaTeryt ?? "",
+    gmina: p.gmina,
+    powiat: p.powiat,
+    wojewodztwo: p.wojewodztwo,
+    powierzchniaM2: 0,
+    frontM: null,
+    proporcjaBokow: null,
+    budynkiIstniejace: null,
+    klasaUzytku: null,
+    gruntLesny: null,
+    gruntRolnyKlasaIdoIII: null,
+    statusPlanistyczny: "brak_danych",
+    wskaznikiPlanistyczne: null,
+    zabudowaMieszkaniowaWSasiedztwie: null,
+    przeznaczenieSprzeczneZMieszkaniowa: null,
+    dostepDrogaPubliczna: null,
+    sredniSpadekPct: null,
+    ryzykoPowodzioweSzczegolne: null,
+    osuwisko: null,
+    terenGorniczy: null,
+    odlegloscDoSieciM: null,
+    odlegloscDoZabudowyM: null,
+    czasDojazdAglomeracjaMin: null,
+    przystanekZCzestotliwoscia: null,
+    uslugiPodstawowePieszo: null,
+    pozWZasiegu: null,
+    zlobkiSzkolyWZasiegu: null,
+    udzial2039Pct: null,
+    mediana2039Woj: null,
+    saldoMigracjiMlodzi: null,
+    udzial65PlusPct: null,
+    trend65Plus: null,
+    populacjaStabilna: null,
+    trendLudnosc: null,
+    bezrobociePct: null,
+    liczbaPodmiotowGosp: null,
+    natura2000: null,
+    ochronaWykluczajaca: null,
+    strefaKonserwatorska: null,
+    wartoscOdtworzeniowaM2: null,
+    czynszRynkowyM2: null,
+    cenaNowychM2: null,
+    kosztBudowyM2: null,
+    cenaGruntu: null,
+    pustostanyPct: null,
+    dochodyGospDomowe: null,
+  };
+}
+
+export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<RozwiazanieDzialek> {
   const bledy: string[] = [];
   const wynikiPozycji: WynikPozycji[] = [];
   const znalezione: DaneDzialki[] = [];
@@ -95,11 +152,32 @@ export function rozwiazDzialki(pozycje: PozycjaDzialki[]): RozwiazanieDzialek {
       continue;
     }
     const { id, znanyTeryt } = skomponujId(p);
-    const dane = DZIALKI_PRZYKLADOWE.find((d) => d.id === id);
-    wynikiPozycji.push({ pozycja: p, id, znaleziona: !!dane, znanyTeryt });
     idy.push(id);
+
+    // 1) Provider demonstracyjny (działki przykładowe z bogatymi atrybutami).
+    let dane: DaneDzialki | null = DZIALKI_PRZYKLADOWE.find((d) => d.id === id) ?? null;
+    let zrodlo: ZrodloDanych = dane ? "demo" : "brak";
+
+    // 2) Realne ULDK — geometria + atrybuty administracyjne (reszta to białe plamy).
+    if (!dane) {
+      const u = await pobierzDzialkePoId(id);
+      if (u) {
+        dane = {
+          ...szkieletDanych(id, p),
+          powierzchniaM2: u.powierzchniaM2,
+          frontM: u.frontM,
+          proporcjaBokow: u.proporcjaBokow,
+          wojewodztwo: u.wojewodztwo || p.wojewodztwo,
+          powiat: u.powiat || p.powiat,
+          gmina: u.gmina || p.gmina,
+        };
+        zrodlo = "uldk";
+      }
+    }
+
+    wynikiPozycji.push({ pozycja: p, id, znaleziona: !!dane, znanyTeryt, zrodlo });
     if (dane) znalezione.push(dane);
-    else bledy.push(`Działka ${id} nie znaleziona w ULDK (provider przykładowy).`);
+    else bledy.push(`Działka ${id} nie znaleziona (ULDK ani provider demonstracyjny).`);
   }
 
   // Walidacja przylegania (symulowana): wymaga, by wszystkie istniały.
@@ -112,57 +190,9 @@ export function rozwiazDzialki(pozycje: PozycjaDzialki[]): RozwiazanieDzialek {
   if (znalezione.length > 0) {
     dane = scalDane(znalezione, pozycje, idy);
   } else if (pozycje.length > 0) {
-    // Brak danych automatycznych: budujemy szkielet z samej identyfikacji.
+    // Brak danych automatycznych: szkielet z samej identyfikacji (powierzchnia ręczna).
     const p = pozycje[0];
-    dane = {
-      id: idy.join(" + ") || skomponujId(p).id,
-      teryt: "",
-      gmina: p.gmina,
-      powiat: p.powiat,
-      wojewodztwo: p.wojewodztwo,
-      powierzchniaM2: 0,
-      frontM: null,
-      proporcjaBokow: null,
-      budynkiIstniejace: null,
-      klasaUzytku: null,
-      gruntLesny: null,
-      gruntRolnyKlasaIdoIII: null,
-      statusPlanistyczny: "brak_danych",
-      wskaznikiPlanistyczne: null,
-      zabudowaMieszkaniowaWSasiedztwie: null,
-      przeznaczenieSprzeczneZMieszkaniowa: null,
-      dostepDrogaPubliczna: null,
-      sredniSpadekPct: null,
-      ryzykoPowodzioweSzczegolne: null,
-      osuwisko: null,
-      terenGorniczy: null,
-      odlegloscDoSieciM: null,
-      odlegloscDoZabudowyM: null,
-      czasDojazdAglomeracjaMin: null,
-      przystanekZCzestotliwoscia: null,
-      uslugiPodstawowePieszo: null,
-      pozWZasiegu: null,
-      zlobkiSzkolyWZasiegu: null,
-      udzial2039Pct: null,
-      mediana2039Woj: null,
-      saldoMigracjiMlodzi: null,
-      udzial65PlusPct: null,
-      trend65Plus: null,
-      populacjaStabilna: null,
-      trendLudnosc: null,
-      bezrobociePct: null,
-      liczbaPodmiotowGosp: null,
-      natura2000: null,
-      ochronaWykluczajaca: null,
-      strefaKonserwatorska: null,
-      wartoscOdtworzeniowaM2: null,
-      czynszRynkowyM2: null,
-      cenaNowychM2: null,
-      kosztBudowyM2: null,
-      cenaGruntu: null,
-      pustostanyPct: null,
-      dochodyGospDomowe: null,
-    };
+    dane = szkieletDanych(idy.join(" + ") || skomponujId(p).id, p);
   }
 
   const poleAutomatyczne = dane
