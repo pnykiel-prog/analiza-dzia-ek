@@ -20,6 +20,7 @@ export async function POST(req: Request) {
   }
 
   const wynik = await rozwiazDzialki(pozycje);
-  const woj = pozycje[0]?.wojewodztwo ?? "";
-  return NextResponse.json({ ...wynik, medianaRegionalna: medianaRegionalna(woj) });
+  const woj = wynik.dane?.wojewodztwo || pozycje[0]?.wojewodztwo || "";
+  const gmina = wynik.dane?.gmina || pozycje[0]?.gmina || "";
+  return NextResponse.json({ ...wynik, medianaRegionalna: medianaRegionalna(woj, gmina) });
 }

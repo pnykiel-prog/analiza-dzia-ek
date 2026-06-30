@@ -15,22 +15,15 @@ import { pobierzDzialkePoId, pobierzCentroid4326 } from "./uldk";
 import { centroid, czyPrzylegaja } from "../geo";
 import { uruchomKonektory } from "./connectors";
 import type { MetaPola, Teren } from "./connectors/types";
+import { medianaRynkowa, wartoscOdtworzeniowaDla } from "../config-rynek";
 
 export type ZrodloDanych = "demo" | "uldk" | "brak";
 
-/** Orientacyjne mediany regionalne (fallback rynkowy, zł/m²). */
-const MEDIANA_REGIONALNA: Record<string, { czynsz: number; cenaNowych: number; wartoscOdtworzeniowa: number }> = {
-  mazowieckie: { czynsz: 55, cenaNowych: 11000, wartoscOdtworzeniowa: 7766 },
-  wielkopolskie: { czynsz: 47, cenaNowych: 9200, wartoscOdtworzeniowa: 6900 },
-  lubelskie: { czynsz: 38, cenaNowych: 7600, wartoscOdtworzeniowa: 6200 },
-  malopolskie: { czynsz: 52, cenaNowych: 12500, wartoscOdtworzeniowa: 7400 },
-  pomorskie: { czynsz: 54, cenaNowych: 12000, wartoscOdtworzeniowa: 7300 },
-  dolnoslaskie: { czynsz: 50, cenaNowych: 11000, wartoscOdtworzeniowa: 7100 },
-};
-const MEDIANA_DOMYSLNA = { czynsz: 42, cenaNowych: 8500, wartoscOdtworzeniowa: 6500 };
-
-export function medianaRegionalna(woj: string) {
-  return MEDIANA_REGIONALNA[woj] ?? MEDIANA_DOMYSLNA;
+/** Podpowiedzi regionalne (fallback) dla prefillu P2/P3 — z tabel M3. */
+export function medianaRegionalna(woj: string, gmina = "") {
+  const m = medianaRynkowa(woj);
+  const w = wartoscOdtworzeniowaDla(woj, gmina);
+  return { czynsz: m.czynsz, cenaNowych: m.cenaNowych, wartoscOdtworzeniowa: w.wartosc };
 }
 
 export interface WynikPozycji {
@@ -243,11 +236,17 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
     ? POLA_AUTO.filter((k) => dane![k] !== null && dane![k] !== undefined).map(String)
     : [];
 
-  // Symulacja drabiny przestrzennej: dostępna dana rynkowa → N wiarygodne,
-  // brak → N poniżej progu (uruchamia fallback/override na P2).
+  // Drabina przestrzenna: N zależy od PEWNOŚCI źródła (oferty lokalne vs fallback
+  // regionalny), nie od samej obecności wartości — by nie udawać „wiarygodnych".
+  const nDla = (pole: keyof DaneDzialki, wiar: number, fallb: number): number => {
+    if (dane?.[pole] == null) return 0;
+    const m = metaPol.find((x) => x.pole === pole);
+    if (!m) return wiar; // dane demo (bez metadanych konektora) traktujemy jak wiarygodne
+    return m.pewnosc >= 70 ? wiar : fallb;
+  };
   const rynek = {
-    czynszN: dane?.czynszRynkowyM2 != null ? 35 : 4,
-    cenaNowychN: dane?.cenaNowychM2 != null ? 32 : 6,
+    czynszN: nDla("czynszRynkowyM2", 35, 4),
+    cenaNowychN: nDla("cenaNowychM2", 32, 6),
   };
 
   return {
