@@ -50,6 +50,7 @@ export default function NowaAnalizaPage() {
   const [blad, setBlad] = useState<string | null>(null);
   const [licze, setLicze] = useState(false);
   const [recznaPow, setRecznaPow] = useState("");
+  const [trybWejscia, setTrybWejscia] = useState<"kaskada" | "id">("kaskada");
 
   // Override P2 (A±/R) — wartości jako stringi + zbiór skorygowanych pól.
   const [p2, setP2] = useState<Record<string, string>>({});
@@ -77,8 +78,12 @@ export default function NowaAnalizaPage() {
   async function analizujP1(e: React.FormEvent) {
     e.preventDefault();
     setBlad(null);
-    if (pozycje.some((p) => !p.numer.trim())) return setBlad("Każda pozycja musi mieć numer działki.");
-    if (!pozycje[0].wojewodztwo) return setBlad("Wybierz przynajmniej województwo pierwszej działki.");
+    if (trybWejscia === "id") {
+      if (pozycje.some((p) => !p.idBezposredni?.trim())) return setBlad("Podaj pełny identyfikator ULDK dla każdej działki.");
+    } else {
+      if (pozycje.some((p) => !p.numer.trim())) return setBlad("Każda pozycja musi mieć numer działki.");
+      if (!pozycje[0].wojewodztwo) return setBlad("Wybierz przynajmniej województwo pierwszej działki.");
+    }
     setLicze(true);
     try {
       const r = await fetch("/api/rozwiaz-dzialki", {
@@ -264,26 +269,43 @@ export default function NowaAnalizaPage() {
       {krok === 1 && (
         <form onSubmit={analizujP1} className="space-y-4">
           <Karta tytul="Poziom 1 — identyfikacja działek" podtytul="Jedyne widoczne pola do wprowadzenia. Z TERYT składany jest identyfikator ULDK.">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <span className="text-xs text-slate-500">Działki przykładowe (ULDK demo):</span>
-              {DZIALKI_DEMO.map((d) => (
-                <button key={d.label} type="button" onClick={() => setPozycje([{ ...d.p }])} className="text-xs border border-slate-300 rounded px-2 py-1 hover:bg-slate-50">
-                  {d.label}
+            {/* Wybór trybu wejścia */}
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+              <div className="inline-flex rounded-lg border border-slate-300 overflow-hidden text-sm">
+                <button type="button" onClick={() => setTrybWejscia("kaskada")} className={`px-3 py-1.5 ${trybWejscia === "kaskada" ? "bg-slate-900 text-white" : "bg-white text-slate-600"}`}>
+                  Kaskada TERYT
                 </button>
-              ))}
+                <button type="button" onClick={() => setTrybWejscia("id")} className={`px-3 py-1.5 ${trybWejscia === "id" ? "bg-slate-900 text-white" : "bg-white text-slate-600"}`}>
+                  Identyfikator ULDK
+                </button>
+              </div>
+              {trybWejscia === "kaskada" && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-slate-500">Przykłady:</span>
+                  {DZIALKI_DEMO.map((d) => (
+                    <button key={d.label} type="button" onClick={() => setPozycje([{ ...d.p }])} className="text-xs border border-slate-300 rounded px-2 py-1 hover:bg-slate-50">
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="space-y-3">
-              {pozycje.map((p, i) => (
-                <PozycjaWiersz
-                  key={i}
-                  i={i}
-                  p={p}
-                  pierwsza={i === 0}
-                  onPatch={patchPozycje}
-                  onUsun={() => usunPozycje(i)}
-                  mozeUsunac={pozycje.length > 1}
-                />
-              ))}
+              {pozycje.map((p, i) =>
+                trybWejscia === "id" ? (
+                  <IdWiersz key={i} i={i} p={p} onPatch={patchPozycje} onUsun={() => usunPozycje(i)} mozeUsunac={pozycje.length > 1} />
+                ) : (
+                  <PozycjaWiersz
+                    key={i}
+                    i={i}
+                    p={p}
+                    pierwsza={i === 0}
+                    onPatch={patchPozycje}
+                    onUsun={() => usunPozycje(i)}
+                    mozeUsunac={pozycje.length > 1}
+                  />
+                )
+              )}
             </div>
             <button type="button" onClick={dodajPozycje} className="mt-3 text-sm border border-slate-300 rounded px-3 py-1.5 hover:bg-slate-50">
               ＋ Dodaj działkę
@@ -490,6 +512,39 @@ function Kroki({ krok, maPoziom2 }: { krok: number; maPoziom2: boolean }) {
           <span className="font-bold">{e.n}</span> {e.t}
         </div>
       ))}
+    </div>
+  );
+}
+
+function IdWiersz({
+  i,
+  p,
+  onPatch,
+  onUsun,
+  mozeUsunac,
+}: {
+  i: number;
+  p: PozycjaDzialki;
+  onPatch: (i: number, patch: Partial<PozycjaDzialki>) => void;
+  onUsun: () => void;
+  mozeUsunac: boolean;
+}) {
+  return (
+    <div className="flex items-end gap-2 border border-slate-100 rounded-lg p-3">
+      <label className="text-sm flex-1">
+        <span className="text-xs text-slate-500">Identyfikator działki (ULDK) *</span>
+        <input
+          value={p.idBezposredni ?? ""}
+          onChange={(e) => onPatch(i, { idBezposredni: e.target.value })}
+          className="inp mt-0.5 font-mono"
+          placeholder="np. 160707_3.0006.51/2  (TERYT_gminy.obręb.numer)"
+        />
+      </label>
+      {mozeUsunac && (
+        <button type="button" onClick={onUsun} className="text-xs text-red-600 border border-red-200 rounded px-2 py-2 hover:bg-red-50">
+          Usuń
+        </button>
+      )}
     </div>
   );
 }

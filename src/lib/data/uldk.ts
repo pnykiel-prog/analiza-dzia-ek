@@ -17,6 +17,7 @@
  */
 
 import { metrykiZWkt } from "../geo";
+import { logDebug, skrot } from "./debug";
 
 const BAZA = "https://uldk.gugik.gov.pl/";
 const TIMEOUT_MS = 8000;
@@ -40,13 +41,21 @@ export function parsujOdpowiedzUldk(text: string): ParsowanaOdpowiedz {
 
 async function uldkFetch(params: Record<string, string>): Promise<ParsowanaOdpowiedz | null> {
   const qs = new URLSearchParams(params).toString();
+  const url = `${BAZA}?${qs}`;
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
-    const r = await fetch(`${BAZA}?${qs}`, { signal: ctrl.signal, headers: { Accept: "text/plain" } });
-    if (!r.ok) return null;
-    return parsujOdpowiedzUldk(await r.text());
-  } catch {
+    logDebug(`ULDK → ${url}`);
+    const r = await fetch(url, { signal: ctrl.signal, headers: { Accept: "text/plain" } });
+    if (!r.ok) {
+      logDebug(`ULDK HTTP ${r.status} dla ${params.request}`);
+      return null;
+    }
+    const txt = await r.text();
+    logDebug(`ULDK ← ${params.request}: ${skrot(txt)}`);
+    return parsujOdpowiedzUldk(txt);
+  } catch (e) {
+    logDebug(`ULDK błąd ${params.request}: ${String(e)}`);
     return null; // timeout / brak sieci / blokada egress → fallback wyżej
   } finally {
     clearTimeout(t);

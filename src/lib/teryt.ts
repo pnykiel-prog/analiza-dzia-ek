@@ -84,6 +84,8 @@ export interface PozycjaDzialki {
   numer: string;
   /** Kod TERYT gminy z kaskady ULDK (gdy dostępny — ma pierwszeństwo nad mini-słownikiem). */
   gminaTeryt?: string;
+  /** Pełny identyfikator ULDK wpisany wprost (omija składanie z nazw/TERYT). */
+  idBezposredni?: string;
 }
 
 /**
@@ -92,6 +94,10 @@ export interface PozycjaDzialki {
  * offline, sygnalizowany w resolverze).
  */
 export function skomponujId(p: PozycjaDzialki): { id: string; znanyTeryt: boolean } {
+  // Tryb bezpośredni: użytkownik podał pełny identyfikator ULDK.
+  if (p.idBezposredni && p.idBezposredni.trim()) {
+    return { id: p.idBezposredni.trim(), znanyTeryt: true };
+  }
   const teryt = (p.gminaTeryt && p.gminaTeryt.trim()) || terytGminy(p.wojewodztwo, p.powiat, p.gmina);
   const token = teryt || `${p.wojewodztwo}/${p.gmina}`;
   // Obręb dopełniony zerami do 4 cyfr (wymóg formatu identyfikatora ULDK).

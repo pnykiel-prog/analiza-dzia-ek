@@ -155,14 +155,16 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
   const idy: string[] = [];
 
   for (const pWej of pozycje) {
-    if (!pWej.numer.trim()) {
-      bledy.push("Pozycja bez numeru działki — pominięta.");
+    const idWpisany = pWej.idBezposredni?.trim();
+    if (!idWpisany && !pWej.numer.trim()) {
+      bledy.push("Pozycja bez numeru działki (lub identyfikatora) — pominięta.");
       continue;
     }
     // Ustal kod TERYT gminy (jeśli klient go nie złapał) z nazw przez słownik ULDK,
     // aby złożyć poprawny identyfikator zamiast pseudo-tokenu z nazw.
+    // Pomijane w trybie bezpośredniego identyfikatora.
     let p = pWej;
-    if (!p.gminaTeryt && p.wojewodztwo && p.powiat && p.gmina) {
+    if (!idWpisany && !p.gminaTeryt && p.wojewodztwo && p.powiat && p.gmina) {
       const t = await rozwiazTerytGminy(p.wojewodztwo, p.powiat, p.gmina);
       if (t) p = { ...p, gminaTeryt: t };
     }
