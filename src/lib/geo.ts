@@ -108,3 +108,63 @@ export function metrykiZWkt(wkt: string): MetryGeometrii {
 export function bboxStykaja(a: BBox, b: BBox, tol = 2): boolean {
   return a.minX - tol <= b.maxX && b.minX - tol <= a.maxX && a.minY - tol <= b.maxY && b.minY - tol <= a.maxY;
 }
+
+/** Centroid (średnia wierzchołków pierścienia zewnętrznego) — do zapytań WMS GetFeatureInfo. */
+export function centroid(wkt: string): Punkt | null {
+  const ring = parsujWielokaty(wkt)[0]?.[0];
+  if (!ring || ring.length === 0) return null;
+  // Pomiń zdublowany wierzchołek zamykający pierścień.
+  const pkt =
+    ring.length > 1 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1]
+      ? ring.slice(0, -1)
+      : ring;
+  const sx = pkt.reduce((s, p) => s + p[0], 0);
+  const sy = pkt.reduce((s, p) => s + p[1], 0);
+  return [sx / pkt.length, sy / pkt.length];
+}
+
+function minOdlegloscWierzcholkow(a: Punkt[], b: Punkt[]): number {
+  let min = Infinity;
+  for (const [ax, ay] of a) {
+    for (const [bx, by] of b) {
+      const d = Math.hypot(ax - bx, ay - by);
+      if (d < min) min = d;
+    }
+  }
+  return min;
+}
+
+/**
+ * Czy zbiór działek (WKT) tworzy jeden spójny, przylegający blok.
+ * Przyleganie liczone NA GEOMETRII (wymóg wytycznych): dwie działki sąsiadują,
+ * gdy ich obwiednie się stykają i mają wspólny (bliski) wierzchołek granicy.
+ * Spójność całości sprawdzana grafowo (BFS po relacji sąsiedztwa).
+ */
+export function czyPrzylegaja(wktList: string[], tol = 1.5): boolean {
+  if (wktList.length <= 1) return true;
+  const ringi = wktList.map((w) => parsujWielokaty(w).flatMap((m) => m[0]));
+  const boxy = wktList.map((w) => bbox(w));
+  const n = wktList.length;
+  const sasiedzi: number[][] = Array.from({ length: n }, () => []);
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const bi = boxy[i], bj = boxy[j];
+      const blisko = bi && bj && bboxStykaja(bi, bj, tol) && minOdlegloscWierzcholkow(ringi[i], ringi[j]) <= tol;
+      if (blisko) {
+        sasiedzi[i].push(j);
+        sasiedzi[j].push(i);
+      }
+    }
+  }
+  // BFS spójności od węzła 0.
+  const odwiedzone = new Set<number>([0]);
+  const kolejka = [0];
+  while (kolejka.length) {
+    const v = kolejka.shift()!;
+    for (const s of sasiedzi[v]) if (!odwiedzone.has(s)) {
+      odwiedzone.add(s);
+      kolejka.push(s);
+    }
+  }
+  return odwiedzone.size === n;
+}

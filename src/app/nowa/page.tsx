@@ -17,6 +17,7 @@ interface MetaRozw {
   bledy: string[];
   poleAutomatyczne: string[];
   rynek: { czynszN: number; cenaNowychN: number };
+  raportZrodel?: { klucz: string; zrodlo: string; status: string; debug?: string }[];
 }
 
 const pustaPozycja = (): PozycjaDzialki => ({ wojewodztwo: "", powiat: "", gmina: "", obreb: "", numer: "" });
@@ -618,6 +619,22 @@ function PotwierdzenieDanych({ dane, meta }: { dane: DaneDzialki; meta: MetaRozw
         <Odczyt e="Gmina" v={dane.gmina || "—"} />
         <Odczyt e="Pola automatyczne" v={`${meta.poleAutomatyczne.length} wypełnionych`} />
       </div>
+      {meta.raportZrodel && meta.raportZrodel.length > 0 && (
+        <div className="mt-3">
+          <div className="text-xs font-medium text-slate-500 mb-1">Raport źródeł danych</div>
+          <div className="flex flex-wrap gap-2">
+            {meta.raportZrodel.map((r, i) => {
+              const kolor = r.status === "ok" ? "bg-green-100 text-green-700" : r.status === "blad" ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-500";
+              const ikona = r.status === "ok" ? "✓" : r.status === "blad" ? "✕" : "–";
+              return (
+                <span key={i} className={`badge ${kolor}`} title={r.debug ?? ""}>
+                  {ikona} {r.zrodlo} {r.status !== "ok" && `(${r.status})`}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
       {meta.bledy.length > 0 && (
         <ul className="mt-3 space-y-1">
           {meta.bledy.map((b, i) => (
