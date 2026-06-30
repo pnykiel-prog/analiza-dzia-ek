@@ -23,7 +23,10 @@ export default function RootLayout({
             </Link>
             <nav className="flex gap-4 text-sm">
               <Link href="/" className="hover:text-slate-300">
-                Analiza
+                Działki
+              </Link>
+              <Link href="/nowa" className="hover:text-slate-300">
+                Nowa analiza
               </Link>
               <Link href="/konfiguracja" className="hover:text-slate-300">
                 Konfiguracja
