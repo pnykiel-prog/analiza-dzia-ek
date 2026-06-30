@@ -6,6 +6,10 @@
 
 import { logDebug as log } from "../debug";
 
+/** Przeglądarkowy User-Agent — część usług (WMS/WAF) odrzuca zapytania bez niego. */
+export const USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36";
+
 export interface OpcjeFetch {
   timeoutMs?: number;
   proby?: number; // łączna liczba prób (1 = bez retry)
@@ -24,7 +28,7 @@ export async function fetchTekst(url: string, opcje: OpcjeFetch = {}): Promise<s
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-      const r = await fetch(url, { signal: ctrl.signal, headers: naglowki });
+      const r = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": USER_AGENT, ...naglowki } });
       if (!r.ok) {
         log(`HTTP ${r.status} ${url}`);
         // 4xx (poza 429) nie ma sensu ponawiać.

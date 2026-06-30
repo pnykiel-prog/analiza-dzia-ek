@@ -14,6 +14,7 @@ import type { Konektor, Teren, WynikKonektora, MetaPola } from "./types";
 import { brakWyniku } from "./types";
 import { KONFIG_KONEKTORY } from "../connectorsConfig";
 import { logDebug, skrot } from "../debug";
+import { USER_AGENT } from "./net";
 
 export interface ElementOSM {
   tags?: Record<string, string>;
@@ -63,7 +64,7 @@ async function pobierzZInstancji(endpoint: string, lat: number, lon: number): Pr
     const r = await fetch(endpoint, {
       method: "POST",
       signal: ctrl.signal,
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": USER_AGENT, Accept: "application/json" },
       body,
     });
     if (!r.ok) {
