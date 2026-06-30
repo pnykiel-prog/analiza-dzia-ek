@@ -53,7 +53,10 @@ export function znajdzWarstwe(xml: string, slowo: string): string | null {
 const cacheWarstw = new Map<string, string>();
 
 async function ustalWarstwe(cfg: KonfiguracjaWms): Promise<string> {
+  // Skonfigurowana nazwa warstwy jest nadrzędna (potwierdzona z GetCapabilities).
+  if (cfg.warstwy) return cfg.warstwy;
   if (cacheWarstw.has(cfg.klucz)) return cacheWarstw.get(cfg.klucz)!;
+  // Fallback: auto-odkrycie warstwy z GetCapabilities po słowie kluczowym.
   let warstwa = cfg.warstwy;
   const caps = await fetchTekst(
     `${cfg.endpoint}?SERVICE=WMS&VERSION=${cfg.wersjaWms}&REQUEST=GetCapabilities`,

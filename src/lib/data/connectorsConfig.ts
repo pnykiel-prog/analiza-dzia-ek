@@ -81,8 +81,8 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
     {
       klucz: "GDOS_NATURA2000",
       zrodlo: "GDOŚ Natura 2000",
-      endpoint: "https://sdi.gdos.gov.pl/wms",
-      warstwy: "ObszarySpecjalnejOchrony,SpecjalneObszaryOchrony",
+      endpoint: "https://sdi.gdos.gov.pl/ows",
+      warstwy: "GDOS:ObszarySpecjalnejOchrony,GDOS:SpecjalneObszaryOchrony",
       slowoKluczowe: "natura 2000",
       pole: "natura2000",
       wersjaWms: "1.1.1",
@@ -91,9 +91,9 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
     },
     {
       klucz: "GDOS_OCHRONA",
-      zrodlo: "GDOŚ formy ochrony (parki/rezerwaty)",
-      endpoint: "https://sdi.gdos.gov.pl/wms",
-      warstwy: "ParkiNarodowe,Rezerwaty",
+      zrodlo: "GDOŚ formy ochrony (parki narodowe/rezerwaty)",
+      endpoint: "https://sdi.gdos.gov.pl/ows",
+      warstwy: "GDOS:ParkiNarodowe,GDOS:Rezerwaty",
       slowoKluczowe: "park narodowy",
       pole: "ochronaWykluczajaca",
       wersjaWms: "1.1.1",
