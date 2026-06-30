@@ -9,8 +9,9 @@ import { rozpoznajPrzeznaczenie } from "../../data/connectors/kimpzp";
 import { uruchomKonektory } from "../../data/connectors";
 import type { Teren } from "../../data/connectors/types";
 import { DZIALKI_PRZYKLADOWE } from "../../data/sample";
-import { ocenOdpowiedzWms } from "../../data/connectors/wms";
+import { ocenOdpowiedzWms, znajdzWarstwe } from "../../data/connectors/wms";
 import { klasyfikujPoi } from "../../data/connectors/overpass";
+import { terytGminy, powiaty } from "../../teryt";
 
 const KW = (x0: number, y0: number, b: number) =>
   `POLYGON((${x0} ${y0},${x0 + b} ${y0},${x0 + b} ${y0 + b},${x0} ${y0 + b},${x0} ${y0}))`;
@@ -76,6 +77,19 @@ test("overpass: klasyfikacja POI do proxy W3", () => {
   ]);
   assert.deepEqual(k, { przystanek: true, uslugi: true, poz: true, szkola: true });
   assert.deepEqual(klasyfikujPoi([{ tags: { building: "yes" } }]), { przystanek: false, uslugi: false, poz: false, szkola: false });
+});
+
+test("wms: odkrycie warstwy z GetCapabilities po słowie kluczowym", () => {
+  const caps = `<WMS_Capabilities><Layer><Name>warstwa_a</Name><Title>Coś innego</Title></Layer>
+    <Layer><Name>osuwiska_sopo</Name><Title>Osuwiska (SOPO)</Title></Layer></WMS_Capabilities>`;
+  assert.equal(znajdzWarstwe(caps, "osuwisk"), "osuwiska_sopo");
+  assert.equal(znajdzWarstwe(caps, "natura 2000"), null);
+});
+
+test("teryt: pełny słownik — Głuchołazy (obszar wiejski) = 160701_5", () => {
+  assert.equal(terytGminy("opolskie", "nyski", "Głuchołazy (obszar wiejski)"), "160701_5");
+  assert.ok(powiaty("opolskie").includes("nyski"));
+  assert.ok(powiaty("mazowieckie").length > 30); // pełny słownik, nie mini
 });
 
 test("runner: brak konfiguracji/geometrii → status brak, raport pełny, bez wyjątku", async () => {

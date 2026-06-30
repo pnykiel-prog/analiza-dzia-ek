@@ -86,7 +86,8 @@ async function idZmiennej(klucz: KluczZmiennej): Promise<string | null> {
 async function wartosc(unitId: string, klucz: KluczZmiennej): Promise<number | null> {
   const varId = await idZmiennej(klucz);
   if (!varId) return null;
-  const odp = await fetchJson(url("data/by-unit", { "unit-id": unitId, "var-id": varId, year: String(gus.rok) }), {
+  // BDL: unit-id jest segmentem ścieżki (data/by-unit/{id}), nie parametrem zapytania.
+  const odp = await fetchJson(url(`data/by-unit/${encodeURIComponent(unitId)}`, { "var-id": varId, year: String(gus.rok) }), {
     ...KONFIG_KONEKTORY.siec,
     naglowki: naglowki(),
   });

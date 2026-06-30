@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import type { DaneDzialki, WynikAnalizy } from "@/lib/types";
 import { domyslnaKonfiguracja, type Konfiguracja } from "@/lib/config";
-import { WOJEWODZTWA, type PozycjaDzialki } from "@/lib/teryt";
+import { WOJEWODZTWA } from "@/lib/wojewodztwa";
+import type { PozycjaDzialki } from "@/lib/teryt";
 import { OPIS_TRYBU, trybRynkowy, type Tryb } from "@/lib/fieldModes";
 import { Karta } from "@/components/ui";
 import { Poziom1View } from "@/components/Poziom1View";

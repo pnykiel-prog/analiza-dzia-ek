@@ -55,7 +55,8 @@ out tags 300;`;
 
 async function pobierzOverpass(lat: number, lon: number): Promise<ElementOSM[] | null> {
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), KONFIG_KONEKTORY.siec.timeoutMs + 4000);
+  // Overpass bywa wolny (zapytanie ma [timeout:25]) — dłuższy limit niż domyślny.
+  const t = setTimeout(() => ctrl.abort(), 28000);
   try {
     const body = `data=${encodeURIComponent(zapytanie(lat, lon, cfg.promienM))}`;
     logDebug(`Overpass → ${cfg.endpoint} (${lat.toFixed(5)},${lon.toFixed(5)} r=${cfg.promienM})`);

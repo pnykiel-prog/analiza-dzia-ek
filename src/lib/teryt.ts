@@ -1,63 +1,20 @@
 /**
- * Słownik TERYT — tryb hybrydowy.
+ * Słownik TERYT — pełny, statyczny.
  *
- * Województwo: sztywna lista 16 (zawsze). Powiat / gmina / obręb: podpowiedzi
- * z wbudowanego mini-drzewa (zasilonego m.in. lokalizacjami działek
- * przykładowych) z możliwością wpisania dowolnej wartości (datalist).
+ * Dane: PRG (geoportal.gov.pl) — 16 województw, 380 powiatów, wszystkie gminy
+ * z poprawnymi kodami ULDK. Gminy miejsko-wiejskie rozbite na pod-jednostki
+ * ULDK: „(miasto)" → `_4`, „(obszar wiejski)" → `_5` (parcele należą do nich,
+ * nie do `_3`). Wygenerowane z `teryt-data.json` (bez geometrii, ~100 KB).
  *
- * Docelowo mini-drzewo zastąpi pełny TERYT z API GUGiK/GUS — bez zmiany UI,
- * które operuje na tych samych funkcjach pomocniczych.
+ * ULDK nie udostępnia API do listowania jednostek — dlatego kaskada opiera się
+ * na tym statycznym słowniku, a nie na zapytaniach do usługi.
  */
 
-export const WOJEWODZTWA: { kod: string; nazwa: string }[] = [
-  { kod: "02", nazwa: "dolnośląskie" },
-  { kod: "04", nazwa: "kujawsko-pomorskie" },
-  { kod: "06", nazwa: "lubelskie" },
-  { kod: "08", nazwa: "lubuskie" },
-  { kod: "10", nazwa: "łódzkie" },
-  { kod: "12", nazwa: "małopolskie" },
-  { kod: "14", nazwa: "mazowieckie" },
-  { kod: "16", nazwa: "opolskie" },
-  { kod: "18", nazwa: "podkarpackie" },
-  { kod: "20", nazwa: "podlaskie" },
-  { kod: "22", nazwa: "pomorskie" },
-  { kod: "24", nazwa: "śląskie" },
-  { kod: "26", nazwa: "świętokrzyskie" },
-  { kod: "28", nazwa: "warmińsko-mazurskie" },
-  { kod: "30", nazwa: "wielkopolskie" },
-  { kod: "32", nazwa: "zachodniopomorskie" },
-];
+import DRZEWO from "./teryt-data.json";
+export { WOJEWODZTWA } from "./wojewodztwa";
 
-export interface GminaTeryt {
-  teryt: string; // token TERYT gminy używany w identyfikatorze ULDK
-  obreby: string[]; // znane obręby (podpowiedzi)
-}
-
-type DrzewoTeryt = Record<string, Record<string, Record<string, GminaTeryt>>>;
-
-/** Mini-drzewo: województwo → powiat → gmina → { teryt, obręby }. Sparse. */
-export const DRZEWO_TERYT: DrzewoTeryt = {
-  mazowieckie: {
-    piaseczyński: {
-      Lesznowola: { teryt: "146509_8", obreby: ["0012"] },
-      Piaseczno: { teryt: "146511_4", obreby: ["0001", "0002"] },
-    },
-    "Warszawa": {
-      "Warszawa-Białołęka": { teryt: "146503_8", obreby: ["0001"] },
-    },
-  },
-  wielkopolskie: {
-    poznański: {
-      Kórnik: { teryt: "300108_4", obreby: ["0005"] },
-      Swarzędz: { teryt: "300113_4", obreby: ["0001"] },
-    },
-  },
-  lubelskie: {
-    bialski: {
-      "Janów Podlaski": { teryt: "061702_2", obreby: ["0011"] },
-    },
-  },
-};
+/** województwo → powiat → nazwa gminy (z etykietą rodzaju) → kod TERYT ULDK. */
+const DRZEWO_TERYT = DRZEWO as Record<string, Record<string, Record<string, string>>>;
 
 export function powiaty(woj: string): string[] {
   return Object.keys(DRZEWO_TERYT[woj] ?? {}).sort((a, b) => a.localeCompare(b, "pl"));
@@ -67,12 +24,13 @@ export function gminy(woj: string, powiat: string): string[] {
   return Object.keys(DRZEWO_TERYT[woj]?.[powiat] ?? {}).sort((a, b) => a.localeCompare(b, "pl"));
 }
 
-export function obreby(woj: string, powiat: string, gmina: string): string[] {
-  return DRZEWO_TERYT[woj]?.[powiat]?.[gmina]?.obreby ?? [];
+/** Obręby nie są w słowniku PRG — wpisywane ręcznie (kod 4-cyfrowy). */
+export function obreby(_woj: string, _powiat: string, _gmina: string): string[] {
+  return [];
 }
 
 export function terytGminy(woj: string, powiat: string, gmina: string): string | null {
-  return DRZEWO_TERYT[woj]?.[powiat]?.[gmina]?.teryt ?? null;
+  return DRZEWO_TERYT[woj]?.[powiat]?.[gmina] ?? null;
 }
 
 /** Dane jednej pozycji identyfikacyjnej z formularza. */

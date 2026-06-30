@@ -32,7 +32,42 @@ export function ocenOdpowiedzWms(tekst: string): WynikWms {
   return "pusty";
 }
 
-function urlGetFeatureInfo(cfg: KonfiguracjaWms, c: [number, number]): string {
+/**
+ * Znajduje nazwę warstwy w odpowiedzi GetCapabilities po słowie kluczowym
+ * (w nazwie lub tytule warstwy). Pozwala samoczynnie skorygować nazwę warstwy,
+ * gdy ta z konfiguracji się nie zgadza. Zwraca null, gdy nic nie pasuje.
+ */
+export function znajdzWarstwe(xml: string, slowo: string): string | null {
+  const s = slowo.toLowerCase();
+  const bloki = xml.split(/<Layer\b/i).slice(1);
+  for (const blok of bloki) {
+    const name = /<Name>\s*([^<]+?)\s*<\/Name>/i.exec(blok)?.[1];
+    const title = /<Title>\s*([^<]+?)\s*<\/Title>/i.exec(blok)?.[1];
+    if (!name) continue;
+    if (name.toLowerCase().includes(s) || (title ?? "").toLowerCase().includes(s)) return name;
+  }
+  return null;
+}
+
+// Cache odkrytych warstw per źródło (w obrębie instancji serwera).
+const cacheWarstw = new Map<string, string>();
+
+async function ustalWarstwe(cfg: KonfiguracjaWms): Promise<string> {
+  if (cacheWarstw.has(cfg.klucz)) return cacheWarstw.get(cfg.klucz)!;
+  let warstwa = cfg.warstwy;
+  const caps = await fetchTekst(
+    `${cfg.endpoint}?SERVICE=WMS&VERSION=${cfg.wersjaWms}&REQUEST=GetCapabilities`,
+    { timeoutMs: 5000, proby: 1 }
+  );
+  if (caps) {
+    const odkryta = znajdzWarstwe(caps, cfg.slowoKluczowe);
+    if (odkryta) warstwa = odkryta;
+  }
+  cacheWarstw.set(cfg.klucz, warstwa);
+  return warstwa;
+}
+
+function urlGetFeatureInfo(cfg: KonfiguracjaWms, warstwa: string, c: [number, number]): string {
   const [x, y] = c;
   const d = 20;
   const p = new URLSearchParams({
@@ -40,8 +75,8 @@ function urlGetFeatureInfo(cfg: KonfiguracjaWms, c: [number, number]): string {
     VERSION: cfg.wersjaWms,
     REQUEST: "GetFeatureInfo",
     SRS: "EPSG:2180",
-    LAYERS: cfg.warstwy,
-    QUERY_LAYERS: cfg.warstwy,
+    LAYERS: warstwa,
+    QUERY_LAYERS: warstwa,
     BBOX: `${x - d},${y - d},${x + d},${y + d}`,
     WIDTH: "101",
     HEIGHT: "101",
@@ -66,8 +101,9 @@ function utworzKonektorWms(cfg: KonfiguracjaWms): Konektor {
       const czas = new Date().toISOString();
       const c = teren.centroid2180;
       if (!c) return brakWyniku(this.klucz, this.zrodlo, czas, "Brak centroidu (brak geometrii).");
+      const warstwa = await ustalWarstwe(cfg); // auto-odkrycie nazwy warstwy (GetCapabilities)
       // Krótki timeout, bez retry — niedostępne WMS nie mają spowalniać analizy.
-      const tekst = await fetchTekst(urlGetFeatureInfo(cfg, c), { timeoutMs: 4500, proby: 1 });
+      const tekst = await fetchTekst(urlGetFeatureInfo(cfg, warstwa, c), { timeoutMs: 4500, proby: 1 });
       if (tekst === null) return brakWyniku(this.klucz, this.zrodlo, czas, "Brak odpowiedzi WMS.");
       const ocena = ocenOdpowiedzWms(tekst);
       if (ocena === "blad") return brakWyniku(this.klucz, this.zrodlo, czas, "Wyjątek WMS (sprawdź warstwę/endpoint).");

@@ -38,6 +38,8 @@ export interface KonfiguracjaKonektorow {
     zrodlo: string;
     endpoint: string;
     warstwy: string;
+    /** Słowo kluczowe do auto-odkrycia warstwy przez GetCapabilities (gdy nazwa się nie zgadza). */
+    slowoKluczowe: string;
     pole: "natura2000" | "ochronaWykluczajaca" | "ryzykoPowodzioweSzczegolne" | "osuwisko" | "terenGorniczy" | "strefaKonserwatorska";
     wersjaWms: string;
     infoFormat: string;
@@ -81,6 +83,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       zrodlo: "GDOŚ Natura 2000",
       endpoint: "https://sdi.gdos.gov.pl/wms",
       warstwy: "ObszarySpecjalnejOchrony,SpecjalneObszaryOchrony",
+      slowoKluczowe: "natura 2000",
       pole: "natura2000",
       wersjaWms: "1.1.1",
       infoFormat: "application/json",
@@ -91,6 +94,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       zrodlo: "GDOŚ formy ochrony (parki/rezerwaty)",
       endpoint: "https://sdi.gdos.gov.pl/wms",
       warstwy: "ParkiNarodowe,Rezerwaty",
+      slowoKluczowe: "park narodowy",
       pole: "ochronaWykluczajaca",
       wersjaWms: "1.1.1",
       infoFormat: "application/json",
@@ -101,6 +105,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       zrodlo: "ISOK / Wody Polskie — zagrożenie powodziowe",
       endpoint: "https://wody.isok.gov.pl/wms/zmgp",
       warstwy: "obszary_szczegolnego_zagrozenia_powodzia",
+      slowoKluczowe: "szczególnego zagrożenia",
       pole: "ryzykoPowodzioweSzczegolne",
       wersjaWms: "1.1.1",
       infoFormat: "application/json",
@@ -111,6 +116,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       zrodlo: "PIG-PIB SOPO — osuwiska",
       endpoint: "https://geozagrozenia.pgi.gov.pl/arcgis/services/sopo/MapServer/WMSServer",
       warstwy: "osuwiska",
+      slowoKluczowe: "osuwisk",
       pole: "osuwisko",
       wersjaWms: "1.1.1",
       infoFormat: "application/json",
@@ -121,6 +127,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       zrodlo: "NID — strefy ochrony konserwatorskiej",
       endpoint: "https://mapy.zabytek.gov.pl/nid/services/WMS/MapServer/WMSServer",
       warstwy: "strefy_ochrony_konserwatorskiej",
+      slowoKluczowe: "ochrony konserwatorskiej",
       pole: "strefaKonserwatorska",
       wersjaWms: "1.1.1",
       infoFormat: "application/json",
