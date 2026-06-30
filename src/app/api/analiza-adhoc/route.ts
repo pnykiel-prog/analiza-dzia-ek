@@ -21,7 +21,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ blad: "Brak identyfikatora działki (pole „id”)." }, { status: 400 });
   }
   if (typeof dane.powierzchniaM2 !== "number" || !(dane.powierzchniaM2 > 0)) {
-    return NextResponse.json({ blad: "Powierzchnia działki musi być liczbą dodatnią." }, { status: 400 });
+    return NextResponse.json(
+      { blad: "Brak powierzchni działki — nie pobrano geometrii (działka spoza przykładowego ULDK). Podaj powierzchnię ręcznie." },
+      { status: 400 }
+    );
   }
 
   const pelne = uzupelnijBraki(dane as DaneDzialki);
