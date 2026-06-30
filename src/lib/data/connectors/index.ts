@@ -8,8 +8,10 @@ import type { DaneDzialki } from "../../types";
 import type { Konektor, Teren, WynikKonektora, MetaPola } from "./types";
 import { konektorGUS } from "./gus";
 import { konektorKIMPZP } from "./kimpzp";
+import { konektoryWms } from "./wms";
+import { konektorOverpass } from "./overpass";
 
-const REJESTR: Konektor[] = [konektorGUS, konektorKIMPZP];
+const REJESTR: Konektor[] = [konektorGUS, konektorKIMPZP, ...konektoryWms, konektorOverpass];
 
 export interface RaportKonektorow {
   dane: Partial<DaneDzialki>;

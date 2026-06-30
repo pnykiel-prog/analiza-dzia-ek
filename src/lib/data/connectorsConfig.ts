@@ -32,6 +32,18 @@ export interface KonfiguracjaKonektorow {
     zmienneId: Partial<Record<keyof KonfiguracjaKonektorow["gus"]["zapytania"], string>>;
   };
   kimpzp: { aktywny: boolean; endpoint: string; warstwy: string; infoFormat: string };
+  /** Generyczne konektory „obecność obiektu w punkcie" (WMS GetFeatureInfo) → bramki. */
+  wmsObecnosc: {
+    klucz: string;
+    zrodlo: string;
+    endpoint: string;
+    warstwy: string;
+    pole: "natura2000" | "ochronaWykluczajaca" | "ryzykoPowodzioweSzczegolne" | "osuwisko" | "terenGorniczy" | "strefaKonserwatorska";
+    wersjaWms: string;
+    infoFormat: string;
+    aktywny: boolean;
+  }[];
+  overpass: { aktywny: boolean; endpoint: string; promienM: number };
   /** Katalog pozostałych źródeł (mapa architektury; włączane w M2/M3). */
   katalog: { klucz: string; zrodlo: string; endpoint: string; poziom: "P1" | "P2"; etap: "M1" | "M2" | "M3"; aktywny: boolean }[];
 }
@@ -61,6 +73,61 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
     warstwy: "plany",
     infoFormat: "application/json",
   },
+  wmsObecnosc: [
+    // Adresy/warstwy startowe — DO POTWIERDZENIA przez GetCapabilities źródeł.
+    // „Obecność obiektu w punkcie" → ustawia pole logiczne (bramka). Wyjątek WMS → „brak".
+    {
+      klucz: "GDOS_NATURA2000",
+      zrodlo: "GDOŚ Natura 2000",
+      endpoint: "https://sdi.gdos.gov.pl/wms",
+      warstwy: "ObszarySpecjalnejOchrony,SpecjalneObszaryOchrony",
+      pole: "natura2000",
+      wersjaWms: "1.1.1",
+      infoFormat: "application/json",
+      aktywny: true,
+    },
+    {
+      klucz: "GDOS_OCHRONA",
+      zrodlo: "GDOŚ formy ochrony (parki/rezerwaty)",
+      endpoint: "https://sdi.gdos.gov.pl/wms",
+      warstwy: "ParkiNarodowe,Rezerwaty",
+      pole: "ochronaWykluczajaca",
+      wersjaWms: "1.1.1",
+      infoFormat: "application/json",
+      aktywny: true,
+    },
+    {
+      klucz: "ISOK_POWODZ",
+      zrodlo: "ISOK / Wody Polskie — zagrożenie powodziowe",
+      endpoint: "https://wody.isok.gov.pl/wms/zmgp",
+      warstwy: "obszary_szczegolnego_zagrozenia_powodzia",
+      pole: "ryzykoPowodzioweSzczegolne",
+      wersjaWms: "1.1.1",
+      infoFormat: "application/json",
+      aktywny: true,
+    },
+    {
+      klucz: "PIG_SOPO",
+      zrodlo: "PIG-PIB SOPO — osuwiska",
+      endpoint: "https://geozagrozenia.pgi.gov.pl/arcgis/services/sopo/MapServer/WMSServer",
+      warstwy: "osuwiska",
+      pole: "osuwisko",
+      wersjaWms: "1.1.1",
+      infoFormat: "application/json",
+      aktywny: true,
+    },
+    {
+      klucz: "NID_ZABYTKI",
+      zrodlo: "NID — strefy ochrony konserwatorskiej",
+      endpoint: "https://mapy.zabytek.gov.pl/nid/services/WMS/MapServer/WMSServer",
+      warstwy: "strefy_ochrony_konserwatorskiej",
+      pole: "strefaKonserwatorska",
+      wersjaWms: "1.1.1",
+      infoFormat: "application/json",
+      aktywny: true,
+    },
+  ],
+  overpass: { aktywny: true, endpoint: "https://overpass-api.de/api/interpreter", promienM: 1500 },
   katalog: [
     { klucz: "ULDK", zrodlo: "ULDK (GUGiK)", endpoint: "https://uldk.gugik.gov.pl/", poziom: "P1", etap: "M1", aktywny: true },
     { klucz: "GUS_BDL", zrodlo: "GUS BDL", endpoint: "https://bdl.stat.gov.pl/api/v1", poziom: "P1", etap: "M1", aktywny: true },
