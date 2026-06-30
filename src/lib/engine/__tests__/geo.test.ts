@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { powierzchniaZWkt, metrykiZWkt, bbox, bboxStykaja } from "../../geo";
+import { powierzchniaZWkt, metrykiZWkt, bbox, bboxStykaja, pl1992ToWgs84 } from "../../geo";
 import { parsujOdpowiedzUldk } from "../../data/uldk";
 
 test("geo: powierzchnia prostokąta 100×50 = 5000 m²", () => {
@@ -33,6 +33,12 @@ test("geo: bboxStykaja wykrywa przyleganie i rozłączność", () => {
   const odlegly = bbox("POLYGON((500 500,600 500,600 600,500 600,500 500))")!;
   assert.equal(bboxStykaja(a, stykajacy), true);
   assert.equal(bboxStykaja(a, odlegly), false);
+});
+
+test("geo: reprojekcja PUWG1992 → WGS84 (okolice Głuchołazów)", () => {
+  const [lon, lat] = pl1992ToWgs84(386924, 269276);
+  assert.ok(lon > 16.5 && lon < 18.5, `lon poza zakresem: ${lon}`);
+  assert.ok(lat > 49.5 && lat < 51.0, `lat poza zakresem: ${lat}`);
 });
 
 test("uldk: parsowanie odpowiedzi OK (status 0 + wiersze)", () => {

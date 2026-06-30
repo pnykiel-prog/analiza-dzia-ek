@@ -104,6 +104,66 @@ export function metrykiZWkt(wkt: string): MetryGeometrii {
   };
 }
 
+/**
+ * Reprojekcja EPSG:2180 (PUWG1992 / CS92) → WGS84 [lon, lat].
+ * Odwrotna transwersalna Merkatora (GRS80). Wejście: (easting, northing) — taka
+ * jest kolejność współrzędnych w WKT z ULDK. Pozwala policzyć centroid WGS84 do
+ * Overpass bez dodatkowego zapytania do ULDK.
+ */
+export function pl1992ToWgs84(easting: number, northing: number): [number, number] {
+  const a = 6378137.0;
+  const f = 1 / 298.257222101;
+  const k0 = 0.9993;
+  const lon0 = (19 * Math.PI) / 180;
+  const FE = 500000;
+  const FN = -5300000;
+
+  const e2 = f * (2 - f);
+  const ep2 = e2 / (1 - e2);
+  const xp = easting - FE;
+  const yp = northing - FN;
+  const M = yp / k0;
+  const mu = M / (a * (1 - e2 / 4 - (3 * e2 * e2) / 64 - (5 * e2 ** 3) / 256));
+  const e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
+  const phi1 =
+    mu +
+    ((3 * e1) / 2 - (27 * e1 ** 3) / 32) * Math.sin(2 * mu) +
+    ((21 * e1 ** 2) / 16 - (55 * e1 ** 4) / 32) * Math.sin(4 * mu) +
+    ((151 * e1 ** 3) / 96) * Math.sin(6 * mu) +
+    ((1097 * e1 ** 4) / 512) * Math.sin(8 * mu);
+
+  const sin1 = Math.sin(phi1);
+  const cos1 = Math.cos(phi1);
+  const tan1 = Math.tan(phi1);
+  const C1 = ep2 * cos1 * cos1;
+  const T1 = tan1 * tan1;
+  const N1 = a / Math.sqrt(1 - e2 * sin1 * sin1);
+  const R1 = (a * (1 - e2)) / Math.pow(1 - e2 * sin1 * sin1, 1.5);
+  const D = xp / (N1 * k0);
+
+  const lat =
+    phi1 -
+    ((N1 * tan1) / R1) *
+      ((D * D) / 2 -
+        ((5 + 3 * T1 + 10 * C1 - 4 * C1 * C1 - 9 * ep2) * D ** 4) / 24 +
+        ((61 + 90 * T1 + 298 * C1 + 45 * T1 * T1 - 252 * ep2 - 3 * C1 * C1) * D ** 6) / 720);
+  const lon =
+    lon0 +
+    (D -
+      ((1 + 2 * T1 + C1) * D ** 3) / 6 +
+      ((5 - 2 * C1 + 28 * T1 - 3 * C1 * C1 + 8 * ep2 + 24 * T1 * T1) * D ** 5) / 120) /
+      cos1;
+
+  return [(lon * 180) / Math.PI, (lat * 180) / Math.PI];
+}
+
+/** Centroid WGS84 [lon, lat] z geometrii WKT w EPSG:2180. */
+export function centroid4326ZWkt(wkt2180: string): [number, number] | null {
+  const c = centroid(wkt2180);
+  if (!c) return null;
+  return pl1992ToWgs84(c[0], c[1]);
+}
+
 /** Czy dwie obwiednie się stykają/zachodzą w granicach tolerancji [m] (proxy przylegania). */
 export function bboxStykaja(a: BBox, b: BBox, tol = 2): boolean {
   return a.minX - tol <= b.maxX && b.minX - tol <= a.maxX && a.minY - tol <= b.maxY && b.minY - tol <= a.maxY;
