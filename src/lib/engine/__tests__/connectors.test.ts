@@ -9,6 +9,8 @@ import { rozpoznajPrzeznaczenie } from "../../data/connectors/kimpzp";
 import { uruchomKonektory } from "../../data/connectors";
 import type { Teren } from "../../data/connectors/types";
 import { DZIALKI_PRZYKLADOWE } from "../../data/sample";
+import { ocenOdpowiedzWms } from "../../data/connectors/wms";
+import { klasyfikujPoi } from "../../data/connectors/overpass";
 
 const KW = (x0: number, y0: number, b: number) =>
   `POLYGON((${x0} ${y0},${x0 + b} ${y0},${x0 + b} ${y0 + b},${x0} ${y0 + b},${x0} ${y0}))`;
@@ -58,12 +60,30 @@ test("kimpzp: rozpoznanie przeznaczenia z tekstu", () => {
   assert.equal(rozpoznajPrzeznaczenie(""), null);
 });
 
+test("wms: ocena odpowiedzi GetFeatureInfo (obecny/pusty/błąd)", () => {
+  assert.equal(ocenOdpowiedzWms('{"type":"FeatureCollection","features":[{"x":1}]}'), "obecny");
+  assert.equal(ocenOdpowiedzWms('{"type":"FeatureCollection","features":[]}'), "pusty");
+  assert.equal(ocenOdpowiedzWms("<ServiceExceptionReport><ServiceException>Layer not defined</ServiceException></ServiceExceptionReport>"), "blad");
+  assert.equal(ocenOdpowiedzWms("<wfs:FeatureCollection><gml:featureMember/></wfs:FeatureCollection>"), "obecny");
+});
+
+test("overpass: klasyfikacja POI do proxy W3", () => {
+  const k = klasyfikujPoi([
+    { tags: { highway: "bus_stop" } },
+    { tags: { shop: "supermarket" } },
+    { tags: { amenity: "pharmacy" } },
+    { tags: { amenity: "school" } },
+  ]);
+  assert.deepEqual(k, { przystanek: true, uslugi: true, poz: true, szkola: true });
+  assert.deepEqual(klasyfikujPoi([{ tags: { building: "yes" } }]), { przystanek: false, uslugi: false, poz: false, szkola: false });
+});
+
 test("runner: brak konfiguracji/geometrii → status brak, raport pełny, bez wyjątku", async () => {
   const teren: Teren = {
     id: "X.1", teryt: "", wojewodztwo: "mazowieckie", powiat: "p", gmina: "g",
-    centroid2180: null, wktList: [], powierzchniaM2: 1000,
+    centroid2180: null, centroid4326: null, wktList: [], powierzchniaM2: 1000,
   };
   const r = await uruchomKonektory(teren, DZIALKI_PRZYKLADOWE[0]);
-  assert.equal(r.raport.length >= 2, true); // GUS + KIMPZP
-  assert.deepEqual(r.dane, {}); // nic nie wypełniono (demo ma komplet, konektory brak)
+  assert.equal(r.raport.length >= 4, true); // GUS + KIMPZP + WMS + Overpass
+  assert.deepEqual(r.dane, {}); // brak geometrii/konfiguracji → nic nie wypełniono
 });

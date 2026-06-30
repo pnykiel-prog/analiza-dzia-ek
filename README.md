@@ -108,13 +108,23 @@ Zgodnie z briefem wdrożeniowym warstwa danych używa **wzorca konektora**
   (tryb debug `KONEKTORY_DEBUG=1`).
 - Obliczenia geometryczne w **EPSG:2180** (powierzchnia, centroid, przyleganie).
 
-**Zaimplementowane konektory (M1):**
+**Zaimplementowane konektory:**
 
-| Konektor | Dane | Status |
-|---|---|---|
-| ULDK | geometria, powierzchnia, front, TERYT | działa (geokoder) |
-| GUS BDL | demografia, rynek pracy | konektor gotowy; wymaga uzupełnienia ID zmiennych BDL w konfiguracji |
-| KIMPZP | status planistyczny | best-effort (≈75% gmin to rastry → „do weryfikacji") |
+| Konektor | Etap | Dane | Status |
+|---|---|---|---|
+| ULDK | M1 | geometria, powierzchnia, front, TERYT | działa (geokoder) |
+| GUS BDL | M1 | demografia, rynek pracy | auto-dobór ID zmiennych z katalogu BDL po nazwie |
+| KIMPZP | M1 | status planistyczny | best-effort (≈75% gmin to rastry → „do weryfikacji") |
+| GDOŚ Natura 2000 / ochrona | M2 | bramki: Natura 2000, ochrona wykluczająca | obecność WMS w punkcie |
+| ISOK / Wody Polskie | M2 | bramka: powódź szczególna | obecność WMS w punkcie |
+| PIG-PIB SOPO | M2 | bramka: osuwiska | obecność WMS w punkcie |
+| NID | M2 | flaga: strefa konserwatorska | obecność WMS w punkcie |
+| OSM / Overpass | M2 | W3: przystanek, usługi pieszo, POZ, szkoły/żłobki | zapytanie `around` (proxy dostępności) |
+
+Konektory środowiskowe (M2) działają wzorcem „obecność obiektu w punkcie" (WMS
+GetFeatureInfo w centroidzie). Adresy WMS i nazwy warstw w `connectorsConfig.ts`
+są wartościami startowymi — do potwierdzenia przez `GetCapabilities` źródeł;
+przy złej warstwie konektor zwraca „brak" (bramka „do weryfikacji"), nie błąd.
 
 Przyleganie wielu działek liczone jest **na geometrii** (test spójności bloku),
 nie na numerach. Panel pokazuje **raport źródeł** (które konektory zwróciły dane).

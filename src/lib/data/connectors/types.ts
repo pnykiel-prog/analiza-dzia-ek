@@ -19,6 +19,7 @@ export interface Teren {
   powiat: string;
   gmina: string;
   centroid2180: [number, number] | null; // do zapytań WMS GetFeatureInfo
+  centroid4326: [number, number] | null; // [lon, lat] do zapytań Overpass (OSM)
   wktList: string[]; // geometrie składowych działek (EPSG:2180)
   powierzchniaM2: number;
 }

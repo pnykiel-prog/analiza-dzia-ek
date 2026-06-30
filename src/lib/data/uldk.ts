@@ -16,7 +16,7 @@
  * (np. Vercel) z otwartym dostępem do sieci działają normalnie.
  */
 
-import { metrykiZWkt } from "../geo";
+import { metrykiZWkt, centroid } from "../geo";
 import { logDebug, skrot } from "./debug";
 
 const BAZA = "https://uldk.gugik.gov.pl/";
@@ -151,4 +151,15 @@ export async function pobierzDzialkePoId(id: string): Promise<DzialkaUldk | null
     gmina: (w[3] ?? "").trim(),
     geomWkt,
   };
+}
+
+/**
+ * Centroid działki w WGS84 [lon, lat] — potrzebny do zapytań Overpass (OSM).
+ * Osobne wywołanie z `srid=4326`. Zwraca null przy braku danych.
+ */
+export async function pobierzCentroid4326(id: string): Promise<[number, number] | null> {
+  const odp = await uldkFetch({ request: "GetParcelById", id, result: "geom_wkt", srid: "4326" });
+  const wkt = odp?.ok ? (odp.wiersze[0]?.[0] ?? "").trim() : "";
+  if (!wkt) return null;
+  return centroid(wkt); // WKT 4326: "lon lat" → [lon, lat]
 }

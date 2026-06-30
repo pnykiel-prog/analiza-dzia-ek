@@ -11,7 +11,7 @@ import type { DaneDzialki } from "../types";
 import { DZIALKI_PRZYKLADOWE } from "./sample";
 import { skomponujId, type PozycjaDzialki } from "../teryt";
 import { statusRynkowy } from "../fieldModes";
-import { pobierzDzialkePoId, rozwiazTerytGminy } from "./uldk";
+import { pobierzDzialkePoId, rozwiazTerytGminy, pobierzCentroid4326 } from "./uldk";
 import { centroid, czyPrzylegaja } from "../geo";
 import { uruchomKonektory } from "./connectors";
 import type { MetaPola, Teren } from "./connectors/types";
@@ -153,6 +153,7 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
   const znalezione: DaneDzialki[] = [];
   const wktZnalezione: string[] = []; // geometrie z ULDK (do centroidu i przylegania)
   const idy: string[] = [];
+  let idUldkPierwszy: string | null = null; // do centroidu WGS84 (Overpass)
 
   for (const pWej of pozycje) {
     const idWpisany = pWej.idBezposredni?.trim();
@@ -190,6 +191,7 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
         };
         zrodlo = "uldk";
         if (u.geomWkt) wktZnalezione.push(u.geomWkt);
+        if (!idUldkPierwszy) idUldkPierwszy = id;
       }
     }
 
@@ -223,6 +225,7 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
   let metaPol: MetaPola[] = [];
   if (dane) {
     const wkt0 = wktZnalezione[0];
+    const centroid4326 = idUldkPierwszy ? await pobierzCentroid4326(idUldkPierwszy) : null;
     const teren: Teren = {
       id: dane.id,
       teryt: pozycje[0]?.gminaTeryt ?? dane.teryt ?? "",
@@ -230,6 +233,7 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
       powiat: dane.powiat,
       gmina: dane.gmina,
       centroid2180: wkt0 ? centroid(wkt0) : null,
+      centroid4326,
       wktList: wktZnalezione,
       powierzchniaM2: dane.powierzchniaM2,
     };
