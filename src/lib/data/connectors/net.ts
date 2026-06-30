@@ -4,17 +4,13 @@
  * (te funkcje działają po stronie serwera) — nigdy z przeglądarki (CORS).
  */
 
-const DEBUG = process.env.KONEKTORY_DEBUG === "1";
+import { logDebug as log } from "../debug";
 
 export interface OpcjeFetch {
   timeoutMs?: number;
   proby?: number; // łączna liczba prób (1 = bez retry)
   backoffMs?: number; // bazowy backoff (rośnie wykładniczo)
   naglowki?: Record<string, string>;
-}
-
-function log(msg: string) {
-  if (DEBUG) console.log(`[konektor] ${msg}`);
 }
 
 async function spij(ms: number) {
