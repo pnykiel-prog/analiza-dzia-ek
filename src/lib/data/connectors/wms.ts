@@ -21,6 +21,8 @@ export function ocenOdpowiedzWms(tekst: string): WynikWms {
   const t = tekst.trim();
   if (!t) return "pusty";
   if (/serviceexception|<ows:exception|exceptionreport/i.test(t)) return "blad";
+  // Strona anti-bot / WAF (np. Incapsula) udająca 200 — NIE traktować jako „pusto".
+  if (/incapsula|_incapsula_resource|distil|captcha|access denied|<title>\s*403/i.test(t)) return "blad";
   if (t.startsWith("{") || t.startsWith("[")) {
     try {
       const j = JSON.parse(t) as { features?: unknown[] };
@@ -30,6 +32,8 @@ export function ocenOdpowiedzWms(tekst: string): WynikWms {
     }
   }
   if (/featuremember|<wfs:member|gml:featuremembers?/i.test(t)) return "obecny";
+  // Odpowiedź HTML na zapytanie o JSON = strona błędu/blokady, nie dane → błąd.
+  if (/^<!doctype html|^<html/i.test(t)) return "blad";
   return "pusty";
 }
 

@@ -67,6 +67,9 @@ test("wms: ocena odpowiedzi GetFeatureInfo (obecny/pusty/błąd)", () => {
   assert.equal(ocenOdpowiedzWms('{"type":"FeatureCollection","features":[]}'), "pusty");
   assert.equal(ocenOdpowiedzWms("<ServiceExceptionReport><ServiceException>Layer not defined</ServiceException></ServiceExceptionReport>"), "blad");
   assert.equal(ocenOdpowiedzWms("<wfs:FeatureCollection><gml:featureMember/></wfs:FeatureCollection>"), "obecny");
+  // Strona anti-bot (Incapsula) i HTML nie mogą udawać „pusto".
+  assert.equal(ocenOdpowiedzWms('<html><head><script src="/_Incapsula_Resource?SWJIYLWA=x"></script></head></html>'), "blad");
+  assert.equal(ocenOdpowiedzWms("<!doctype html><html><body>403</body></html>"), "blad");
 });
 
 test("overpass: klasyfikacja POI do proxy W3", () => {
