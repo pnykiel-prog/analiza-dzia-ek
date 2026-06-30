@@ -12,6 +12,9 @@ import { DZIALKI_PRZYKLADOWE } from "./sample";
 import { skomponujId, type PozycjaDzialki } from "../teryt";
 import { statusRynkowy } from "../fieldModes";
 import { pobierzDzialkePoId } from "./uldk";
+import { centroid, czyPrzylegaja } from "../geo";
+import { uruchomKonektory } from "./connectors";
+import type { MetaPola, Teren } from "./connectors/types";
 
 export type ZrodloDanych = "demo" | "uldk" | "brak";
 
@@ -46,6 +49,10 @@ export interface MetaRozwiazania {
   poleAutomatyczne: string[];
   /** Symulowana liczba ofert N dla pól rynkowych (z drabiny przestrzennej). */
   rynek: { czynszN: number; cenaNowychN: number };
+  /** Raport źródeł danych (status per konektor). */
+  raportZrodel: { klucz: string; zrodlo: string; status: string; debug?: string }[];
+  /** Metadane pól wypełnionych przez konektory. */
+  metaPol: MetaPola[];
 }
 
 export interface RozwiazanieDzialek {
@@ -144,6 +151,7 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
   const bledy: string[] = [];
   const wynikiPozycji: WynikPozycji[] = [];
   const znalezione: DaneDzialki[] = [];
+  const wktZnalezione: string[] = []; // geometrie z ULDK (do centroidu i przylegania)
   const idy: string[] = [];
 
   for (const p of pozycje) {
@@ -172,6 +180,7 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
           gmina: u.gmina || p.gmina,
         };
         zrodlo = "uldk";
+        if (u.geomWkt) wktZnalezione.push(u.geomWkt);
       }
     }
 
@@ -180,10 +189,15 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
     else bledy.push(`Działka ${id} nie znaleziona (ULDK ani provider demonstracyjny).`);
   }
 
-  // Walidacja przylegania (symulowana): wymaga, by wszystkie istniały.
-  const przylegajace = wynikiPozycji.length > 0 && wynikiPozycji.every((w) => w.znaleziona);
+  // Walidacja przylegania: na geometrii (ULDK), z fallbackiem do reguły „wszystkie istnieją".
+  let przylegajace: boolean;
+  if (wynikiPozycji.length > 1 && wktZnalezione.length === znalezione.length && wktZnalezione.length > 1) {
+    przylegajace = czyPrzylegaja(wktZnalezione);
+  } else {
+    przylegajace = wynikiPozycji.length > 0 && wynikiPozycji.every((w) => w.znaleziona);
+  }
   if (wynikiPozycji.length > 1 && !przylegajace) {
-    bledy.push("Nie można potwierdzić, że działki tworzą spójny, przylegający blok.");
+    bledy.push("Działki nie tworzą spójnego, przylegającego bloku (test na geometrii).");
   }
 
   let dane: DaneDzialki | null = null;
@@ -193,6 +207,27 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
     // Brak danych automatycznych: szkielet z samej identyfikacji (powierzchnia ręczna).
     const p = pozycje[0];
     dane = szkieletDanych(idy.join(" + ") || skomponujId(p).id, p);
+  }
+
+  // Uruchom konektory danych (GUS, KIMPZP, …) na scalonym terenie i dopełnij białe plamy.
+  let raportZrodel: MetaRozwiazania["raportZrodel"] = [];
+  let metaPol: MetaPola[] = [];
+  if (dane) {
+    const wkt0 = wktZnalezione[0];
+    const teren: Teren = {
+      id: dane.id,
+      teryt: pozycje[0]?.gminaTeryt ?? dane.teryt ?? "",
+      wojewodztwo: dane.wojewodztwo,
+      powiat: dane.powiat,
+      gmina: dane.gmina,
+      centroid2180: wkt0 ? centroid(wkt0) : null,
+      wktList: wktZnalezione,
+      powierzchniaM2: dane.powierzchniaM2,
+    };
+    const wynikK = await uruchomKonektory(teren, dane);
+    dane = { ...dane, ...wynikK.dane };
+    raportZrodel = wynikK.raport;
+    metaPol = wynikK.meta;
   }
 
   const poleAutomatyczne = dane
@@ -208,7 +243,15 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
 
   return {
     dane,
-    meta: { pozycje: wynikiPozycji, przylegajace: wynikiPozycji.length <= 1 ? true : przylegajace, bledy, poleAutomatyczne, rynek },
+    meta: {
+      pozycje: wynikiPozycji,
+      przylegajace: wynikiPozycji.length <= 1 ? true : przylegajace,
+      bledy,
+      poleAutomatyczne,
+      rynek,
+      raportZrodel,
+      metaPol,
+    },
   };
 }
 

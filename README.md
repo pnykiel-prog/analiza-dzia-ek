@@ -92,6 +92,37 @@ stopniowo wraz z poziomem (tryby **R / R? / A / A° / A± / S**):
 
 Brak danej w polu A/A°/A± nie blokuje — obniża pewność (zasada „brak danych ≠ nie").
 
+## Warstwa integracji danych (wzorzec konektora)
+
+Zgodnie z briefem wdrożeniowym warstwa danych używa **wzorca konektora**
+(`src/lib/data/connectors/`):
+
+- Wspólny interfejs `pobierz(teren) → { status, dane, źródło, czas, meta }`;
+  awaria jednego konektora **nie wywraca raportu** (runner = `Promise.allSettled`).
+- Każda dana niesie **metadane**: źródło, znacznik czasu, pewność, tryb pola.
+- **Brak danych ≠ błąd** — konektor bez wyniku zwraca status „brak" (biała plama)
+  i obniża pewność.
+- **Konfiguracja, nie kod** — endpointy, klucze, mapowanie zmiennych GUS i flagi
+  aktywności w `src/lib/data/connectorsConfig.ts`.
+- Warstwa sieciowa (`net.ts`): timeout, retry z backoffem, log surowych odpowiedzi
+  (tryb debug `KONEKTORY_DEBUG=1`).
+- Obliczenia geometryczne w **EPSG:2180** (powierzchnia, centroid, przyleganie).
+
+**Zaimplementowane konektory (M1):**
+
+| Konektor | Dane | Status |
+|---|---|---|
+| ULDK | geometria, powierzchnia, front, TERYT | działa (geokoder) |
+| GUS BDL | demografia, rynek pracy | konektor gotowy; wymaga uzupełnienia ID zmiennych BDL w konfiguracji |
+| KIMPZP | status planistyczny | best-effort (≈75% gmin to rastry → „do weryfikacji") |
+
+Przyleganie wielu działek liczone jest **na geometrii** (test spójności bloku),
+nie na numerach. Panel pokazuje **raport źródeł** (które konektory zwróciły dane).
+
+Katalog pozostałych źródeł (M2/M3: NMT, EGiB, GESUT, BDOT10k, GDOŚ, ISOK, PIG,
+GIOŚ, NID, Overpass, routing, RSPO, RPWDL, dane rynkowe) jest zarejestrowany w
+`connectorsConfig.ts` i włączany przyrostowo.
+
 ## Integracja ULDK (geometria + kaskada TERYT)
 
 Panel `/nowa` korzysta z **realnego ULDK** (GUGiK):
