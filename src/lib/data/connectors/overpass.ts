@@ -53,21 +53,21 @@ function zapytanie(lat: number, lon: number, r: number): string {
 out tags 300;`;
 }
 
-async function pobierzOverpass(lat: number, lon: number): Promise<ElementOSM[] | null> {
+async function pobierzZInstancji(endpoint: string, lat: number, lon: number): Promise<ElementOSM[] | null> {
   const ctrl = new AbortController();
   // Overpass bywa wolny (zapytanie ma [timeout:25]) — dłuższy limit niż domyślny.
   const t = setTimeout(() => ctrl.abort(), 28000);
   try {
     const body = `data=${encodeURIComponent(zapytanie(lat, lon, cfg.promienM))}`;
-    logDebug(`Overpass → ${cfg.endpoint} (${lat.toFixed(5)},${lon.toFixed(5)} r=${cfg.promienM})`);
-    const r = await fetch(cfg.endpoint, {
+    logDebug(`Overpass → ${endpoint} (${lat.toFixed(5)},${lon.toFixed(5)} r=${cfg.promienM})`);
+    const r = await fetch(endpoint, {
       method: "POST",
       signal: ctrl.signal,
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
     });
     if (!r.ok) {
-      logDebug(`Overpass HTTP ${r.status}`);
+      logDebug(`Overpass HTTP ${r.status} (${endpoint})`);
       return null;
     }
     const txt = await r.text();
@@ -75,11 +75,20 @@ async function pobierzOverpass(lat: number, lon: number): Promise<ElementOSM[] |
     const j = JSON.parse(txt) as { elements?: ElementOSM[] };
     return Array.isArray(j.elements) ? j.elements : [];
   } catch (e) {
-    logDebug(`Overpass błąd: ${String(e)}`);
+    logDebug(`Overpass błąd (${endpoint}): ${String(e)}`);
     return null;
   } finally {
     clearTimeout(t);
   }
+}
+
+/** Próbuje kolejnych instancji Overpass aż któraś odpowie. */
+async function pobierzOverpass(lat: number, lon: number): Promise<ElementOSM[] | null> {
+  for (const endpoint of cfg.endpointy) {
+    const wynik = await pobierzZInstancji(endpoint, lat, lon);
+    if (wynik !== null) return wynik;
+  }
+  return null;
 }
 
 export const konektorOverpass: Konektor = {
