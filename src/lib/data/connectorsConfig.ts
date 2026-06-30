@@ -17,19 +17,19 @@ export interface KonfiguracjaKonektorow {
     rok: number;
     poziomGmina: number; // poziom jednostki w BDL (6 = gmina)
     /**
-     * Mapowanie pól → ID zmiennych BDL. UWAGA: identyfikatory zależą od katalogu
-     * BDL i wymagają potwierdzenia w `variables/search`. Puste = pole pomijane
-     * (biała plama), nie błąd.
+     * Auto-dobór zmiennych z katalogu BDL po nazwie (`variables/search`).
+     * Frazy są stabilniejsze niż numeryczne ID — konektor sam znajduje ID na BDL.
      */
-    zmienne: {
-      udzial65Plus: string;
-      udzial2039: string;
+    zapytania: {
+      ludnoscOgolem: string;
+      ludnosc65: string;
+      ludnosc2039: string;
       bezrobocie: string;
       podmiotyNa10k: string;
       saldoMigracji: string;
-      ludnoscOgolem: string;
-      pustostany: string;
     };
+    /** Opcjonalne nadpisanie ID (pomija auto-dobór, gdy ustawione). */
+    zmienneId: Partial<Record<keyof KonfiguracjaKonektorow["gus"]["zapytania"], string>>;
   };
   kimpzp: { aktywny: boolean; endpoint: string; warstwy: string; infoFormat: string };
   /** Katalog pozostałych źródeł (mapa architektury; włączane w M2/M3). */
@@ -44,16 +44,15 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
     clientId: "",
     rok: 2023,
     poziomGmina: 6,
-    zmienne: {
-      // Wartości startowe — DO POTWIERDZENIA w katalogu BDL (variables/search).
-      udzial65Plus: "",
-      udzial2039: "",
-      bezrobocie: "",
-      podmiotyNa10k: "",
-      saldoMigracji: "",
-      ludnoscOgolem: "",
-      pustostany: "",
+    zapytania: {
+      ludnoscOgolem: "ludność ogółem",
+      ludnosc65: "ludność w wieku 65 lat i więcej",
+      ludnosc2039: "ludność w wieku 20-39",
+      bezrobocie: "udział bezrobotnych zarejestrowanych w liczbie ludności w wieku produkcyjnym",
+      podmiotyNa10k: "podmioty wpisane do rejestru REGON na 10 tys. ludności",
+      saldoMigracji: "saldo migracji",
     },
+    zmienneId: {},
   },
   kimpzp: {
     aktywny: true,

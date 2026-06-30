@@ -94,6 +94,8 @@ export interface PozycjaDzialki {
 export function skomponujId(p: PozycjaDzialki): { id: string; znanyTeryt: boolean } {
   const teryt = (p.gminaTeryt && p.gminaTeryt.trim()) || terytGminy(p.wojewodztwo, p.powiat, p.gmina);
   const token = teryt || `${p.wojewodztwo}/${p.gmina}`;
-  const id = `${token}.${p.obreb}.${p.numer}`.trim();
+  // Obręb dopełniony zerami do 4 cyfr (wymóg formatu identyfikatora ULDK).
+  const obreb = /^\d+$/.test(p.obreb.trim()) ? p.obreb.trim().padStart(4, "0") : p.obreb.trim();
+  const id = `${token}.${obreb}.${p.numer.trim()}`;
   return { id, znanyTeryt: !!teryt };
 }
