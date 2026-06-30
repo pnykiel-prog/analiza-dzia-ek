@@ -3,7 +3,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { czyPrzylegaja, centroid } from "../../geo";
-import { wybierzJednostke, wartoscZmiennej } from "../../data/connectors/gus";
+import { wybierzJednostke, wartoscZmiennej, pierwszaZmienna } from "../../data/connectors/gus";
+import { dopasujPoNazwie } from "../../data/uldk";
 import { rozpoznajPrzeznaczenie } from "../../data/connectors/kimpzp";
 import { uruchomKonektory } from "../../data/connectors";
 import type { Teren } from "../../data/connectors/types";
@@ -37,6 +38,18 @@ test("gus: wartość zmiennej (rok lub najnowsza)", () => {
   assert.equal(wartoscZmiennej(json, 2021), 10);
   assert.equal(wartoscZmiennej(json), 12); // najnowsza
   assert.equal(wartoscZmiennej({}), null);
+});
+
+test("gus: pierwsza zmienna z variables/search", () => {
+  assert.equal(pierwszaZmienna({ results: [{ id: 4321 }, { id: 9 }] }), "4321");
+  assert.equal(pierwszaZmienna({ results: [] }), null);
+});
+
+test("uldk: dopasowanie po nazwie bez wielkości liter (głuchołazy → Głuchołazy)", () => {
+  const opcje = [{ teryt: "160707_3", nazwa: "Głuchołazy" }, { teryt: "160701_1", nazwa: "Nysa" }];
+  assert.equal(dopasujPoNazwie(opcje, "głuchołazy")!.teryt, "160707_3");
+  assert.equal(dopasujPoNazwie(opcje, "nys")!.teryt, "160701_1");
+  assert.equal(dopasujPoNazwie(opcje, "xxx"), null);
 });
 
 test("kimpzp: rozpoznanie przeznaczenia z tekstu", () => {

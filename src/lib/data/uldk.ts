@@ -81,6 +81,33 @@ export async function pobierzObreby(gminaTeryt: string): Promise<PozycjaSlownika
   return sl.map((p) => ({ ...p, teryt: p.teryt.includes(".") ? p.teryt.split(".").pop()! : p.teryt }));
 }
 
+/** Dopasowanie po nazwie: dokładne (bez wielkości liter), potem „zawiera". */
+export function dopasujPoNazwie(opcje: PozycjaSlownika[], nazwa: string): PozycjaSlownika | null {
+  const n = nazwa.toLowerCase().trim();
+  if (!n) return null;
+  return (
+    opcje.find((o) => o.nazwa.toLowerCase().trim() === n) ??
+    opcje.find((o) => o.nazwa.toLowerCase().includes(n)) ??
+    null
+  );
+}
+
+/**
+ * Ustala kod TERYT gminy z samych nazw (woj → powiat → gmina) przez słownik
+ * administracyjny ULDK. Pozwala złożyć poprawny identyfikator działki nawet gdy
+ * użytkownik wpisał nazwy ręcznie (klient nie złapał kodu). Zwraca null, gdy
+ * nie uda się dopasować na którymś poziomie.
+ */
+export async function rozwiazTerytGminy(woj: string, powiat: string, gmina: string): Promise<string | null> {
+  if (!woj || !powiat || !gmina) return null;
+  const w = dopasujPoNazwie(await pobierzWojewodztwa(), woj);
+  if (!w) return null;
+  const p = dopasujPoNazwie(await pobierzPowiaty(w.teryt), powiat);
+  if (!p) return null;
+  const g = dopasujPoNazwie(await pobierzGminy(p.teryt), gmina);
+  return g?.teryt ?? null;
+}
+
 export interface DzialkaUldk {
   id: string;
   powierzchniaM2: number;

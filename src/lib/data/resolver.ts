@@ -11,7 +11,7 @@ import type { DaneDzialki } from "../types";
 import { DZIALKI_PRZYKLADOWE } from "./sample";
 import { skomponujId, type PozycjaDzialki } from "../teryt";
 import { statusRynkowy } from "../fieldModes";
-import { pobierzDzialkePoId } from "./uldk";
+import { pobierzDzialkePoId, rozwiazTerytGminy } from "./uldk";
 import { centroid, czyPrzylegaja } from "../geo";
 import { uruchomKonektory } from "./connectors";
 import type { MetaPola, Teren } from "./connectors/types";
@@ -154,10 +154,17 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
   const wktZnalezione: string[] = []; // geometrie z ULDK (do centroidu i przylegania)
   const idy: string[] = [];
 
-  for (const p of pozycje) {
-    if (!p.numer.trim()) {
+  for (const pWej of pozycje) {
+    if (!pWej.numer.trim()) {
       bledy.push("Pozycja bez numeru działki — pominięta.");
       continue;
+    }
+    // Ustal kod TERYT gminy (jeśli klient go nie złapał) z nazw przez słownik ULDK,
+    // aby złożyć poprawny identyfikator zamiast pseudo-tokenu z nazw.
+    let p = pWej;
+    if (!p.gminaTeryt && p.wojewodztwo && p.powiat && p.gmina) {
+      const t = await rozwiazTerytGminy(p.wojewodztwo, p.powiat, p.gmina);
+      if (t) p = { ...p, gminaTeryt: t };
     }
     const { id, znanyTeryt } = skomponujId(p);
     idy.push(id);
