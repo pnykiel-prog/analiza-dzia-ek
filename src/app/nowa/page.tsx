@@ -21,6 +21,13 @@ interface MetaRozw {
 
 const pustaPozycja = (): PozycjaDzialki => ({ wojewodztwo: "", powiat: "", gmina: "", obreb: "", numer: "" });
 
+/** Działki demonstracyjne dostępne w przykładowym providerze ULDK. */
+const DZIALKI_DEMO: { label: string; p: PozycjaDzialki }[] = [
+  { label: "Lesznowola (wzorcowa, młodzi)", p: { wojewodztwo: "mazowieckie", powiat: "piaseczyński", gmina: "Lesznowola", obreb: "0012", numer: "123/4" } },
+  { label: "Kórnik (senioralna)", p: { wojewodztwo: "wielkopolskie", powiat: "poznański", gmina: "Kórnik", obreb: "0005", numer: "88/2" } },
+  { label: "Janów Podlaski (białe plamy)", p: { wojewodztwo: "lubelskie", powiat: "bialski", gmina: "Janów Podlaski", obreb: "0011", numer: "45" } },
+];
+
 export default function NowaAnalizaPage() {
   const [krok, setKrok] = useState<1 | 2 | 3>(1);
   const [pozycje, setPozycje] = useState<PozycjaDzialki[]>([pustaPozycja()]);
@@ -30,6 +37,7 @@ export default function NowaAnalizaPage() {
   const [wynik, setWynik] = useState<WynikAnalizy | null>(null);
   const [blad, setBlad] = useState<string | null>(null);
   const [licze, setLicze] = useState(false);
+  const [recznaPow, setRecznaPow] = useState("");
 
   // Override P2 (A±/R) — wartości jako stringi + zbiór skorygowanych pól.
   const [p2, setP2] = useState<Record<string, string>>({});
@@ -80,13 +88,37 @@ export default function NowaAnalizaPage() {
       setDane(d.dane);
       setMeta(d.meta);
       setMediana(d.medianaRegionalna);
-      await przelicz(d.dane);
       setKrok(1);
+      setRecznaPow("");
+      // Jeśli pobrano geometrię (działka w ULDK) — liczymy od razu.
+      // W przeciwnym razie czekamy na ręczne podanie powierzchni (działka spoza
+      // demonstracyjnego providera danych).
+      if (d.dane && d.dane.powierzchniaM2 > 0) {
+        await przelicz(d.dane);
+      } else {
+        setWynik(null);
+      }
     } catch {
       setBlad("Nie udało się połączyć z serwerem.");
     } finally {
       setLicze(false);
     }
+  }
+
+  // Analiza, gdy geometria nie została pobrana automatycznie — powierzchnia ręczna.
+  async function analizujZPowierzchnia() {
+    if (!dane) return;
+    const pow = Number(recznaPow);
+    if (!(pow > 0)) {
+      setBlad("Podaj powierzchnię działki (m²), aby kontynuować.");
+      return;
+    }
+    setBlad(null);
+    setLicze(true);
+    const noweDane = { ...dane, powierzchniaM2: pow };
+    setDane(noweDane);
+    await przelicz(noweDane);
+    setLicze(false);
   }
 
   async function przelicz(daneDoLiczenia: DaneDzialki, konfiguracja?: Partial<Konfiguracja>) {
@@ -226,6 +258,14 @@ export default function NowaAnalizaPage() {
       {krok === 1 && (
         <form onSubmit={analizujP1} className="space-y-4">
           <Karta tytul="Poziom 1 — identyfikacja działek" podtytul="Jedyne widoczne pola do wprowadzenia. Z TERYT składany jest identyfikator ULDK.">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-slate-500">Działki przykładowe (ULDK demo):</span>
+              {DZIALKI_DEMO.map((d) => (
+                <button key={d.label} type="button" onClick={() => setPozycje([{ ...d.p }])} className="text-xs border border-slate-300 rounded px-2 py-1 hover:bg-slate-50">
+                  {d.label}
+                </button>
+              ))}
+            </div>
             <div className="space-y-3">
               {pozycje.map((p, i) => (
                 <PozycjaWiersz
@@ -256,6 +296,32 @@ export default function NowaAnalizaPage() {
       {/* Wynik rozwiązania + A° potwierdzenie */}
       {dane && meta && (
         <PotwierdzenieDanych dane={dane} meta={meta} />
+      )}
+
+      {/* Działka spoza ULDK demo — brak geometrii, powierzchnia ręczna */}
+      {krok === 1 && dane && dane.powierzchniaM2 === 0 && (
+        <Karta tytul="Działka spoza przykładowego ULDK — podaj powierzchnię" podtytul="Provider demonstracyjny obejmuje 3 działki; dla pozostałych geometria nie jest pobierana automatycznie">
+          <p className="text-sm text-slate-600 mb-3">
+            Nie pobrano geometrii dla podanego identyfikatora. Po podłączeniu realnego ULDK powierzchnia i kształt
+            uzupełnią się automatycznie. Na razie podaj powierzchnię ręcznie, aby uruchomić analizę — albo skorzystaj z
+            działek przykładowych powyżej.
+          </p>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="text-sm">
+              <span className="text-xs text-slate-500">Powierzchnia (m²)</span>
+              <input
+                type="number"
+                value={recznaPow}
+                onChange={(e) => setRecznaPow(e.target.value)}
+                className="inp mt-0.5 w-40"
+                placeholder="np. 4000"
+              />
+            </label>
+            <button onClick={analizujZPowierzchnia} disabled={licze} className="bg-slate-900 text-white px-5 py-2.5 rounded-lg hover:bg-slate-700 disabled:opacity-50">
+              {licze ? "Liczę…" : "Analizuj z podaną powierzchnią"}
+            </button>
+          </div>
+        </Karta>
       )}
 
       {/* KROK 2 — ocena działki */}
