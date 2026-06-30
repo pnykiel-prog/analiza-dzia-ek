@@ -45,7 +45,7 @@ export interface KonfiguracjaKonektorow {
     infoFormat: string;
     aktywny: boolean;
   }[];
-  overpass: { aktywny: boolean; endpoint: string; promienM: number };
+  overpass: { aktywny: boolean; endpointy: string[]; promienM: number };
   /** Katalog pozostałych źródeł (mapa architektury; włączane w M2/M3). */
   katalog: { klucz: string; zrodlo: string; endpoint: string; poziom: "P1" | "P2"; etap: "M1" | "M2" | "M3"; aktywny: boolean }[];
 }
@@ -134,7 +134,17 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       aktywny: true,
     },
   ],
-  overpass: { aktywny: true, endpoint: "https://overpass-api.de/api/interpreter", promienM: 1500 },
+  overpass: {
+    aktywny: true,
+    // Kilka instancji — publiczny overpass-api.de bywa blokowany dla IP centrów
+    // danych (np. Vercel); przy niepowodzeniu próbujemy kolejnej (mirror).
+    endpointy: [
+      "https://overpass-api.de/api/interpreter",
+      "https://overpass.kumi.systems/api/interpreter",
+      "https://overpass.private.coffee/api/interpreter",
+    ],
+    promienM: 1500,
+  },
   katalog: [
     { klucz: "ULDK", zrodlo: "ULDK (GUGiK)", endpoint: "https://uldk.gugik.gov.pl/", poziom: "P1", etap: "M1", aktywny: true },
     { klucz: "GUS_BDL", zrodlo: "GUS BDL", endpoint: "https://bdl.stat.gov.pl/api/v1", poziom: "P1", etap: "M1", aktywny: true },
