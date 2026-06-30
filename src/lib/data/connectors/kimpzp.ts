@@ -56,7 +56,7 @@ export const konektorKIMPZP: Konektor = {
       INFO_FORMAT: cfg.infoFormat,
       FEATURE_COUNT: "5",
     });
-    const tekst = await fetchTekst(`${cfg.endpoint}?${params.toString()}`, KONFIG_KONEKTORY.siec);
+    const tekst = await fetchTekst(`${cfg.endpoint}?${params.toString()}`, { timeoutMs: 4500, proby: 1 });
     if (tekst === null) return brakWyniku(this.klucz, this.zrodlo, czas, "Brak odpowiedzi WMS.");
 
     const przeznaczenie = rozpoznajPrzeznaczenie(tekst);

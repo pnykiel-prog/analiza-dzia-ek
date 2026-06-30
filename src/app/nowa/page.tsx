@@ -50,7 +50,7 @@ export default function NowaAnalizaPage() {
   const [blad, setBlad] = useState<string | null>(null);
   const [licze, setLicze] = useState(false);
   const [recznaPow, setRecznaPow] = useState("");
-  const [trybWejscia, setTrybWejscia] = useState<"kaskada" | "id">("kaskada");
+  const [trybWejscia, setTrybWejscia] = useState<"kaskada" | "id">("id");
 
   // Override P2 (A±/R) — wartości jako stringi + zbiór skorygowanych pól.
   const [p2, setP2] = useState<Record<string, string>>({});
@@ -570,37 +570,30 @@ function PozycjaWiersz({
   const [powOpts, setPowOpts] = useState<OpcjaT[]>([]);
   const [gmOpts, setGmOpts] = useState<OpcjaT[]>([]);
   const [obrOpts, setObrOpts] = useState<OpcjaT[]>([]);
-  const [wojTeryt, setWojTeryt] = useState("");
-  const [powiatTeryt, setPowiatTeryt] = useState("");
 
-  // Kaskada z ULDK (z fallbackiem). Każdy poziom dociąga się po wyborze rodzica.
+  // Kaskada (podpowiedzi z mini-słownika). Dociąga po nazwie rodzica.
   useEffect(() => {
     pobierzOpcjeTeryt({ poziom: "wojewodztwa" }).then((o) => o.length && setWojOpts(o));
   }, []);
   useEffect(() => {
-    if (!wojTeryt) return setPowOpts([]);
-    pobierzOpcjeTeryt({ poziom: "powiaty", wojTeryt, wojNazwa: p.wojewodztwo }).then(setPowOpts);
-  }, [wojTeryt, p.wojewodztwo]);
+    if (!p.wojewodztwo) return setPowOpts([]);
+    pobierzOpcjeTeryt({ poziom: "powiaty", wojNazwa: p.wojewodztwo }).then(setPowOpts);
+  }, [p.wojewodztwo]);
   useEffect(() => {
-    if (!powiatTeryt) return setGmOpts([]);
-    pobierzOpcjeTeryt({ poziom: "gminy", powiatTeryt, wojNazwa: p.wojewodztwo, powiatNazwa: p.powiat }).then(setGmOpts);
-  }, [powiatTeryt, p.wojewodztwo, p.powiat]);
+    if (!p.wojewodztwo || !p.powiat) return setGmOpts([]);
+    pobierzOpcjeTeryt({ poziom: "gminy", wojNazwa: p.wojewodztwo, powiatNazwa: p.powiat }).then(setGmOpts);
+  }, [p.wojewodztwo, p.powiat]);
   useEffect(() => {
-    if (!p.gminaTeryt) return setObrOpts([]);
-    pobierzOpcjeTeryt({ poziom: "obreby", gminaTeryt: p.gminaTeryt, wojNazwa: p.wojewodztwo, powiatNazwa: p.powiat, gminaNazwa: p.gmina }).then(setObrOpts);
-  }, [p.gminaTeryt, p.wojewodztwo, p.powiat, p.gmina]);
+    if (!p.wojewodztwo || !p.powiat || !p.gmina) return setObrOpts([]);
+    pobierzOpcjeTeryt({ poziom: "obreby", wojNazwa: p.wojewodztwo, powiatNazwa: p.powiat, gminaNazwa: p.gmina }).then(setObrOpts);
+  }, [p.wojewodztwo, p.powiat, p.gmina]);
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-6 gap-2 items-end border border-slate-100 rounded-lg p-3">
       <Lab label="Województwo *">
         <select
           value={p.wojewodztwo}
-          onChange={(e) => {
-            const opt = wojOpts.find((o) => o.nazwa === e.target.value);
-            setWojTeryt(opt?.teryt ?? "");
-            setPowiatTeryt("");
-            onPatch(i, { wojewodztwo: e.target.value, powiat: "", gmina: "", obreb: "", gminaTeryt: undefined });
-          }}
+          onChange={(e) => onPatch(i, { wojewodztwo: e.target.value, powiat: "", gmina: "", obreb: "", gminaTeryt: undefined })}
           className="inp bg-white"
         >
           <option value="">—</option>
@@ -613,11 +606,7 @@ function PozycjaWiersz({
         <input
           list={`pow-${i}`}
           value={p.powiat}
-          onChange={(e) => {
-            const opt = powOpts.find((o) => o.nazwa === e.target.value);
-            setPowiatTeryt(opt?.teryt ?? "");
-            onPatch(i, { powiat: e.target.value, gmina: "", obreb: "", gminaTeryt: undefined });
-          }}
+          onChange={(e) => onPatch(i, { powiat: e.target.value, gmina: "", obreb: "", gminaTeryt: undefined })}
           className="inp"
         />
         <datalist id={`pow-${i}`}>{powOpts.map((x) => <option key={x.teryt} value={x.nazwa} />)}</datalist>

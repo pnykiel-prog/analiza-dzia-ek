@@ -66,7 +66,8 @@ function utworzKonektorWms(cfg: KonfiguracjaWms): Konektor {
       const czas = new Date().toISOString();
       const c = teren.centroid2180;
       if (!c) return brakWyniku(this.klucz, this.zrodlo, czas, "Brak centroidu (brak geometrii).");
-      const tekst = await fetchTekst(urlGetFeatureInfo(cfg, c), KONFIG_KONEKTORY.siec);
+      // Krótki timeout, bez retry — niedostępne WMS nie mają spowalniać analizy.
+      const tekst = await fetchTekst(urlGetFeatureInfo(cfg, c), { timeoutMs: 4500, proby: 1 });
       if (tekst === null) return brakWyniku(this.klucz, this.zrodlo, czas, "Brak odpowiedzi WMS.");
       const ocena = ocenOdpowiedzWms(tekst);
       if (ocena === "blad") return brakWyniku(this.klucz, this.zrodlo, czas, "Wyjątek WMS (sprawdź warstwę/endpoint).");
