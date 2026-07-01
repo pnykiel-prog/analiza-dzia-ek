@@ -133,6 +133,28 @@ test("MPZP: deklaracja wypełniającego zamyka brak planu (bez alertu)", () => {
   assert.ok(!zadekl.sygnaly.some((s) => s.tekst.includes("Brak MPZP")));
 });
 
+test("MPZP budowlany wyłącza bramki środowiskowe/formalne z braków P1 (przenosi na P2)", () => {
+  const d = {
+    ...wzorcowa,
+    statusPlanistyczny: "mpzp_mieszkaniowy" as const,
+    dostepDrogaPubliczna: null,
+    ryzykoPowodzioweSzczegolne: null,
+    natura2000: null,
+    ochronaWykluczajaca: null,
+    terenGorniczy: null,
+    osuwisko: null,
+    gruntLesny: null,
+    gruntRolnyKlasaIdoIII: null,
+    przeznaczenieSprzeczneZMieszkaniowa: null,
+    zabudowaMieszkaniowaWSasiedztwie: null,
+  };
+  const w = uruchomPoziom1(d);
+  // Żadna bramka nie jest „do weryfikacji" — plan je przesądza.
+  assert.ok(w.bramki.szczegoly.every((b) => b.status !== "do_weryfikacji"));
+  // Te pozycje nie pojawiają się w „Czego nie pobrano" na P1.
+  assert.ok(!w.braki.some((b) => /powodzi|natura|osuwisk|drogi|leśny|rolny|przeznaczenie|sąsiedztw/i.test(b.tytul)));
+});
+
 test("Pipeline: każdy poziom zasila następny (spójność id)", () => {
   for (const d of DZIALKI_PRZYKLADOWE) {
     const a = uruchomAnalize(d);
