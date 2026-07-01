@@ -173,11 +173,11 @@ function Wiersz({ e, v }: { e: string; v: number }) {
 function MontazPasek({ s }: { s: WynikScenariusza }) {
   const koszt = s.koszt.razem;
   const czesci = [
-    { e: "Grant", v: s.montaz.grant, kolor: "bg-green-500" },
-    { e: "Kredyt", v: s.montaz.kredyt, kolor: "bg-blue-500" },
-    { e: "Partycypacja", v: s.montaz.partycypacjaNajemcow, kolor: "bg-violet-500" },
-    { e: "Wkład gminy", v: s.montaz.wkladGminy, kolor: "bg-amber-500" },
-    { e: "Luka / środki własne", v: s.montaz.srodkiWlasne, kolor: "bg-slate-400" },
+    { e: "Grant", v: s.montaz.grant, kolor: "bg-grunt-chart-1" },
+    { e: "Kredyt", v: s.montaz.kredyt, kolor: "bg-grunt-ink" },
+    { e: "Partycypacja", v: s.montaz.partycypacjaNajemcow, kolor: "bg-grunt-chart-4" },
+    { e: "Wkład gminy", v: s.montaz.wkladGminy, kolor: "bg-grunt-chart-6" },
+    { e: "Luka / środki własne", v: s.montaz.srodkiWlasne, kolor: "bg-grunt-border-soft" },
   ].filter((c) => c.v > 0);
   return (
     <div>

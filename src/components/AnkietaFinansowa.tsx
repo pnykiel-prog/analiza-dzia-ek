@@ -19,6 +19,7 @@ import {
   ETYK_ZASOBU,
 } from "@/lib/finanse/etykiety";
 import { Karta } from "./ui";
+import { Chip, CalloutWalidacji } from "./grunt";
 
 const INWESTORZY = Object.keys(ETYK_INWESTORA) as TypInwestora[];
 const GRUNT_OPCJE = Object.keys(ETYK_GRUNTU) as SposobWniesieniaDzialki[];
@@ -40,13 +41,11 @@ export function AnkietaFinansowa({
   const [dataWniosku, setDataWniosku] = useState(domyslnaData ?? "2026-06-01");
   const sugestia = useMemo(() => sugerujRezim(dataWniosku), [dataWniosku]);
   const [rezim, setRezim] = useState<RezimFinansowy>(sugestia.rezim);
-  // Reżim śledzi sugestię z daty, dopóki użytkownik ręcznie nie zmieni (uproszczenie: podpowiedź).
   const [rezimReczny, setRezimReczny] = useState(false);
   const rezimEff = rezimReczny ? rezim : sugestia.rezim;
 
   const opcjeZasobu = useMemo(() => dostepneZasoby(rezimEff, typInwestora), [rezimEff, typInwestora]);
   const [typZasobu, setTypZasobu] = useState<TypZasobu>("SPOLECZNY_CZYNSZOWY");
-  // Jeśli bieżący zasób nie jest dostępny w nowej konfiguracji — wybierz pierwszy dostępny.
   const zasobEff = opcjeZasobu.some((o) => o.zasob === typZasobu) ? typZasobu : opcjeZasobu[0]?.zasob;
 
   const [sposobWniesieniaDzialki, setSposob] = useState<SposobWniesieniaDzialki>("APORT_GMINNY");
@@ -76,88 +75,93 @@ export function AnkietaFinansowa({
       tytul="Ankieta finansowa — kto pyta o analizę (brama Poziomu 3)"
       podtytul="Typ inwestora, zasób, reżim i sposób wniesienia działki determinują montaż i wynik finansowy"
     >
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="space-y-4">
         {/* Q1 — inwestor */}
-        <Sel label="Q1. Typ inwestora" value={typInwestora} onChange={(v) => setTypInwestora(v as TypInwestora)}
-          opcje={INWESTORZY.map((i) => [i, ETYK_INWESTORA[i]])} />
+        <Grupa label="Q1. Typ inwestora">
+          {INWESTORZY.map((i) => (
+            <Chip key={i} selected={typInwestora === i} onClick={() => setTypInwestora(i)}>{ETYK_INWESTORA[i]}</Chip>
+          ))}
+        </Grupa>
 
         {/* Q1a — udział gminy (SIM_MIESZANY) */}
         {typInwestora === "SIM_MIESZANY" && (
-          <Sel label="Q1a. Udział gminy" value={udzialGminy} onChange={(v) => setUdzialGminy(v as UdzialGminy)}
-            opcje={[["wiekszosciowy", "Większościowy"], ["mniejszosciowy", "Mniejszościowy"], ["symboliczny", "Symboliczny"]]} />
+          <Grupa label="Q1a. Udział gminy">
+            {(["wiekszosciowy", "mniejszosciowy", "symboliczny"] as UdzialGminy[]).map((u) => (
+              <Chip key={u} selected={udzialGminy === u} onClick={() => setUdzialGminy(u)}>
+                {u === "wiekszosciowy" ? "Większościowy" : u === "mniejszosciowy" ? "Mniejszościowy" : "Symboliczny"}
+              </Chip>
+            ))}
+          </Grupa>
         )}
-
-        {/* Q8 — data wniosku (steruje reżimem) */}
-        <label className="text-sm block">
-          <span className="text-xs text-slate-500">Q8. Data złożenia wniosku o finansowanie</span>
-          <input type="date" value={dataWniosku} onChange={(e) => setDataWniosku(e.target.value)} className="inp mt-0.5" />
-        </label>
-
-        {/* Q3 — reżim (sugerowany z daty) */}
-        <label className="text-sm block">
-          <span className="text-xs text-slate-500">Q3. Reżim prawny analizy</span>
-          <select
-            value={rezimEff}
-            onChange={(e) => { setRezim(e.target.value as RezimFinansowy); setRezimReczny(true); }}
-            className="inp bg-white mt-0.5"
-          >
-            <option value="current">{ETYK_REZIMU.current}</option>
-            <option value="future">{ETYK_REZIMU.future}</option>
-          </select>
-          <span className="text-[11px] text-slate-500">Sugerowany z daty: {ETYK_REZIMU[sugestia.rezim]}</span>
-        </label>
 
         {/* Q2 — zasób (dynamiczny filtr) */}
-        <label className="text-sm block">
-          <span className="text-xs text-slate-500">Q2. Typ zasobu (co ma powstać)</span>
-          <select value={zasobEff ?? ""} onChange={(e) => setTypZasobu(e.target.value as TypZasobu)} className="inp bg-white mt-0.5">
-            {opcjeZasobu.map((o) => (
-              <option key={o.zasob} value={o.zasob}>
-                {ETYK_ZASOBU[o.zasob]}{o.dostep === "ograniczony" ? " (ograniczony)" : ""}
-              </option>
-            ))}
-          </select>
-          <span className="text-[11px] text-slate-400">Filtrowane wg macierzy dostępu; „brak" ukryty.</span>
-        </label>
+        <Grupa label="Q2. Typ zasobu (co ma powstać)" podpis="Filtrowane wg macierzy dostępu; „brak” ukryty.">
+          {opcjeZasobu.map((o) => (
+            <Chip key={o.zasob} selected={zasobEff === o.zasob} limited={o.dostep === "ograniczony"} onClick={() => setTypZasobu(o.zasob)}>
+              {ETYK_ZASOBU[o.zasob]}
+            </Chip>
+          ))}
+        </Grupa>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          {/* Q8 — data wniosku */}
+          <label className="text-sm block">
+            <span className="text-[11px] font-medium text-grunt-text-muted2">Q8. Data złożenia wniosku o finansowanie</span>
+            <input type="date" value={dataWniosku} onChange={(e) => setDataWniosku(e.target.value)} className="inp mono mt-1" />
+          </label>
+
+          {/* Q3 — reżim (chipy, sugerowany z daty) */}
+          <div>
+            <span className="text-[11px] font-medium text-grunt-text-muted2">Q3. Reżim prawny analizy</span>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {(["current", "future"] as RezimFinansowy[]).map((r) => (
+                <Chip key={r} selected={rezimEff === r} onClick={() => { setRezim(r); setRezimReczny(true); }}>{ETYK_REZIMU[r]}</Chip>
+              ))}
+            </div>
+            <span className="text-[10px] text-grunt-text-faint2">Sugerowany z daty: {ETYK_REZIMU[sugestia.rezim]}</span>
+          </div>
+        </div>
 
         {/* Q4 — sposób wniesienia działki */}
-        <Sel label="Q4. Sposób wniesienia działki" value={sposobWniesieniaDzialki} onChange={(v) => setSposob(v as SposobWniesieniaDzialki)}
-          opcje={GRUNT_OPCJE.map((g) => [g, ETYK_GRUNTU[g]])} />
+        <Grupa label="Q4. Sposób wniesienia działki">
+          {GRUNT_OPCJE.map((g) => (
+            <Chip key={g} selected={sposobWniesieniaDzialki === g} onClick={() => setSposob(g)}>{ETYK_GRUNTU[g]}</Chip>
+          ))}
+        </Grupa>
 
         {/* Q5 — współpraca z gminą */}
-        <Sel label="Q5. Forma współpracy z gminą" value={wspolpracaGmina} onChange={(v) => setWspolpraca(v as WspolpracaGmina)}
-          opcje={WSPOLPRACA_OPCJE.map((w) => [w, ETYK_WSPOLPRACY[w]])} />
+        <Grupa label="Q5. Forma współpracy z gminą">
+          {WSPOLPRACA_OPCJE.map((w) => (
+            <Chip key={w} selected={wspolpracaGmina === w} onClick={() => setWspolpraca(w)}>{ETYK_WSPOLPRACY[w]}</Chip>
+          ))}
+        </Grupa>
+
+        {/* Checkboxy Q1b / Q6 / Q7 */}
+        <div className="flex flex-wrap gap-x-6 gap-y-2 pt-1">
+          {KWALIFIKACJA_INVESTEU.includes(typInwestora) && (
+            <Chk label="Q1b. Nowo utworzony podmiot bez zdolności kredytowej (gwarancja InvestEU)" checked={nowyPodmiot} onChange={setNowyPodmiot} />
+          )}
+          <Chk label="Q6. Efektywność energetyczna / OZE (FEnIKS)" checked={efektywnoscEnergetyczna} onChange={setEE} />
+          <Chk label="Q7. Mieszkanie na Start (dopłata do czynszu — OPEX)" checked={mieszkanieNaStart} onChange={setMnS} />
+        </div>
       </div>
 
-      {/* Checkboxy Q1b / Q6 / Q7 */}
-      <div className="flex flex-wrap gap-4 mt-3">
-        {KWALIFIKACJA_INVESTEU.includes(typInwestora) && (
-          <Chk label="Q1b. Nowo utworzony podmiot bez zdolności kredytowej (gwarancja InvestEU)" checked={nowyPodmiot} onChange={setNowyPodmiot} />
+      {/* Walidacja / okno przejściowe */}
+      <div className="mt-4 space-y-2">
+        {sugestia.oknoPrzejsciowe && (
+          <CalloutWalidacji ton="ostrzezenie" tytul="Okno przejściowe 2027–2028" opis={`${sugestia.uzasadnienie} Analiza pokaże porównanie obu reżimów.`} />
         )}
-        <Chk label="Q6. Efektywność energetyczna / OZE (FEnIKS)" checked={efektywnoscEnergetyczna} onChange={setEE} />
-        <Chk label="Q7. Mieszkanie na Start (dopłata do czynszu — OPEX)" checked={mieszkanieNaStart} onChange={setMnS} />
+        {walidacja?.zablokowana && <CalloutWalidacji ton="blad" tytul="Profil zablokowany" opis={walidacja.ostrzezenia[0]} />}
+        {walidacja && !walidacja.zablokowana && walidacja.dostep === "ograniczony" && (
+          <CalloutWalidacji ton="ostrzezenie" tytul="Dostęp ograniczony" opis={walidacja.ostrzezenia[0]} />
+        )}
       </div>
-
-      {sugestia.oknoPrzejsciowe && (
-        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3">
-          ⚑ {sugestia.uzasadnienie} Analiza pokaże porównanie obu reżimów.
-        </p>
-      )}
-      {walidacja?.zablokowana && (
-        <p className="text-xs text-red-800 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mt-3">
-          ⛔ {walidacja.ostrzezenia[0]}
-        </p>
-      )}
-      {walidacja && !walidacja.zablokowana && walidacja.dostep === "ograniczony" && (
-        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3">
-          ⚑ {walidacja.ostrzezenia[0]}
-        </p>
-      )}
 
       <button
         onClick={() => profil && onSubmit(profil)}
         disabled={licze || !profil || !!walidacja?.zablokowana}
-        className="mt-4 bg-slate-900 text-white px-5 py-2.5 rounded-lg hover:bg-slate-700 disabled:opacity-50"
+        className="btn-primary mt-4"
+        style={{ height: "var(--grunt-h-cta)" }}
       >
         {licze ? "Składam montaż i liczę…" : "Zatwierdź profil i złóż montaż →"}
       </button>
@@ -165,21 +169,20 @@ export function AnkietaFinansowa({
   );
 }
 
-function Sel({ label, value, onChange, opcje }: { label: string; value: string; onChange: (v: string) => void; opcje: [string, string][] }) {
+function Grupa({ label, podpis, children }: { label: string; podpis?: string; children: React.ReactNode }) {
   return (
-    <label className="text-sm block">
-      <span className="text-xs text-slate-500">{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="inp bg-white mt-0.5">
-        {opcje.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
-      </select>
-    </label>
+    <div>
+      <span className="text-[11px] font-medium text-grunt-text-muted2">{label}</span>
+      <div className="flex flex-wrap gap-2 mt-1.5">{children}</div>
+      {podpis && <span className="text-[10px] text-grunt-text-faint2 mt-1 block">{podpis}</span>}
+    </div>
   );
 }
 
 function Chk({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label className="flex items-center gap-2 text-sm text-slate-700">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="w-4 h-4" />
+    <label className="flex items-center gap-2 text-[12.5px] text-grunt-text-3">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="w-4 h-4 accent-grunt-ink" />
       {label}
     </label>
   );

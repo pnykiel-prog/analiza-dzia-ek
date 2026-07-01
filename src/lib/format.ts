@@ -61,10 +61,10 @@ export const etykietaRezimu: Record<Rezim, string> = {
 export function kolorWerdyktu(w: Werdykt): { bg: string; text: string; kropka: string } {
   switch (w) {
     case "zielony":
-      return { bg: "bg-green-100", text: "text-green-800", kropka: "bg-green-500" };
+      return { bg: "bg-grunt-green-bg", text: "text-grunt-green", kropka: "bg-grunt-green" };
     case "zolty":
-      return { bg: "bg-yellow-100", text: "text-yellow-800", kropka: "bg-yellow-500" };
+      return { bg: "bg-grunt-amber-bg", text: "text-grunt-amber-text", kropka: "bg-grunt-amber" };
     case "czerwony":
-      return { bg: "bg-red-100", text: "text-red-800", kropka: "bg-red-500" };
+      return { bg: "bg-grunt-red-bg", text: "text-grunt-red", kropka: "bg-grunt-red" };
   }
 }

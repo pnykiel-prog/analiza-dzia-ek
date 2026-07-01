@@ -5,11 +5,11 @@ import { Karta, Flagi } from "./ui";
 const zakres = (z: Zakres, suf = "%") => (z.min === z.max ? `${z.min}${suf}` : `${z.min}–${z.max}${suf}`);
 
 const KOLOR_SKLADNIKA: Record<SkladnikMontazu["klucz"], string> = {
-  grant: "bg-green-500",
-  kredyt: "bg-blue-500",
-  partycypacja: "bg-violet-500",
-  kapital_wlasny: "bg-amber-500",
-  grunt: "bg-slate-400",
+  grant: "bg-grunt-chart-1",
+  kredyt: "bg-grunt-ink",
+  partycypacja: "bg-grunt-chart-4",
+  kapital_wlasny: "bg-grunt-chart-6",
+  grunt: "bg-grunt-border-soft",
 };
 
 export function AnalizaFinansowaView({ a }: { a: AnalizaFinansowa }) {

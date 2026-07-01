@@ -1,12 +1,13 @@
 import type { WynikPoziom1 } from "@/lib/types";
 import { Karta, Pasek, Statystyka, WerdyktBadge, Flagi } from "./ui";
+import { WskaznikPewnosci } from "./grunt";
 import { etykietaProfilu, liczba, pct } from "@/lib/format";
 
 const STATUS_BRAMKI: Record<string, { etykieta: string; klasa: string }> = {
-  pass: { etykieta: "pass", klasa: "bg-green-100 text-green-800" },
-  warunkowo: { etykieta: "warunkowo", klasa: "bg-yellow-100 text-yellow-800" },
-  fail: { etykieta: "fail", klasa: "bg-red-100 text-red-800" },
-  do_weryfikacji: { etykieta: "do weryfikacji", klasa: "bg-slate-100 text-slate-600" },
+  pass: { etykieta: "pass", klasa: "bg-grunt-green-bg text-grunt-green" },
+  warunkowo: { etykieta: "warunkowo", klasa: "bg-grunt-amber-bg text-grunt-amber-text" },
+  fail: { etykieta: "fail", klasa: "bg-grunt-red-bg text-grunt-red" },
+  do_weryfikacji: { etykieta: "do weryfikacji", klasa: "bg-grunt-neutral-bg text-grunt-text-muted" },
 };
 
 export function Poziom1View({ p1 }: { p1: WynikPoziom1 }) {
@@ -17,30 +18,31 @@ export function Poziom1View({ p1 }: { p1: WynikPoziom1 }) {
       <Karta
         tytul="Werdykt wstępny"
         podtytul="Dwa profile oceniane niezależnie (te same wymiary, inne wagi)"
-        prawy={<span className="text-xs text-slate-500">Pewność: <strong>{p1.pewnosc}%</strong></span>}
+        prawy={<WskaznikPewnosci pewnosc={p1.pewnosc} />}
       >
         <div className="grid md:grid-cols-2 gap-4">
-          <div className="rounded-lg border border-slate-200 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-medium text-slate-700">Dla młodych</span>
-              <WerdyktBadge w={p1.werdyktMlodzi} etykieta={`${p1.scoreMlodzi}/100`} />
-            </div>
-            <Pasek wartosc={p1.scoreMlodzi} />
-          </div>
-          <div className="rounded-lg border border-slate-200 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-medium text-slate-700">Senioralny</span>
-              <WerdyktBadge w={p1.werdyktSeniorzy} etykieta={`${p1.scoreSeniorzy}/100`} />
-            </div>
-            <Pasek wartosc={p1.scoreSeniorzy} />
-          </div>
+          <KartaWerdyktu
+            nazwa="Dla młodych"
+            profil="mlodzi"
+            rekomendowany={p1.profilRekomendowany === "mlodzi" || p1.profilRekomendowany === "oba"}
+            score={p1.scoreMlodzi}
+            werdykt={p1.werdyktMlodzi}
+          />
+          <KartaWerdyktu
+            nazwa="Senioralny"
+            profil="seniorzy"
+            rekomendowany={p1.profilRekomendowany === "seniorzy" || p1.profilRekomendowany === "oba"}
+            score={p1.scoreSeniorzy}
+            werdykt={p1.werdyktSeniorzy}
+          />
         </div>
-        <div className="mt-3 text-sm text-slate-600">
-          Profil rekomendowany: <strong className="text-slate-800">{etykietaProfilu[p1.profilRekomendowany]}</strong>
+        <div className="mt-3 text-[13px] text-grunt-text-muted">
+          Profil rekomendowany: <strong className="text-grunt-text">{etykietaProfilu[p1.profilRekomendowany]}</strong>
         </div>
         {p1.pewnosc < 70 && (
-          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3">
-            Niski wskaźnik pewności — werdykt wstępny, do potwierdzenia w Poziomie 2 (białe plamy w danych).
+          <p className="text-[12px] text-grunt-amber-text bg-grunt-amber-bg border border-grunt-amber/25 rounded-md px-3 py-2 mt-3">
+            Niski wskaźnik pewności — werdykt wstępny, do potwierdzenia w Poziomie 2 (białe plamy w danych). Brak
+            danych nie blokuje analizy — obniża pewność.
           </p>
         )}
       </Karta>
@@ -119,5 +121,44 @@ export function Poziom1View({ p1 }: { p1: WynikPoziom1 }) {
         </Karta>
       )}
     </>
+  );
+}
+
+function KartaWerdyktu({
+  nazwa,
+  profil,
+  rekomendowany,
+  score,
+  werdykt,
+}: {
+  nazwa: string;
+  profil: "mlodzi" | "seniorzy";
+  rekomendowany: boolean;
+  score: number;
+  werdykt: import("@/lib/types").Werdykt;
+}) {
+  const tint = profil === "mlodzi" ? "bg-grunt-young-bg" : "bg-grunt-senior-bg";
+  const dot = profil === "mlodzi" ? "bg-grunt-young" : "bg-grunt-senior";
+  const txt = profil === "mlodzi" ? "text-grunt-young" : "text-grunt-senior";
+  return (
+    <div
+      className={`relative rounded-panel border p-4 ${rekomendowany ? "border-grunt-ink shadow-raised" : "border-grunt-border"}`}
+    >
+      {rekomendowany && (
+        <span className="absolute -top-2 right-3 badge bg-grunt-ink text-white">★ Rekomendowany</span>
+      )}
+      <div className={`flex items-center gap-2 -mx-4 -mt-4 mb-3 px-4 py-2 rounded-t-panel ${tint}`}>
+        <span className={`w-2.5 h-2.5 rounded-full ${dot}`} />
+        <span className={`text-[13px] font-semibold ${txt}`}>{nazwa}</span>
+      </div>
+      <div className="flex items-end justify-between mb-2">
+        <span className="mono text-[32px] font-semibold leading-none text-grunt-text">
+          {score}
+          <span className="text-[15px] text-grunt-text-faint2">/100</span>
+        </span>
+        <WerdyktBadge w={werdykt} />
+      </div>
+      <Pasek wartosc={score} />
+    </div>
   );
 }
