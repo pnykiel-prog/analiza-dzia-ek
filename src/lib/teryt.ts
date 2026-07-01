@@ -33,6 +33,33 @@ export function terytGminy(woj: string, powiat: string, gmina: string): string |
   return DRZEWO_TERYT[woj]?.[powiat]?.[gmina] ?? null;
 }
 
+/** Odwrotny indeks: kod TERYT gminy (ULDK, np. „146509_8" lub „146509") → jednostka. */
+let REV_TERYT: Map<string, { wojewodztwo: string; powiat: string; gmina: string }> | null = null;
+
+function budujOdwrotny(): void {
+  REV_TERYT = new Map();
+  for (const [woj, powiaty] of Object.entries(DRZEWO_TERYT))
+    for (const [pow, gminy] of Object.entries(powiaty))
+      for (const [nazwa, kod] of Object.entries(gminy)) {
+        // Nazwa bazowa bez etykiety rodzaju („(gmina wiejska)" itd.) — pod GUS/units-search.
+        const gmina = nazwa.replace(/\s*\(.*\)\s*$/, "").trim();
+        const jedn = { wojewodztwo: woj, powiat: pow, gmina };
+        REV_TERYT.set(kod, jedn);
+        REV_TERYT.set(kod.split("_")[0], jedn); // fallback: sam 6-cyfrowy kod gminy
+      }
+}
+
+/**
+ * Rozpoznaje jednostkę administracyjną z prefiksu TERYT identyfikatora działki.
+ * Akceptuje kod gminy ULDK („146509_8"), sam kod 6-cyfrowy („146509") lub pełny
+ * identyfikator działki („146509_8.0012.123/4"). Zwraca null, gdy kod nieznany.
+ */
+export function odwrotnyTeryt(kodLubId: string): { wojewodztwo: string; powiat: string; gmina: string } | null {
+  if (!REV_TERYT) budujOdwrotny();
+  const kodGminy = kodLubId.trim().split(".")[0]; // odetnij obręb/numer, jeśli podano pełny id
+  return REV_TERYT!.get(kodGminy) ?? REV_TERYT!.get(kodGminy.split("_")[0]) ?? null;
+}
+
 /** Dane jednej pozycji identyfikacyjnej z formularza. */
 export interface PozycjaDzialki {
   wojewodztwo: string;

@@ -9,7 +9,7 @@
 
 import type { DaneDzialki } from "../types";
 import { DZIALKI_PRZYKLADOWE } from "./sample";
-import { skomponujId, type PozycjaDzialki } from "../teryt";
+import { skomponujId, odwrotnyTeryt, type PozycjaDzialki } from "../teryt";
 import { statusRynkowy } from "../fieldModes";
 import { pobierzDzialkePoId } from "./uldk";
 import { centroid, centroid4326ZWkt, czyPrzylegaja } from "../geo";
@@ -205,6 +205,21 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
     // Brak danych automatycznych: szkielet z samej identyfikacji (powierzchnia ręczna).
     const p = pozycje[0];
     dane = szkieletDanych(idy.join(" + ") || skomponujId(p).id, p);
+  }
+
+  // Uzupełnij część administracyjną z prefiksu TERYT identyfikatora (tryb ID bez ULDK):
+  // dzięki temu konektory regionalne (rynek/wartość offline) i GUS (po nazwie gminy)
+  // mają województwo/gminę nawet gdy ULDK nie zwróciło danych.
+  if (dane) {
+    const rev = odwrotnyTeryt(dane.id);
+    if (rev) {
+      dane = {
+        ...dane,
+        wojewodztwo: dane.wojewodztwo || rev.wojewodztwo,
+        powiat: dane.powiat || rev.powiat,
+        gmina: dane.gmina || rev.gmina,
+      };
+    }
   }
 
   // Uruchom konektory danych (GUS, KIMPZP, …) na scalonym terenie i dopełnij białe plamy.

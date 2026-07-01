@@ -16,8 +16,25 @@ const ETYK_PODSTAWA: Record<string, string> = {
  */
 export function Poziom1View({ p1, pelny = true }: { p1: WynikPoziom1; pelny?: boolean }) {
   const poj = p1.pojemnosc;
+  // Ile składników popytu opiera się na fallbacku (brak danych demograficznych/rynkowych).
+  const fallbackM = p1.popyt.mlodzi.skladniki.filter((s) => s.fallback).length;
+  const fallbackS = p1.popyt.seniorzy.skladniki.filter((s) => s.fallback).length;
+  const brakDanychPopytu = Math.max(fallbackM, fallbackS) >= 3;
   return (
     <>
+      {brakDanychPopytu && (
+        <div className="flex items-start gap-3 rounded-md border border-grunt-amber/25 bg-grunt-amber-bg px-3.5 py-2.5">
+          <span className="mono grid place-items-center shrink-0 w-6 h-6 rounded-full bg-grunt-amber text-white text-[13px] font-bold">!</span>
+          <div>
+            <div className="text-[13px] font-semibold text-grunt-amber-text">Brak danych demograficznych/rynkowych dla tej działki</div>
+            <div className="text-[12px] text-grunt-text-muted">
+              Źródło automatyczne (GUS BDL / rynek) nie zwróciło danych dla tej gminy, więc popyt liczony jest z wartości domyślnych —
+              werdykt jest orientacyjny i będzie zbliżony niezależnie od działki. Sprawdź „Raport źródeł danych” (widok administratora),
+              aby zobaczyć status źródeł.
+            </div>
+          </div>
+        </div>
+      )}
       {p1.funkcjaMieszkaniowaDozwolona === false && (
         <div className="flex items-start gap-3 rounded-md border border-grunt-red/25 bg-grunt-red-bg px-3.5 py-2.5">
           <span className="mono grid place-items-center shrink-0 w-6 h-6 rounded-full bg-grunt-red text-white text-[13px] font-bold">✕</span>
