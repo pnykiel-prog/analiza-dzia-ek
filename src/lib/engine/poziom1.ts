@@ -32,16 +32,26 @@ function liczBramki(d: DaneDzialki): { szczegoly: WynikBramki[]; flagi: string[]
   const szczegoly: WynikBramki[] = [];
   const flagi: string[] = [];
 
+  // MPZP z przeznaczeniem budowlanym jest aktem nadrzędnym: przesądza dostęp do
+  // drogi, kwestie środowiskowe/powodziowe/górnicze (plan uchwalony z SOOŚ),
+  // odrolnienie/odlesienie i sąsiedztwo (WZ bezprzedmiotowe). Dlatego przy braku
+  // danych te bramki NIE są „białą plamą" P1 — zostają objęte planem, a szczegóły
+  // przechodzą na Poziom 2.
+  const objetePlanem = d.statusPlanistyczny === "mpzp_mieszkaniowy";
+
   const trojstan = (
     nazwa: string,
     zrodlo: string,
     warunek: boolean | null,
     gdyTrue: StatusBramki,
     uzasadnienieTrue: string,
-    uzasadnieniePass = "Brak przeciwwskazań."
+    uzasadnieniePass = "Brak przeciwwskazań.",
+    planemObjete = false
   ): void => {
     if (warunek === null) {
-      szczegoly.push({ nazwa, zrodlo, status: "do_weryfikacji", uzasadnienie: "Brak danych — do weryfikacji (biała plama ≠ wykluczenie)." });
+      if (planemObjete)
+        szczegoly.push({ nazwa, zrodlo, status: "pass", uzasadnienie: "Przesądzone w MPZP (plan budowlany) — szczegóły na Poziomie 2." });
+      else szczegoly.push({ nazwa, zrodlo, status: "do_weryfikacji", uzasadnienie: "Brak danych — do weryfikacji (biała plama ≠ wykluczenie)." });
     } else if (warunek) {
       szczegoly.push({ nazwa, zrodlo, status: gdyTrue, uzasadnienie: uzasadnienieTrue });
     } else {
@@ -54,7 +64,9 @@ function liczBramki(d: DaneDzialki): { szczegoly: WynikBramki[]; flagi: string[]
     "BDOT10k / OSM",
     d.dostepDrogaPubliczna === null ? null : !d.dostepDrogaPubliczna,
     "warunkowo",
-    "Brak dostępu do drogi publicznej — możliwa służebność (flaga)."
+    "Brak dostępu do drogi publicznej — możliwa służebność (flaga).",
+    "Brak przeciwwskazań.",
+    objetePlanem
   );
   if (d.dostepDrogaPubliczna === false) flagi.push("Brak dostępu do drogi publicznej");
 
@@ -63,14 +75,18 @@ function liczBramki(d: DaneDzialki): { szczegoly: WynikBramki[]; flagi: string[]
     "ISOK / Hydroportal",
     d.ryzykoPowodzioweSzczegolne,
     "fail",
-    "Działka w obszarze szczególnego zagrożenia powodzią — wykluczenie."
+    "Działka w obszarze szczególnego zagrożenia powodzią — wykluczenie.",
+    "Brak przeciwwskazań.",
+    objetePlanem
   );
 
-  const gruntChroniony =
-    d.gruntLesny === null && d.gruntRolnyKlasaIdoIII === null
+  // Przy MPZP budowlanym przeznaczenie budowlane jest przesądzone (odrolnienie/
+  // odlesienie nastąpiło na etapie planu) — bramka nieaktywna.
+  const gruntChroniony = objetePlanem
+    ? false
+    : d.gruntLesny === null && d.gruntRolnyKlasaIdoIII === null
       ? null
-      : (d.gruntLesny === true || d.gruntRolnyKlasaIdoIII === true) &&
-        d.statusPlanistyczny !== "mpzp_mieszkaniowy";
+      : d.gruntLesny === true || d.gruntRolnyKlasaIdoIII === true;
   trojstan(
     "Grunt leśny (Ls) lub rolny kl. I–III bez przeznaczenia budowlanego",
     "EGiB",
@@ -85,15 +101,33 @@ function liczBramki(d: DaneDzialki): { szczegoly: WynikBramki[]; flagi: string[]
     "GDOŚ Geoserwis",
     d.ochronaWykluczajaca,
     "fail",
-    "Wykluczająca forma ochrony przyrody."
+    "Wykluczająca forma ochrony przyrody.",
+    "Brak przeciwwskazań.",
+    objetePlanem
   );
 
-  trojstan("Natura 2000", "GDOŚ Geoserwis", d.natura2000, "warunkowo", "Obszar Natura 2000 — ograniczenia, wymagana ocena (flaga).");
+  trojstan(
+    "Natura 2000",
+    "GDOŚ Geoserwis",
+    d.natura2000,
+    "warunkowo",
+    "Obszar Natura 2000 — ograniczenia, wymagana ocena (flaga).",
+    "Brak przeciwwskazań.",
+    objetePlanem
+  );
   if (d.natura2000 === true) flagi.push("Natura 2000");
 
   const gorniczeOsuwisko =
     d.terenGorniczy === null && d.osuwisko === null ? null : d.terenGorniczy === true || d.osuwisko === true;
-  trojstan("Teren górniczy / osuwisko (SOPO)", "MIDAS / SOPO", gorniczeOsuwisko, "warunkowo", "Teren górniczy lub osuwiskowy — ograniczenia posadowienia (flaga).");
+  trojstan(
+    "Teren górniczy / osuwisko (SOPO)",
+    "MIDAS / SOPO",
+    gorniczeOsuwisko,
+    "warunkowo",
+    "Teren górniczy lub osuwiskowy — ograniczenia posadowienia (flaga).",
+    "Brak przeciwwskazań.",
+    objetePlanem
+  );
   if (gorniczeOsuwisko) flagi.push("Teren górniczy / osuwisko");
 
   const sprzeczne =
@@ -105,7 +139,9 @@ function liczBramki(d: DaneDzialki): { szczegoly: WynikBramki[]; flagi: string[]
     "KIMPZP / Rejestr Urbanistyczny",
     sprzeczne,
     "fail",
-    "Przeznaczenie sprzeczne z funkcją mieszkaniową — wykluczenie."
+    "Przeznaczenie sprzeczne z funkcją mieszkaniową — wykluczenie.",
+    "Brak przeciwwskazań.",
+    objetePlanem
   );
 
   return { szczegoly, flagi };
@@ -191,13 +227,18 @@ function liczWymiary(
     0.6,
     pn
   );
-  const mSasiedztwo = metryka(
-    "Spójność z zabudową sąsiedztwa (dobre sąsiedztwo / WZ)",
-    d.zabudowaMieszkaniowaWSasiedztwie === null ? null : d.zabudowaMieszkaniowaWSasiedztwie ? "mieszkaniowa w sąsiedztwie" : "brak",
-    d.zabudowaMieszkaniowaWSasiedztwie === null ? null : d.zabudowaMieszkaniowaWSasiedztwie ? 100 : 30,
-    0.4,
-    pn
-  );
+  // Przy MPZP budowlanym kryterium „dobrego sąsiedztwa"/WZ jest bezprzedmiotowe
+  // (WZ wydaje się tylko wobec braku planu) — nie traktujemy go jako białej plamy.
+  const mSasiedztwo =
+    d.statusPlanistyczny === "mpzp_mieszkaniowy"
+      ? metryka("Spójność z zabudową sąsiedztwa (dobre sąsiedztwo / WZ)", "MPZP — kryterium bezprzedmiotowe", 100, 0.4, pn)
+      : metryka(
+          "Spójność z zabudową sąsiedztwa (dobre sąsiedztwo / WZ)",
+          d.zabudowaMieszkaniowaWSasiedztwie === null ? null : d.zabudowaMieszkaniowaWSasiedztwie ? "mieszkaniowa w sąsiedztwie" : "brak",
+          d.zabudowaMieszkaniowaWSasiedztwie === null ? null : d.zabudowaMieszkaniowaWSasiedztwie ? 100 : 30,
+          0.4,
+          pn
+        );
   const w1Metryki = [mStatus, mSasiedztwo];
   const w1 = sredniaWazona(w1Metryki);
 
@@ -439,7 +480,7 @@ function liczSygnaly(d: DaneDzialki, szczegoly: WynikBramki[], cfg: Konfiguracja
   poz(d.zlobkiSzkolyWZasiegu, "Szkoła / żłobek w zasięgu");
   poz(d.pozWZasiegu, "POZ w zasięgu");
   poz(d.uslugiPodstawowePieszo, "Usługi podstawowe pieszo");
-  poz(d.zabudowaMieszkaniowaWSasiedztwie, "Zabudowa mieszkaniowa w sąsiedztwie");
+  if (d.statusPlanistyczny !== "mpzp_mieszkaniowy") poz(d.zabudowaMieszkaniowaWSasiedztwie, "Zabudowa mieszkaniowa w sąsiedztwie");
   if (d.statusPlanistyczny === "brak_danych" && d.mpzpZadeklarowany !== true)
     s.push({ tekst: "Brak MPZP — biała plama planistyczna", ton: "ostrzezenie" });
   const luka = lukaPctZDanych(d, cfg);
