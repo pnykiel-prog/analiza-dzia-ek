@@ -21,9 +21,15 @@ async function spij(ms: number) {
   await new Promise((r) => setTimeout(r, ms));
 }
 
+/** Bezpieczny górny limit prób — twardy backstop anty-pętlowy (spec §3.1). */
+const MAX_PROB = 3;
+
 /** Fetch tekstu z timeoutem i retry/backoff. Zwraca null przy wyczerpaniu prób. */
 export async function fetchTekst(url: string, opcje: OpcjeFetch = {}): Promise<string | null> {
-  const { timeoutMs = 8000, proby = 2, backoffMs = 500, naglowki } = opcje;
+  const { timeoutMs = 8000, backoffMs = 500, naglowki } = opcje;
+  // Spec §3.1: jedna próba + timeout. `proby` domyślnie 1; twardo ograniczone do MAX_PROB,
+  // by żaden override nie mógł stworzyć nieograniczonej pętli ponawiania.
+  const proby = Math.max(1, Math.min(opcje.proby ?? 1, MAX_PROB));
   for (let i = 0; i < proby; i++) {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);

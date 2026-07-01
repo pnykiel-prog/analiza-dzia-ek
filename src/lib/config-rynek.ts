@@ -77,3 +77,56 @@ const MEDIANA_DOMYSLNA = { czynsz: 42, cenaNowych: 8500 };
 export function medianaRynkowa(woj: string): { czynsz: number; cenaNowych: number } {
   return MEDIANA_RYNKOWA[woj] ?? MEDIANA_DOMYSLNA;
 }
+
+// ── Reguła wystarczalności rynku (drabina przestrzenna, spec §7) ─────────────
+
+export type PoziomDrabiny = "miejscowosc" | "gmina" | "powiat" | "wojewodztwo";
+
+export interface WynikDrabiny {
+  czynsz: number;
+  cenaNowych: number;
+  /** Szczebel, z którego pochodzą wartości (najniższy z wystarczającą próbą). */
+  poziom: PoziomDrabiny;
+  /** Liczba ofert w próbie (0 = brak podłączonego źródła ofert lokalnych). */
+  n: number;
+}
+
+/** Progi wystarczalności próby ofert (N): ≥30 wiarygodne, 10–29 szacunek, <10 degradacja. */
+export const PROGI_OFERT = { wiarygodne: 30, szacunek: 10 };
+
+/**
+ * Drabina przestrzenna miejscowość→gmina→powiat→województwo: maks. JEDNA próba na
+ * szczebel (spec §3.1/§7), schodzenie w dół tylko przy niewystarczającej próbie.
+ * Brak otwartego API ofert → szczeble lokalne zwracają 0 ofert i schodzimy do
+ * mediany wojewódzkiej (fallback). Po podłączeniu realnego źródła ofert wystarczy,
+ * by `probaOfert` zwracała n>0 na właściwym szczeblu — logika drabiny bez zmian.
+ */
+export function drabinaRynkowa(
+  woj: string,
+  gmina = "",
+  powiat = "",
+  probaOfert: (poziom: PoziomDrabiny, klucz: string) => { czynsz: number; cenaNowych: number; n: number } | null = () => null
+): WynikDrabiny {
+  const szczeble: { poziom: PoziomDrabiny; klucz: string }[] = [
+    { poziom: "miejscowosc", klucz: gmina },
+    { poziom: "gmina", klucz: gmina },
+    { poziom: "powiat", klucz: powiat },
+  ];
+  for (const { poziom, klucz } of szczeble) {
+    if (!klucz) continue;
+    const p = probaOfert(poziom, klucz); // jedna próba na szczebel
+    if (p && p.n >= PROGI_OFERT.szacunek) {
+      return { czynsz: p.czynsz, cenaNowych: p.cenaNowych, poziom, n: p.n };
+    }
+  }
+  // Fallback wojewódzki (statystyczny, nie zliczone oferty): n=0 → degradacja pewności.
+  const m = medianaRynkowa(woj);
+  return { czynsz: m.czynsz, cenaNowych: m.cenaNowych, poziom: "wojewodztwo", n: 0 };
+}
+
+/** Pewność [0–100] z liczby ofert wg progów wystarczalności. */
+export function pewnoscOfert(n: number): number {
+  if (n >= PROGI_OFERT.wiarygodne) return 85;
+  if (n >= PROGI_OFERT.szacunek) return 60;
+  return 45; // niewystarczające → fallback regionalny
+}
