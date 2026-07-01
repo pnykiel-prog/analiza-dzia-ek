@@ -13,6 +13,7 @@ import { Poziom2View } from "@/components/Poziom2View";
 import { Poziom3View } from "@/components/Poziom3View";
 import { AnkietaFinansowa } from "@/components/AnkietaFinansowa";
 import { Stepper, BannerBramki } from "@/components/grunt";
+import { PodgladTerenu, type TrybMapy, type WarstwyMapy } from "@/components/GruntMap";
 import { liczba } from "@/lib/format";
 
 interface MetaRozw {
@@ -380,6 +381,12 @@ export default function NowaAnalizaPage() {
       {/* KROK 2 — ocena działki */}
       {krok === 2 && dane && (
         <div className="space-y-4">
+          <PodgladTerenu
+            mode={meta?.przylegajace === false ? "nonadjacent" : "ok"}
+            view="level2"
+            height={340}
+            layers={warstwyP2(dane, wynik?.poziom1.profilRekomendowany)}
+          />
           <Karta tytul="Poziom 2 — planistyka (A±)" podtytul="Uzupełnione automatycznie, profesjonalista koryguje wg wypisu (override)">
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <SelPole label="Status planistyczny" tryb="A±" k="statusPlanistyczny" p2={p2} setP2={setP2} orig={p2orig}
@@ -522,6 +529,17 @@ export default function NowaAnalizaPage() {
       )}
     </div>
   );
+}
+
+// Warstwy mapy Poziomu 2 z danych działki i rekomendowanego profilu.
+function warstwyP2(dane: DaneDzialki, profil?: string): WarstwyMapy {
+  return {
+    parcel: true,
+    env: dane.natura2000 === true || dane.ochronaWykluczajaca === true,
+    plan: dane.statusPlanistyczny === "brak_danych",
+    iso_m: profil === "mlodzi" || profil === "oba",
+    iso_s: profil === "seniorzy" || profil === "oba",
+  };
 }
 
 // ── Pomocnicze konwersje ─────────────────────────────────────────────────────
@@ -681,7 +699,9 @@ function PozycjaWiersz({
 }
 
 function PotwierdzenieDanych({ dane, meta }: { dane: DaneDzialki; meta: MetaRozw }) {
+  const trybMapy: TrybMapy = dane.powierzchniaM2 === 0 ? "notfound" : meta.przylegajace === false ? "nonadjacent" : "ok";
   return (
+    <div className="grid lg:grid-cols-[1fr_minmax(0,440px)] gap-4 items-start">
     <Karta tytul="Teren inwestycji (A°, potwierdzenie wczytania)" podtytul="Scalona geometria z ULDK — dane automatyczne pobrane w tle">
       <div className="flex flex-wrap gap-2 mb-3 text-xs">
         {meta.pozycje.map((p, i) => (
@@ -732,6 +752,10 @@ function PotwierdzenieDanych({ dane, meta }: { dane: DaneDzialki; meta: MetaRozw
         </ul>
       )}
     </Karta>
+    <div className="lg:sticky" style={{ top: "var(--grunt-sticky-top)" }}>
+      <PodgladTerenu mode={trybMapy} view="start" layers={{ parcel: true }} />
+    </div>
+    </div>
   );
 }
 
