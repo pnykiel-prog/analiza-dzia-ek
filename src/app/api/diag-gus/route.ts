@@ -106,6 +106,44 @@ export async function GET(req: Request) {
   }
   diag.krok2_zmienne = zmienne;
 
+  // 3) Eksplorator katalogu: dla każdej frazy zwróć kandydatów (id + nazwa + jednostka),
+  //    by przypiąć poprawne ID zmiennych BDL bez zgadywania. Param `szukaj` → tylko ta fraza.
+  const listaZmiennych = (surowa: string | null): { id: string; nazwa: string; jednostka?: string }[] => {
+    if (!surowa) return [];
+    try {
+      const wyniki = (JSON.parse(surowa) as { results?: Record<string, unknown>[] })?.results ?? [];
+      return wyniki.slice(0, 12).map((r) => ({
+        id: String(r.id),
+        nazwa: [r.n1, r.n2, r.n3].filter(Boolean).join(" · "),
+        jednostka: (r.measureUnitName as string) ?? undefined,
+      }));
+    } catch {
+      return [];
+    }
+  };
+  const szukajFraz = async (fraza: string) =>
+    ({ fraza, wyniki: listaZmiennych(await fetchTekst(url("variables/search", { name: fraza }), { ...siec, naglowki })) });
+
+  const szukaj = u.searchParams.get("szukaj");
+  if (szukaj) {
+    diag.szukaj = await szukajFraz(szukaj);
+  } else {
+    // Zestaw fraz eksploracyjnych dla brakujących pojęć (ludność, wiek, bezrobocie).
+    diag.kandydaci = await Promise.all(
+      [
+        "ludność ogółem",
+        "ludność w wieku 65 lat i więcej",
+        "ludność w wieku poprodukcyjnym",
+        "udział ludności w wieku 65 lat i więcej",
+        "ludność w wieku 20-39",
+        "ludność w wieku 25-39",
+        "ludność w wieku produkcyjnym",
+        "bezrobotni zarejestrowani ogółem",
+        "udział bezrobotnych zarejestrowanych",
+      ].map(szukajFraz)
+    );
+  }
+
   // Podsumowanie diagnostyczne — jednoznaczna przyczyna.
   diag.wniosek = !surowaJedn
     ? "HOST NIEOSIĄGALNY lub błąd sieci — Vercel nie łączy się z bdl.stat.gov.pl (sprawdź egress/zaporę)."

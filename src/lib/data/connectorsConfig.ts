@@ -69,7 +69,10 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       podmiotyNa10k: "podmioty wpisane do rejestru REGON na 10 tys. ludności",
       saldoMigracji: "saldo migracji",
     },
-    zmienneId: {},
+    // Potwierdzone ID zmiennych BDL (diagnostyka /api/diag-gus, gmina Rzeszów):
+    // podmioty na 10 tys. = 60530 (wart. 1804), saldo migracji = 1365234 (wart. 622).
+    // Pozostałe (ludność ogółem/wiek/bezrobocie) do przypięcia po eksploracji katalogu.
+    zmienneId: { podmiotyNa10k: "60530", saldoMigracji: "1365234" },
     medianaWiek2039Pct: 25,
   },
   kimpzp: {
