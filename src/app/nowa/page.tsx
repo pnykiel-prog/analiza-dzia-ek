@@ -97,16 +97,22 @@ export default function NowaAnalizaPage() {
   }
 
   // Buduje ręczne wskaźniki podstawy planistycznej (pojemność P1); null → fallback do danych auto.
+  // Wystarczy podać intensywność ALBO max pow. zabudowy + kondygnacje — pojemność liczy się z tego,
+  // co jest dostępne (intensywność 0 → pojemność = max pow. zabudowy × kondygnacje).
   function wskazniki(d: DaneDzialki): DaneDzialki["wskaznikiPlanistyczne"] {
-    const maZab = wsk.maxPowZabudowyPct.trim() !== "" && wsk.intensywnosc.trim() !== "";
-    if (!maZab) return d.wskaznikiPlanistyczne;
-    const kond = n(wsk.maxKondygnacje) ?? 4;
+    const maIntens = wsk.intensywnosc.trim() !== "";
+    const maZab = wsk.maxPowZabudowyPct.trim() !== "";
+    if (!maIntens && !maZab) return d.wskaznikiPlanistyczne; // brak danych → fallback do auto
+    const kond = n(wsk.maxKondygnacje) ?? d.wskaznikiPlanistyczne?.maxKondygnacje ?? 4;
+    const intens = maIntens ? (n(wsk.intensywnosc) ?? 0) : 0;
+    // maxPow potrzebny zawsze (obwiednia P2 + limit PBC); przy braku daj sensowny domyślny.
+    const maxPow = maZab ? (n(wsk.maxPowZabudowyPct) ?? 40) : (d.wskaznikiPlanistyczne?.maxPowZabudowyPct ?? 40);
     return {
-      intensywnosc: n(wsk.intensywnosc) ?? 1,
+      intensywnosc: intens,
       maxWysokoscM: d.wskaznikiPlanistyczne?.maxWysokoscM ?? Math.round(kond * 3.2),
       maxKondygnacje: kond,
-      maxPowZabudowyPct: n(wsk.maxPowZabudowyPct) ?? 35,
-      minPbcPct: n(wsk.minPbcPct) ?? 25,
+      maxPowZabudowyPct: maxPow,
+      minPbcPct: n(wsk.minPbcPct) ?? d.wskaznikiPlanistyczne?.minPbcPct ?? 0,
       normatywParkingowy: d.wskaznikiPlanistyczne?.normatywParkingowy ?? 0.8,
       udzialUslugPct: d.wskaznikiPlanistyczne?.udzialUslugPct ?? 15,
     };
