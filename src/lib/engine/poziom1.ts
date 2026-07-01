@@ -19,7 +19,9 @@ import type {
   WynikWymiaru,
 } from "../types";
 import type { KonfiguracjaScoring } from "../config";
-import { KONFIG_SCORING } from "../config";
+import { KONFIG_SCORING, KONFIG_POPYT } from "../config";
+import type { WynikPopytu } from "../types";
+import { ocenPopyt } from "./popyt";
 import { clamp, fmt, liniowo, progi, sredniaWazona } from "./utils";
 
 // ── Bramki (Warstwa 0) ──────────────────────────────────────────────────────
@@ -148,10 +150,26 @@ function pulapCzynszu(d: DaneDzialki, cfg: KonfiguracjaScoring): number | null {
   return (d.wartoscOdtworzeniowaM2 * cfg.stopaPulapuCzynszu) / 12;
 }
 
+/** Luka najemcy w procentach (czynsz rynkowy vs pułap SIM) — null przy braku danych. */
+function lukaPctZDanych(d: DaneDzialki, cfg: KonfiguracjaScoring): number | null {
+  const pulap = pulapCzynszu(d, cfg);
+  if (pulap === null || d.czynszRynkowyM2 === null || d.czynszRynkowyM2 <= 0) return null;
+  return ((d.czynszRynkowyM2 - pulap) / d.czynszRynkowyM2) * 100;
+}
+function lukaCenowaPkt(d: DaneDzialki, cfg: KonfiguracjaScoring): number | null {
+  const luka = lukaPctZDanych(d, cfg);
+  if (luka === null) return null;
+  return luka >= 45 ? 100 : luka >= 30 ? 80 : luka >= 15 ? 55 : luka >= 5 ? 30 : 10;
+}
+function lukaCenowaOpis(d: DaneDzialki, cfg: KonfiguracjaScoring): string {
+  const luka = lukaPctZDanych(d, cfg);
+  return luka === null ? "brak danych" : `${Math.round(luka)}%`;
+}
+
 function liczWymiary(
   d: DaneDzialki,
   cfg: KonfiguracjaScoring
-): { wymiary: WynikWymiaru[]; kluczowe: KluczoweLiczby; flagiW5: string[] } {
+): { wymiary: WynikWymiaru[]; kluczowe: KluczoweLiczby; flagiW5: string[]; popyt: { mlodzi: WynikPopytu; seniorzy: WynikPopytu } } {
   const pn = cfg.punktNeutralny;
   const flagiW5: string[] = [];
 
@@ -181,77 +199,44 @@ function liczWymiary(
   const w1Metryki = [mStatus, mSasiedztwo];
   const w1 = sredniaWazona(w1Metryki);
 
-  // W2 — Popyt demograficzny (różne metryki per profil)
-  const trendLudPkt =
-    d.trendLudnosc === null ? null : d.trendLudnosc === "rosnaca" ? 100 : d.trendLudnosc === "stabilna" ? 65 : 30;
-  const mTrendLud = metryka("Trend liczby ludności (5–10 lat)", d.trendLudnosc, trendLudPkt, 0.15, pn);
+  // W2 — Popyt (pod-model: wewnętrzny + zewnętrzny × mnożniki), zob. popyt.ts.
+  const popytMlodzi = ocenPopyt(d, "mlodzi", cfg, KONFIG_POPYT);
+  const popytSeniorzy = ocenPopyt(d, "seniorzy", cfg, KONFIG_POPYT);
+  const w2Mlodzi = popytMlodzi.realizowalny;
+  const w2Seniorzy = popytSeniorzy.realizowalny;
 
-  // młodzi
-  const udzialPkt =
-    d.udzial2039Pct === null || d.mediana2039Woj === null
-      ? null
-      : d.udzial2039Pct >= d.mediana2039Woj
-        ? 100
-        : liniowo(d.udzial2039Pct, d.mediana2039Woj * 0.6, d.mediana2039Woj, 20, 100);
-  const mUdzial = metryka("Udział 20–39 lat vs mediana woj.", d.udzial2039Pct, udzialPkt, 0.3, pn, "mlodzi", "%");
-  const saldoPkt =
-    d.saldoMigracjiMlodzi === null ? null : d.saldoMigracjiMlodzi > 0 ? 100 : d.saldoMigracjiMlodzi === 0 ? 55 : 20;
-  const mSaldo = metryka("Saldo migracji (25–39)", d.saldoMigracjiMlodzi, saldoPkt, 0.3, pn, "mlodzi");
-  const bezrobociePkt =
-    d.bezrobociePct === null ? null : progi(d.bezrobociePct, [{ max: 3, pkt: 100 }, { max: 5, pkt: 75 }, { max: 8, pkt: 45 }], 20);
-  const podmiotyPkt = d.liczbaPodmiotowGosp === null ? null : liniowo(d.liczbaPodmiotowGosp, 80, 220, 40, 100);
-  const rynekPkt = bezrobociePkt === null && podmiotyPkt === null ? null : (bezrobociePkt ?? pn) * 0.5 + (podmiotyPkt ?? pn) * 0.5;
-  const mRynek = metryka(
-    "Rynek pracy (bezrobocie, podmioty gosp.)",
-    d.bezrobociePct === null ? null : `bezrobocie ${fmt(d.bezrobociePct, "%", 1)}, ${fmt(d.liczbaPodmiotowGosp)} podm./1000`,
-    rynekPkt,
-    0.25,
-    pn,
-    "mlodzi"
-  );
-
-  // seniorzy — popyt = bezwzględny poziom 65+ × modyfikator trendu/stabilności.
-  // Uwaga interpretacyjna (poziom1_scoring.md §3 W2): wysoki udział 65+ przy
-  // wyludnianiu to objaw wymierania, a nie szansy — stąd modyfikator < 1.
-  let udzial65Pkt: number | null;
-  let udzial65Opis: string;
-  if (d.udzial65PlusPct === null || d.trend65Plus === null) {
-    udzial65Pkt = null;
-    udzial65Opis = "brak danych";
-  } else {
-    const bazaPoziom = liniowo(d.udzial65PlusPct, 12, 25, 40, 100); // bezwzględny udział 65+
-    const modyfikator =
-      d.trend65Plus === "rosnacy"
-        ? d.populacjaStabilna
-          ? 1.0
-          : 0.6 // rosnący przy wyludnianiu
-        : d.trend65Plus === "stabilny"
-          ? 0.85
-          : 0.7; // malejący
-    udzial65Pkt = clamp(bazaPoziom * modyfikator);
-    const trendOpis =
-      d.trend65Plus === "rosnacy"
-        ? d.populacjaStabilna
-          ? "rosnący, populacja stabilna"
-          : "rosnący przy wyludnianiu"
-        : d.trend65Plus === "stabilny"
-          ? "stabilny"
-          : "malejący";
-    udzial65Opis = `${fmt(d.udzial65PlusPct, "%")} 65+, ${trendOpis}`;
-  }
-  const mUdzial65 = metryka("Udział 65+ i jego trend", udzial65Opis, udzial65Pkt, 0.7, pn, "seniorzy");
-
-  const w2Metryki = [mUdzial, mSaldo, mRynek, mUdzial65, mTrendLud];
-  const w2Mlodzi = sredniaWazona([
-    { punkty: mUdzial.punkty, waga: mUdzial.waga },
-    { punkty: mSaldo.punkty, waga: mSaldo.waga },
-    { punkty: mRynek.punkty, waga: mRynek.waga },
-    { punkty: mTrendLud.punkty, waga: mTrendLud.waga },
-  ]);
-  const w2Seniorzy = sredniaWazona([
-    { punkty: mUdzial65.punkty, waga: mUdzial65.waga },
-    { punkty: mTrendLud.punkty, waga: mTrendLud.waga },
-  ]);
+  // Metryka pomocnicza budująca wiersz W2 z komponentu popytu (fallback = brak danych).
+  const mPop = (nazwa: string, wartosc: string, punkty: number, profil: Profil | undefined, fallback: boolean): WynikMetryki => ({
+    nazwa,
+    wartosc: fallback ? `${wartosc} (szac.)` : wartosc,
+    punkty: fallback ? pn : clamp(punkty),
+    waga: 1,
+    fallback,
+    profil,
+  });
+  const skl = (p: WynikPopytu, n: string) => p.skladniki.find((s) => s.nazwa.startsWith(n));
+  const w2Metryki: WynikMetryki[] = [
+    mPop("Popyt realizowalny", `${popytMlodzi.realizowalny}/100`, popytMlodzi.realizowalny, "mlodzi", false),
+    mPop("· wewnętrzny / zewnętrzny", `${popytMlodzi.wewnetrzny} / ${popytMlodzi.zewnetrzny}`, popytMlodzi.potencjalny, "mlodzi", false),
+    mPop("Popyt realizowalny ", `${popytSeniorzy.realizowalny}/100`, popytSeniorzy.realizowalny, "seniorzy", false),
+    mPop("· wewnętrzny / zewnętrzny ", `${popytSeniorzy.wewnetrzny} / ${popytSeniorzy.zewnetrzny}`, popytSeniorzy.potencjalny, "seniorzy", false),
+    mPop(
+      "Kwalifikacja dochodowa (luka czynszowa)",
+      popytMlodzi.udzialKwalifikujacyPct === null ? "brak danych" : `${popytMlodzi.udzialKwalifikujacyPct}%`,
+      popytMlodzi.udzialKwalifikujacyPct ?? pn,
+      undefined,
+      skl(popytMlodzi, "Kwalifikacja")?.fallback ?? false
+    ),
+    mPop("Napięcie mieszkaniowe", `${popytMlodzi.napiecie}/100`, popytMlodzi.napiecie, undefined, skl(popytMlodzi, "Napięcie")?.fallback ?? false),
+    mPop(
+      "Napływ migracyjny (25–39)",
+      skl(popytMlodzi, "Napływ")?.wartosc ?? "—",
+      skl(popytMlodzi, "Napływ")?.udzial ?? pn,
+      "mlodzi",
+      skl(popytMlodzi, "Napływ")?.fallback ?? false
+    ),
+    mPop("Luka cenowa (czynsz vs pułap)", lukaCenowaOpis(d, cfg), lukaCenowaPkt(d, cfg) ?? pn, undefined, lukaCenowaPkt(d, cfg) === null),
+  ];
 
   // W3 — Dostępność komunikacyjna
   const dojazdPkt =
@@ -365,7 +350,7 @@ function liczWymiary(
     },
     {
       kod: "W2",
-      nazwa: "Popyt demograficzny",
+      nazwa: "Popyt (wewnętrzny + zewnętrzny)",
       punktyMlodzi: w2Mlodzi,
       punktySeniorzy: w2Seniorzy,
       wagaMlodzi: cfg.wagiWymiarow.mlodzi.W2,
@@ -410,7 +395,7 @@ function liczWymiary(
     sredniSpadekPct: d.sredniSpadekPct,
   };
 
-  return { wymiary, kluczowe, flagiW5 };
+  return { wymiary, kluczowe, flagiW5, popyt: { mlodzi: popytMlodzi, seniorzy: popytSeniorzy } };
 }
 
 // ── Agregacja, werdykt, pewność ─────────────────────────────────────────────
@@ -441,7 +426,7 @@ export function uruchomPoziom1(d: DaneDzialki, cfg: KonfiguracjaScoring = KONFIG
   const { szczegoly, flagi: flagiBramek } = liczBramki(d);
   const statusBramek = agregujBramki(szczegoly);
 
-  const { wymiary, kluczowe, flagiW5 } = liczWymiary(d, cfg);
+  const { wymiary, kluczowe, flagiW5, popyt } = liczWymiary(d, cfg);
 
   // Wynik profilu = Σ(waga × wynik wymiaru) ÷ 100
   const scoreMlodzi = clamp(
@@ -480,7 +465,10 @@ export function uruchomPoziom1(d: DaneDzialki, cfg: KonfiguracjaScoring = KONFIG
   const realne = total - fallbackMetryk - bramkiBezDanych;
   const pewnosc = clamp(Math.round((realne / total) * 100));
 
-  const flagi = [...new Set([...flagiBramek, ...flagiW5])];
+  // Flagi popytu: bierzemy z rekomendowanego profilu (lub obu, gdy „oba").
+  const flagiPopytu =
+    profil === "seniorzy" ? popyt.seniorzy.flagi : profil === "oba" ? [...popyt.mlodzi.flagi, ...popyt.seniorzy.flagi] : popyt.mlodzi.flagi;
+  const flagi = [...new Set([...flagiBramek, ...flagiW5, ...flagiPopytu])];
 
   return {
     dzialkaId: d.id,
@@ -495,5 +483,6 @@ export function uruchomPoziom1(d: DaneDzialki, cfg: KonfiguracjaScoring = KONFIG
     wymiary,
     kluczoweLiczby: kluczowe,
     flagi,
+    popyt,
   };
 }

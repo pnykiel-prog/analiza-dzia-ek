@@ -1,4 +1,4 @@
-import type { Profil, Werdykt, WynikPoziom1, WynikWymiaru } from "@/lib/types";
+import type { Profil, Werdykt, WynikPopytu, WynikPoziom1, WynikWymiaru } from "@/lib/types";
 import { Karta, Statystyka, Flagi } from "./ui";
 import { WskaznikPewnosci } from "./grunt";
 import { etykietaProfilu, liczba, pct, statusSlowny } from "@/lib/format";
@@ -48,6 +48,17 @@ export function Poziom1View({ p1 }: { p1: WynikPoziom1 }) {
       <div className="text-[13px] text-grunt-text-muted">
         Profil rekomendowany: <strong className="text-grunt-text">{etykietaProfilu[p1.profilRekomendowany]}</strong>
       </div>
+
+      {/* Ocena popytu — rozdział wewnętrzny/zewnętrzny (W2) */}
+      <Karta
+        tytul="Ocena popytu — wewnętrzny vs zewnętrzny"
+        podtytul="Popyt realizowalny = (wewnętrzny + zewnętrzny) × mnożnik luki cenowej × mnożnik usług (profil)"
+      >
+        <div className="grid md:grid-cols-2 gap-4">
+          <PopytKolumna p={p1.popyt.mlodzi} nazwa="Młodzi" />
+          <PopytKolumna p={p1.popyt.seniorzy} nazwa="Seniorzy" />
+        </div>
+      </Karta>
 
       {/* Kluczowe liczby */}
       <Karta tytul="Kluczowe liczby">
@@ -198,6 +209,60 @@ function KartaWerdyktu({
           </ul>
         )}
       </div>
+    </div>
+  );
+}
+
+function PopytKolumna({ p, nazwa }: { p: WynikPopytu; nazwa: string }) {
+  const teal = p.profil === "mlodzi";
+  const akcent = teal ? "text-grunt-young" : "text-grunt-senior";
+  const dot = teal ? "bg-grunt-young" : "bg-grunt-senior";
+  return (
+    <div className="rounded-panel border border-grunt-border p-4">
+      <div className="flex items-center justify-between mb-3">
+        <span className="flex items-center gap-2 text-[13px] font-semibold">
+          <span className={`w-2.5 h-2.5 rounded-full ${dot}`} /> <span className={akcent}>{nazwa}</span>
+        </span>
+        <span className="mono text-[20px] font-semibold text-grunt-text">
+          {p.realizowalny}<span className="text-[12px] text-grunt-text-faint2">/100</span>
+        </span>
+      </div>
+      <PopytPasek etykieta="Popyt wewnętrzny" wartosc={p.wewnetrzny} kolor="bg-grunt-chart-3" />
+      <PopytPasek etykieta="Popyt zewnętrzny" wartosc={p.zewnetrzny} kolor="bg-grunt-chart-4" />
+      <div className="grid grid-cols-3 gap-2 mt-3 text-[11px]">
+        <MiniStat e="Kwalifikacja doch." v={p.udzialKwalifikujacyPct === null ? "szac." : `${p.udzialKwalifikujacyPct}%`} />
+        <MiniStat e="Mnożnik luki" v={`×${p.mnoznikLuka.toFixed(2)}`} />
+        <MiniStat e="Mnożnik usług" v={`×${p.mnoznikUslugi.toFixed(2)}`} />
+      </div>
+      <p className="text-[11px] text-grunt-text-muted mt-3 bg-grunt-surface-3 rounded-md px-2.5 py-1.5">{p.interpretacja}</p>
+      {p.flagi.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {p.flagi.map((f, i) => (
+            <li key={i} className="text-[11px] text-grunt-amber-text bg-grunt-amber-bg border border-grunt-amber/25 rounded px-2 py-1">⚑ {f}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function PopytPasek({ etykieta, wartosc, kolor }: { etykieta: string; wartosc: number; kolor: string }) {
+  return (
+    <div className="flex items-center gap-2 mb-1.5">
+      <span className="w-32 shrink-0 text-[11px] text-grunt-text-muted2">{etykieta}</span>
+      <div className="flex-1 h-2.5 bg-grunt-surface-3 rounded-full overflow-hidden">
+        <div className={`h-full ${kolor} rounded-full`} style={{ width: `${Math.min(100, wartosc)}%` }} />
+      </div>
+      <span className="mono w-8 text-right text-[11px] font-medium text-grunt-text">{wartosc}</span>
+    </div>
+  );
+}
+
+function MiniStat({ e, v }: { e: string; v: string }) {
+  return (
+    <div className="bg-grunt-surface-3 rounded px-2 py-1">
+      <div className="text-grunt-text-muted2">{e}</div>
+      <div className="mono font-medium text-grunt-text">{v}</div>
     </div>
   );
 }

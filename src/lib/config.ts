@@ -42,6 +42,38 @@ export const KONFIG_SCORING: KonfiguracjaScoring = {
   progFlagaWysokaDotacjaPct: 160,
 };
 
+// ── MODEL OCENY POPYTU (pod-model wymiaru W2) ───────────────────────────────
+
+export interface KonfiguracjaPopyt {
+  /** Wagi popytu wewnętrznego vs zewnętrznego per profil (suma = 1). */
+  wagi: Record<Profil, { wewnetrzny: number; zewnetrzny: number }>;
+  /** Próg obciążenia dochodu czynszem, powyżej którego rynek „za drogi" [%]. */
+  progDochoduNaCzynszPct: number;
+  /** Proxy pułapu dochodowego zasobu komunalnego [zł/mc gosp.]. Dochód powyżej → luka społeczna. */
+  pulapKomunalnyDochod: number;
+  /** Typowy metraż do liczenia obciążenia czynszem per profil [m²]. */
+  metrazTypowyM2: Record<Profil, number>;
+  /** Mnożnik usług: min + wklad × sygnał(0–1) → [min, min+wklad]. */
+  mnoznikUslug: { min: number; wklad: number };
+  /** Mnożnik luki cenowej: interpolacja od braku luki do luki maksymalnej. */
+  mnoznikLuka: { min: number; max: number };
+  /** Próg (0–100) rozdzielający „wysoki/niski" popyt w interpretacji (sekcja 7). */
+  progInterpretacji: number;
+}
+
+export const KONFIG_POPYT: KonfiguracjaPopyt = {
+  wagi: {
+    mlodzi: { wewnetrzny: 0.6, zewnetrzny: 0.4 },
+    seniorzy: { wewnetrzny: 0.85, zewnetrzny: 0.15 },
+  },
+  progDochoduNaCzynszPct: 35,
+  pulapKomunalnyDochod: 5000,
+  metrazTypowyM2: { mlodzi: 45, seniorzy: 40 },
+  mnoznikUslug: { min: 0.6, wklad: 0.5 }, // [0,60–1,10]
+  mnoznikLuka: { min: 0.9, max: 1.15 },
+  progInterpretacji: 50,
+};
+
 // ── POZIOM 2: parametry zabudowy ────────────────────────────────────────────
 
 export interface KonfiguracjaZabudowy {

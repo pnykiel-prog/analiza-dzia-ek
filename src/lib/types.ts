@@ -151,6 +151,30 @@ export interface KluczoweLiczby {
   sredniSpadekPct: Maybe<number>;
 }
 
+// Pod-model oceny popytu (W2) — rozdział wewnętrzny/zewnętrzny + mnożniki.
+export interface SkladnikPopytu {
+  nazwa: string;
+  wartosc: string;
+  udzial: number; // 0–100 (wkład składnika, do prezentacji)
+  fallback: boolean;
+}
+
+export interface WynikPopytu {
+  profil: Profil;
+  wewnetrzny: number; // 0–100 (lokalni kwalifikujący się pod presją)
+  zewnetrzny: number; // 0–100 (napływ migracyjny × luka)
+  potencjalny: number; // 0–100 (ważona suma wg profilu)
+  realizowalny: number; // 0–100 (= wynik wymiaru W2)
+  mnoznikLuka: number; // mnożnik luki cenowej
+  mnoznikUslugi: number; // mnożnik usług/dostępności (profil)
+  udzialKwalifikujacyPct: number | null; // % kwalifikujący się dochodowo (luka czynszowa)
+  napiecie: number; // 0–100 (napięcie mieszkaniowe)
+  interpretacja: string; // wniosek z kombinacji (sekcja 7)
+  flagi: string[];
+  pewnosc: number; // 0–100
+  skladniki: SkladnikPopytu[];
+}
+
 export interface WynikPoziom1 {
   dzialkaId: string;
   bramki: {
@@ -168,6 +192,8 @@ export interface WynikPoziom1 {
   wymiary: WynikWymiaru[];
   kluczoweLiczby: KluczoweLiczby;
   flagi: string[];
+  /** Dekompozycja popytu (W2) per profil — wewnętrzny/zewnętrzny + mnożniki. */
+  popyt: { mlodzi: WynikPopytu; seniorzy: WynikPopytu };
 }
 
 // ────────────────────────────────────────────────────────────────────────────
