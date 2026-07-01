@@ -191,9 +191,12 @@ export const konektorGUS: Konektor = {
       );
     }
     const ogolem = m.get(P2137_OGOLEM_TOTAL) ?? null;
+    // WAŻNE: temat zawiera też pasma zbiorcze („0-14", „70 i więcej") nakładające się
+    // na 5-letnie — sumujemy WYŁĄCZNIE pasma 5-letnie (szerokość == 4), by nie liczyć podwójnie.
+    const piecioletnie = pasma.filter((p) => p.hi - p.lo === 4);
     // 65+ = ogółem − (0–64); 20–39 = pasma 20-24…35-39. Sumy null, gdy pasmo bez danych.
-    const pasma0_64 = sumaPasm(pasma.filter((p) => p.hi <= 64), m);
-    const pasma20_39 = sumaPasm(pasma.filter((p) => p.lo >= 20 && p.hi <= 39), m);
+    const pasma0_64 = sumaPasm(piecioletnie.filter((p) => p.hi <= 64), m);
+    const pasma20_39 = sumaPasm(piecioletnie.filter((p) => p.lo >= 20 && p.hi <= 39), m);
     const podmioty = m.get(idPodmioty) ?? null;
     const saldo = m.get(idSaldo) ?? null;
 
