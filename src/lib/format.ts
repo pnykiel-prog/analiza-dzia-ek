@@ -28,6 +28,13 @@ export const etykietaWerdyktu: Record<Werdykt, string> = {
   czerwony: "Czerwony — wykluczone / wymaga rewizji",
 };
 
+/** Status słowny werdyktu (jak w prototypie GRUNT: „Nadaje się" / „Warunkowo" / …). */
+export const statusSlowny: Record<Werdykt, string> = {
+  zielony: "Nadaje się",
+  zolty: "Warunkowo",
+  czerwony: "Nie nadaje się",
+};
+
 export const etykietaProfilu: Record<ProfilRekomendowany, string> = {
   mlodzi: "Dla młodych",
   seniorzy: "Senioralny",

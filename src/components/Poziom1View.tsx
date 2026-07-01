@@ -1,7 +1,7 @@
-import type { WynikPoziom1 } from "@/lib/types";
-import { Karta, Pasek, Statystyka, WerdyktBadge, Flagi } from "./ui";
+import type { Profil, Werdykt, WynikPoziom1, WynikWymiaru } from "@/lib/types";
+import { Karta, Statystyka, Flagi } from "./ui";
 import { WskaznikPewnosci } from "./grunt";
-import { etykietaProfilu, liczba, pct } from "@/lib/format";
+import { etykietaProfilu, liczba, pct, statusSlowny } from "@/lib/format";
 
 const STATUS_BRAMKI: Record<string, { etykieta: string; klasa: string }> = {
   pass: { etykieta: "pass", klasa: "bg-grunt-green-bg text-grunt-green" },
@@ -15,37 +15,39 @@ export function Poziom1View({ p1 }: { p1: WynikPoziom1 }) {
   return (
     <>
       {/* Werdykt i profile */}
-      <Karta
-        tytul="Werdykt wstępny"
-        podtytul="Dwa profile oceniane niezależnie (te same wymiary, inne wagi)"
-        prawy={<WskaznikPewnosci pewnosc={p1.pewnosc} />}
-      >
-        <div className="grid md:grid-cols-2 gap-4">
-          <KartaWerdyktu
-            nazwa="Dla młodych"
-            profil="mlodzi"
-            rekomendowany={p1.profilRekomendowany === "mlodzi" || p1.profilRekomendowany === "oba"}
-            score={p1.scoreMlodzi}
-            werdykt={p1.werdyktMlodzi}
-          />
-          <KartaWerdyktu
-            nazwa="Senioralny"
-            profil="seniorzy"
-            rekomendowany={p1.profilRekomendowany === "seniorzy" || p1.profilRekomendowany === "oba"}
-            score={p1.scoreSeniorzy}
-            werdykt={p1.werdyktSeniorzy}
-          />
+      {p1.pewnosc < 100 && (
+        <div className="flex items-start gap-3 rounded-md border border-grunt-amber/25 bg-grunt-amber-bg px-3.5 py-2.5">
+          <span className="mono grid place-items-center shrink-0 w-6 h-6 rounded-full bg-grunt-amber text-white text-[13px] font-bold">!</span>
+          <div>
+            <div className="text-[13px] font-semibold text-grunt-amber-text">Wynik częściowy</div>
+            <div className="text-[12px] text-grunt-text-muted">Część danych to białe plamy — pewność obniżona; werdykt do potwierdzenia w Poziomie 2. Brak danej nie blokuje analizy.</div>
+          </div>
         </div>
-        <div className="mt-3 text-[13px] text-grunt-text-muted">
-          Profil rekomendowany: <strong className="text-grunt-text">{etykietaProfilu[p1.profilRekomendowany]}</strong>
-        </div>
-        {p1.pewnosc < 70 && (
-          <p className="text-[12px] text-grunt-amber-text bg-grunt-amber-bg border border-grunt-amber/25 rounded-md px-3 py-2 mt-3">
-            Niski wskaźnik pewności — werdykt wstępny, do potwierdzenia w Poziomie 2 (białe plamy w danych). Brak
-            danych nie blokuje analizy — obniża pewność.
-          </p>
-        )}
-      </Karta>
+      )}
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <KartaWerdyktu
+          nazwa="Młodzi"
+          profil="mlodzi"
+          rekomendowany={p1.profilRekomendowany === "mlodzi" || p1.profilRekomendowany === "oba"}
+          score={p1.scoreMlodzi}
+          werdykt={p1.werdyktMlodzi}
+          pewnosc={p1.pewnosc}
+          drivery={drivery(p1.wymiary, "mlodzi")}
+        />
+        <KartaWerdyktu
+          nazwa="Seniorzy"
+          profil="seniorzy"
+          rekomendowany={p1.profilRekomendowany === "seniorzy" || p1.profilRekomendowany === "oba"}
+          score={p1.scoreSeniorzy}
+          werdykt={p1.werdyktSeniorzy}
+          pewnosc={p1.pewnosc}
+          drivery={drivery(p1.wymiary, "seniorzy")}
+        />
+      </div>
+      <div className="text-[13px] text-grunt-text-muted">
+        Profil rekomendowany: <strong className="text-grunt-text">{etykietaProfilu[p1.profilRekomendowany]}</strong>
+      </div>
 
       {/* Kluczowe liczby */}
       <Karta tytul="Kluczowe liczby">
@@ -124,41 +126,78 @@ export function Poziom1View({ p1 }: { p1: WynikPoziom1 }) {
   );
 }
 
+const KOLOR_STATUSU: Record<Werdykt, string> = {
+  zielony: "text-grunt-green",
+  zolty: "text-grunt-amber",
+  czerwony: "text-grunt-red",
+};
+
+/** Top-3 „drivery" profilu = metryki o najwyższej punktacji (bez fallbacków). */
+function drivery(wymiary: WynikWymiaru[], profil: Profil): string[] {
+  return wymiary
+    .flatMap((w) => w.metryki)
+    .filter((m) => (!m.profil || m.profil === profil) && !m.fallback && m.wartosc !== "brak danych")
+    .sort((a, b) => b.punkty - a.punkty)
+    .slice(0, 3)
+    .map((m) => `${m.nazwa}: ${m.wartosc}`);
+}
+
 function KartaWerdyktu({
   nazwa,
   profil,
   rekomendowany,
   score,
   werdykt,
+  pewnosc,
+  drivery,
 }: {
   nazwa: string;
-  profil: "mlodzi" | "seniorzy";
+  profil: Profil;
   rekomendowany: boolean;
   score: number;
-  werdykt: import("@/lib/types").Werdykt;
+  werdykt: Werdykt;
+  pewnosc: number;
+  drivery: string[];
 }) {
   const tint = profil === "mlodzi" ? "bg-grunt-young-bg" : "bg-grunt-senior-bg";
   const dot = profil === "mlodzi" ? "bg-grunt-young" : "bg-grunt-senior";
   const txt = profil === "mlodzi" ? "text-grunt-young" : "text-grunt-senior";
+  const stKolor = KOLOR_STATUSU[werdykt];
   return (
-    <div
-      className={`relative rounded-panel border p-4 ${rekomendowany ? "border-grunt-ink shadow-raised" : "border-grunt-border"}`}
-    >
-      {rekomendowany && (
-        <span className="absolute -top-2 right-3 badge bg-grunt-ink text-white">★ Rekomendowany</span>
-      )}
-      <div className={`flex items-center gap-2 -mx-4 -mt-4 mb-3 px-4 py-2 rounded-t-panel ${tint}`}>
-        <span className={`w-2.5 h-2.5 rounded-full ${dot}`} />
-        <span className={`text-[13px] font-semibold ${txt}`}>{nazwa}</span>
-      </div>
-      <div className="flex items-end justify-between mb-2">
-        <span className="mono text-[32px] font-semibold leading-none text-grunt-text">
-          {score}
-          <span className="text-[15px] text-grunt-text-faint2">/100</span>
+    <div className={`relative rounded-card border overflow-hidden ${rekomendowany ? "border-grunt-ink shadow-raised" : "border-grunt-border"}`}>
+      <div className={`flex items-center justify-between px-4 py-2.5 ${tint}`}>
+        <span className="flex items-center gap-2">
+          <span className={`w-2.5 h-2.5 rounded-full ${dot}`} />
+          <span className={`text-[13px] font-semibold ${txt}`}>Profil: {nazwa}</span>
         </span>
-        <WerdyktBadge w={werdykt} />
+        {rekomendowany && (
+          <span className="badge bg-grunt-ink text-white text-[10px]">★ REKOMENDOWANY PROFIL</span>
+        )}
       </div>
-      <Pasek wartosc={score} />
+      <div className="p-4">
+        <div className="flex items-end justify-between">
+          <span className={`flex items-center gap-2 text-[22px] font-semibold ${stKolor}`}>
+            <span className={`w-2.5 h-2.5 rounded-full ${werdykt === "zielony" ? "bg-grunt-green" : werdykt === "zolty" ? "bg-grunt-amber" : "bg-grunt-red"}`} />
+            {statusSlowny[werdykt]}
+          </span>
+          <span className="mono text-[38px] font-semibold leading-none text-grunt-text">
+            {score}
+            <span className="text-[15px] text-grunt-text-faint2">/100</span>
+          </span>
+        </div>
+        <div className="mt-3">
+          <WskaznikPewnosci pewnosc={pewnosc} />
+        </div>
+        {drivery.length > 0 && (
+          <ul className="mt-3 space-y-1">
+            {drivery.map((d, i) => (
+              <li key={i} className="text-[12px] text-grunt-text-muted flex gap-1.5">
+                <span className="text-grunt-text-faint">—</span> {d}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
