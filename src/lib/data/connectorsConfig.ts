@@ -58,7 +58,9 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
   gus: {
     aktywny: true,
     endpoint: "https://bdl.stat.gov.pl/api/v1",
-    clientId: "",
+    // Klucz API BDL (X-ClientId) — DARMOWY, podnosi limity zapytań (bez niego BDL
+    // dławi serie zapytań z jednego IP, zwłaszcza z chmury). Ustaw w env: GUS_BDL_CLIENT_ID.
+    clientId: process.env.GUS_BDL_CLIENT_ID ?? "",
     rok: 2023,
     poziomGmina: 6,
     zapytania: {
