@@ -10,7 +10,11 @@ const STATUS_BRAMKI: Record<string, { etykieta: string; klasa: string }> = {
   do_weryfikacji: { etykieta: "do weryfikacji", klasa: "bg-grunt-neutral-bg text-grunt-text-muted" },
 };
 
-export function Poziom1View({ p1 }: { p1: WynikPoziom1 }) {
+/**
+ * Widok Poziomu 1. `pelny=false` (klient) pokazuje tylko wynik: werdykty + popyt.
+ * `pelny=true` (administrator) dokłada kluczowe liczby, bramki, wymiary i flagi.
+ */
+export function Poziom1View({ p1, pelny = true }: { p1: WynikPoziom1; pelny?: boolean }) {
   const k = p1.kluczoweLiczby;
   return (
     <>
@@ -60,6 +64,8 @@ export function Poziom1View({ p1 }: { p1: WynikPoziom1 }) {
         </div>
       </Karta>
 
+      {pelny && (
+      <>
       {/* Kluczowe liczby */}
       <Karta tytul="Kluczowe liczby">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -132,6 +138,8 @@ export function Poziom1View({ p1 }: { p1: WynikPoziom1 }) {
         <Karta tytul="Flagi">
           <Flagi flagi={p1.flagi} />
         </Karta>
+      )}
+      </>
       )}
     </>
   );
