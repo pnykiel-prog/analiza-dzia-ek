@@ -100,6 +100,20 @@ test("P3+ankieta: profil finansowy steruje montażem i reżimem P3", () => {
   assert.equal(zAnkieta.poziom3.scenariusze[1].rezim, "A_SBC_2026");
 });
 
+test("P1: flagi/sygnały i realne białe plamy", () => {
+  const w = uruchomPoziom1(wzorcowa);
+  // Komplet danych → brak białych plam; sygnały pozytywne (dostępność/rynek).
+  assert.equal(w.braki.length, 0);
+  assert.ok(w.sygnaly.some((s) => s.ton === "pozytyw"));
+
+  const b = uruchomPoziom1(bialePlamy);
+  // Brak MPZP i brak czynszu → realne braki; Natura 2000 → sygnał ostrzegawczy.
+  assert.ok(b.braki.length >= 2, `braki=${b.braki.length}`);
+  assert.ok(b.braki.some((x) => x.tytul.includes("MPZP")));
+  assert.ok(b.braki.some((x) => x.tytul.toLowerCase().includes("najmu")));
+  assert.ok(b.sygnaly.some((s) => s.ton === "ostrzezenie"));
+});
+
 test("Pipeline: każdy poziom zasila następny (spójność id)", () => {
   for (const d of DZIALKI_PRZYKLADOWE) {
     const a = uruchomAnalize(d);

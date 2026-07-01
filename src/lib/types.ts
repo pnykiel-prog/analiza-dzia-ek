@@ -175,6 +175,19 @@ export interface WynikPopytu {
   skladniki: SkladnikPopytu[];
 }
 
+/** Flaga/sygnał do panelu „Flagi i sygnały" (kolor wg tonu). */
+export interface Sygnal {
+  tekst: string;
+  ton: "ostrzezenie" | "pozytyw" | "info";
+}
+
+/** Realna biała plama danych — czego aplikacja faktycznie nie pobrała/nie ma podpiętego. */
+export interface BrakDanych {
+  tytul: string; // np. „MPZP / Studium uwarunkowań"
+  opis: string; // dlaczego brak / które źródło
+  wplyw: string; // wpływ na wynik/pewność
+}
+
 export interface WynikPoziom1 {
   dzialkaId: string;
   bramki: {
@@ -194,6 +207,10 @@ export interface WynikPoziom1 {
   flagi: string[];
   /** Dekompozycja popytu (W2) per profil — wewnętrzny/zewnętrzny + mnożniki. */
   popyt: { mlodzi: WynikPopytu; seniorzy: WynikPopytu };
+  /** Flagi i sygnały (ostrzeżenia + pozytywy) do panelu wyników. */
+  sygnaly: Sygnal[];
+  /** Realne białe plamy — czego aplikacja nie pobrała (z wpływem na pewność). */
+  braki: BrakDanych[];
 }
 
 // ────────────────────────────────────────────────────────────────────────────
