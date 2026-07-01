@@ -46,8 +46,14 @@ async function pobierzOpcjeTeryt(params: Record<string, string>): Promise<{ tery
   }
 }
 
+type Ekran = "wejscie" | "poziom1" | "poziom2" | "poziom3" | "raport";
+type Rola = "klient" | "administrator";
+const EKRANY: Ekran[] = ["wejscie", "poziom1", "poziom2", "poziom3", "raport"];
+
 export default function NowaAnalizaPage() {
-  const [krok, setKrok] = useState<1 | 2 | 3>(1);
+  const [ekran, setEkran] = useState<Ekran>("wejscie");
+  const [rola, setRola] = useState<Rola>("klient");
+  const [maxKrok, setMaxKrok] = useState(1);
   const [pozycje, setPozycje] = useState<PozycjaDzialki[]>([pustaPozycja()]);
   const [dane, setDane] = useState<DaneDzialki | null>(null);
   const [meta, setMeta] = useState<MetaRozw | null>(null);
@@ -65,8 +71,6 @@ export default function NowaAnalizaPage() {
   const [p3, setP3] = useState<Record<string, string>>({});
   // Profil finansowy z ankiety (brama P3).
   const [profilFin, setProfilFin] = useState<ProfilFinansowy | null>(null);
-  // Raport (studium) — ekran końcowy.
-  const [pokazRaport, setPokazRaport] = useState(false);
 
   // ── Krok 1: identyfikacja → rozwiązanie → P1 ──────────────────────────────
   function patchPozycje(i: number, patch: Partial<PozycjaDzialki>) {
@@ -109,13 +113,13 @@ export default function NowaAnalizaPage() {
       setDane(d.dane);
       setMeta(d.meta);
       setMediana(d.medianaRegionalna);
-      setKrok(1);
       setRecznaPow("");
-      // Jeśli pobrano geometrię (działka w ULDK) — liczymy od razu.
-      // W przeciwnym razie czekamy na ręczne podanie powierzchni (działka spoza
-      // demonstracyjnego providera danych).
+      // Jeśli pobrano geometrię (działka w ULDK) — liczymy i przechodzimy do wyniku P1.
+      // W przeciwnym razie zostajemy na ekranie wejścia (ręczne podanie powierzchni).
       if (d.dane && d.dane.powierzchniaM2 > 0) {
         await przelicz(d.dane);
+        setEkran("poziom1");
+        setMaxKrok((m) => Math.max(m, 3));
       } else {
         setWynik(null);
       }
@@ -139,6 +143,8 @@ export default function NowaAnalizaPage() {
     const noweDane = { ...dane, powierzchniaM2: pow };
     setDane(noweDane);
     await przelicz(noweDane);
+    setEkran("poziom1");
+    setMaxKrok((m) => Math.max(m, 3));
     setLicze(false);
   }
 
@@ -179,7 +185,8 @@ export default function NowaAnalizaPage() {
     };
     setP2(init);
     setP2orig(init);
-    setKrok(2);
+    setEkran("poziom2");
+    setMaxKrok((m) => Math.max(m, 3));
   }
 
   async function przeliczP2() {
@@ -228,7 +235,8 @@ export default function NowaAnalizaPage() {
       kosztBudowyM2: s(dane?.kosztBudowyM2),
       cenaGruntu: s(dane?.cenaGruntu),
     });
-    setKrok(3);
+    setEkran("poziom3");
+    setMaxKrok((m) => Math.max(m, 4));
   }
 
   // Zatwierdzenie ankiety = brama P3: zapis profilu i przeliczenie z montażem.
@@ -262,27 +270,27 @@ export default function NowaAnalizaPage() {
     };
     setDane(noweDane);
     await przelicz(noweDane, k, profil);
+    setMaxKrok((m) => Math.max(m, 5));
     setLicze(false);
   }
 
   const korektyP2 = Object.keys(p2).filter((k) => p2orig[k] !== undefined && p2[k] !== p2orig[k]);
+  const rolaAdmin = rola === "administrator";
+  const stepAktywny = EKRANY.indexOf(ekran) + 1;
 
-  // Mapowanie kroku kreatora (1|2|3) na 5-krokowy stepper GRUNT (Wejście·P1·P2·P3·Raport).
-  const stepAktywny = pokazRaport ? 5 : krok === 1 ? (wynik ? 2 : 1) : krok === 2 ? 3 : 4;
-  const stepMax = !wynik ? 1 : profilFin ? 5 : krok >= 2 ? 4 : 3;
-  function nawigujStepper(nr: number) {
-    if (nr >= 5 && profilFin) { setPokazRaport(true); return; }
-    setPokazRaport(false);
-    if (nr <= 2) setKrok(1);
-    else if (nr === 3 && wynik) setKrok(2);
-    else if (nr >= 4 && wynik && krok >= 2) setKrok(3);
+  function cofnij() {
+    const i = EKRANY.indexOf(ekran);
+    if (i > 0) setEkran(EKRANY[i - 1]);
+  }
+  function idzDoKroku(nr: number) {
+    if (nr >= 1 && nr <= maxKrok) setEkran(EKRANY[nr - 1]);
   }
 
   return (
     <div className="space-y-5">
       <div className="-mx-6 -mt-6">
-        <Stepper aktywny={stepAktywny} maxOsiagniety={stepMax} onKrok={nawigujStepper} />
-        {dane && (
+        <Stepper aktywny={stepAktywny} maxOsiagniety={maxKrok} onKrok={idzDoKroku} />
+        {dane && ekran !== "wejscie" && (
           <div className="bg-grunt-surface border-b border-grunt-border px-6 py-2 flex flex-wrap items-center gap-x-6 gap-y-1">
             <span className="text-[10px] uppercase tracking-wider text-grunt-text-faint">Teren inwestycji</span>
             <span className="mono text-[12px] text-grunt-text">{dane.id}</span>
@@ -292,30 +300,43 @@ export default function NowaAnalizaPage() {
         )}
       </div>
 
-      <div className="card p-[18px]">
-        <h1 className="text-[25px] font-semibold text-grunt-text tracking-[-0.01em]">Nowa analiza — kreator poziomowy</h1>
-        <p className="text-grunt-text-muted mt-1 text-[13px] max-w-3xl">
-          Pola odsłaniają się stopniowo wraz z poziomem. Na <strong>Poziomie 1</strong> wprowadzasz wyłącznie
-          identyfikację działek — całe scoringowanie liczy się automatycznie. Na <strong>Poziomie 2</strong> i{" "}
-          <strong>3</strong> odsłaniają się parametry oceny i montażu (tryby A° / A± / R).
-        </p>
-        <Legenda />
+      {/* Pasek: rola (klient/administrator) + powrót do poprzedniego ekranu */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="inline-flex rounded-input border border-grunt-border-input overflow-hidden text-[13px]">
+          <button onClick={() => setRola("klient")} className={`px-3.5 py-1.5 ${rola === "klient" ? "bg-grunt-ink text-white" : "bg-grunt-surface text-grunt-text-3"}`}>Klient</button>
+          <button onClick={() => setRola("administrator")} className={`px-3.5 py-1.5 ${rola === "administrator" ? "bg-grunt-ink text-white" : "bg-grunt-surface text-grunt-text-3"}`}>Administrator</button>
+        </div>
+        {ekran !== "wejscie" && (
+          <button onClick={cofnij} className="btn-secondary">← Wstecz</button>
+        )}
       </div>
 
-      {pokazRaport && wynik ? (
+      {blad && <p className="text-sm text-grunt-red bg-grunt-red-bg border border-grunt-red/25 rounded-md px-3 py-2">{blad}</p>}
+
+      {/* EKRAN: RAPORT (studium) */}
+      {ekran === "raport" && wynik && (
         <div className="space-y-4">
-          <div className="brak-druku flex justify-end gap-3">
+          <div className="brak-druku flex justify-end">
             <button onClick={() => window.print()} className="btn-primary" style={{ height: "var(--grunt-h-cta)" }}>↓ Pobierz PDF (drukuj)</button>
-            <button onClick={() => setPokazRaport(false)} className="btn-secondary" style={{ height: "var(--grunt-h-cta)" }}>← Wróć do analizy</button>
           </div>
           <RaportView wynik={wynik} data={new Date().toLocaleDateString("pl-PL")} />
         </div>
-      ) : (
-      <>
-      {blad && <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{blad}</p>}
+      )}
 
-      {/* KROK 1 — identyfikacja */}
-      {krok === 1 && (
+      {/* EKRAN: WEJŚCIE — wyłącznie identyfikacja działki */}
+      {ekran === "wejscie" && (
+        <div className="card p-[18px]">
+          <h1 className="text-[25px] font-semibold text-grunt-text tracking-[-0.01em]">Wprowadzenie danych działki</h1>
+          <p className="text-grunt-text-muted mt-1 text-[13px] max-w-3xl">
+            Podaj identyfikator działki (lub kaskadę TERYT). Poziom 1 zaciąga dane automatycznie i liczy przesiew —
+            wynik pojawi się na kolejnym ekranie. Brakujące źródła są uzupełniane założeniami i obniżają pewność.
+          </p>
+          <Legenda />
+        </div>
+      )}
+
+      {/* EKRAN: WEJŚCIE — formularz identyfikacji */}
+      {ekran === "wejscie" && (
         <form onSubmit={analizujP1} className="space-y-4">
           <Karta tytul="Poziom 1 — identyfikacja działek" podtytul="Jedyne widoczne pola do wprowadzenia. Z TERYT składany jest identyfikator ULDK.">
             {/* Wybór trybu wejścia */}
@@ -370,13 +391,13 @@ export default function NowaAnalizaPage() {
         </form>
       )}
 
-      {/* Wynik rozwiązania + A° potwierdzenie */}
-      {dane && meta && (
+      {/* POZIOM 1 (administrator) — potwierdzenie wczytania: teren, mapa, źródła */}
+      {ekran === "poziom1" && rolaAdmin && dane && meta && (
         <PotwierdzenieDanych dane={dane} meta={meta} />
       )}
 
-      {/* Działka spoza ULDK demo — brak geometrii, powierzchnia ręczna */}
-      {krok === 1 && dane && dane.powierzchniaM2 === 0 && (
+      {/* Działka spoza ULDK demo — brak geometrii, powierzchnia ręczna (na ekranie wejścia) */}
+      {ekran === "wejscie" && dane && dane.powierzchniaM2 === 0 && (
         <Karta tytul="Działka spoza przykładowego ULDK — podaj powierzchnię" podtytul="Provider demonstracyjny obejmuje 3 działki; dla pozostałych geometria nie jest pobierana automatycznie">
           <p className="text-sm text-slate-600 mb-3">
             Nie pobrano geometrii dla podanego identyfikatora. Po podłączeniu realnego ULDK powierzchnia i kształt
@@ -401,8 +422,18 @@ export default function NowaAnalizaPage() {
         </Karta>
       )}
 
-      {/* KROK 2 — ocena działki */}
-      {krok === 2 && dane && (
+      {/* POZIOM 2 (klient) — tylko podgląd terenu; wynik poniżej */}
+      {ekran === "poziom2" && !rolaAdmin && dane && (
+        <PodgladTerenu
+          mode={meta?.przylegajace === false ? "nonadjacent" : "ok"}
+          view="level2"
+          height={340}
+          layers={warstwyP2(dane, wynik?.poziom1.profilRekomendowany)}
+        />
+      )}
+
+      {/* POZIOM 2 (administrator) — ocena działki: dane, korekty, przelicz */}
+      {ekran === "poziom2" && rolaAdmin && dane && (
         <div className="space-y-4">
           <div className="grid lg:grid-cols-[minmax(0,430px)_1fr] gap-4 items-start">
             <div className="lg:sticky" style={{ top: "var(--grunt-sticky-top)" }}>
@@ -469,15 +500,14 @@ export default function NowaAnalizaPage() {
 
           <div className="flex gap-3">
             <button onClick={przeliczP2} disabled={licze} className="btn-primary" style={{ height: "var(--grunt-h-cta)" }}>
-              {licze ? "Liczę…" : "Przelicz Poziom 2"}
+              {licze ? "Liczę…" : "Przelicz Poziom 2 (uwzględnij korekty)"}
             </button>
-            <button onClick={() => setKrok(1)} className="btn-secondary" style={{ height: "var(--grunt-h-cta)" }}>← Poziom 1</button>
           </div>
         </div>
       )}
 
-      {/* KROK 3 — ankieta finansowa (brama) → montaż finansowy */}
-      {krok === 3 && dane && (
+      {/* POZIOM 3 — ankieta finansowa (brama) → montaż finansowy */}
+      {ekran === "poziom3" && dane && (
         <div className="space-y-4">
           <AnkietaFinansowa onSubmit={zatwierdzAnkiete} licze={licze} />
           {!profilFin && (
@@ -488,7 +518,8 @@ export default function NowaAnalizaPage() {
         </div>
       )}
 
-      {krok === 3 && dane && profilFin && (
+      {/* POZIOM 3 (administrator) — edytowalne parametry reżimu/montażu */}
+      {ekran === "poziom3" && rolaAdmin && dane && profilFin && (
         <div className="space-y-4">
           <Karta tytul="Poziom 3 — parametry reżimu i montażu (A±)" podtytul="Bazowo z konfiguracji reżimu B (program 2027+); modyfikowalne dla scenariuszy">
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -515,55 +546,49 @@ export default function NowaAnalizaPage() {
 
           <div className="flex gap-3">
             <button onClick={() => przeliczP3()} disabled={licze} className="btn-primary" style={{ height: "var(--grunt-h-cta)" }}>
-              {licze ? "Liczę…" : "Przelicz Poziom 3"}
+              {licze ? "Liczę…" : "Przelicz Poziom 3 (uwzględnij parametry)"}
             </button>
-            <button onClick={() => setKrok(2)} className="btn-secondary" style={{ height: "var(--grunt-h-cta)" }}>← Poziom 2</button>
           </div>
         </div>
       )}
 
-      {/* WYNIKI bieżącego poziomu */}
+      {/* WYNIKI — jeden ekran = jeden poziom; szczegóły tylko dla administratora */}
       {wynik && wynik.poziom1 && (
-        <div className="pt-2 border-t border-slate-200">
-          {krok === 1 && <SekcjaWynik numer="1" tytul="Wynik Poziomu 1 — przesiew"><Poziom1View p1={wynik.poziom1} /></SekcjaWynik>}
-          {krok === 2 && (
+        <div className="space-y-4">
+          {ekran === "poziom1" && (
             <>
-              <SekcjaWynik numer="1" tytul="Poziom 1 (zaktualizowany)"><Poziom1View p1={wynik.poziom1} /></SekcjaWynik>
-              <SekcjaWynik numer="2" tytul="Wynik Poziomu 2 — model zabudowy"><Poziom2View p2={wynik.poziom2} profilRek={wynik.poziom1.profilRekomendowany} /></SekcjaWynik>
-            </>
-          )}
-          {krok === 3 && profilFin && <SekcjaWynik numer="3" tytul="Wynik Poziomu 3 — model finansowy"><Poziom3View p3={wynik.poziom3} /></SekcjaWynik>}
-
-          {/* Bramki między poziomami */}
-          <div className="mt-4">
-            {krok === 1 && (
+              <Poziom1View p1={wynik.poziom1} pelny={rolaAdmin} />
               <BannerBramki
                 tytul="Poziom 1 zaliczony — przejdź do oceny działki"
-                opis="Poziom 2 odsłania planistykę, rynek i uwarunkowania oraz rekomenduje warianty zabudowy."
+                opis="Poziom 2 odsłania model zabudowy i warianty."
                 akcja={wejdzP2}
                 akcjaLabel="Przejdź do Poziomu 2"
               />
-            )}
-            {krok === 2 && (
+            </>
+          )}
+          {ekran === "poziom2" && (
+            <>
+              <Poziom2View p2={wynik.poziom2} profilRek={wynik.poziom1.profilRekomendowany} />
               <BannerBramki
                 tytul="Poziom 2 gotowy — czas na model finansowy"
                 opis="Najpierw ankieta finansowa (kto pyta i jak finansuje), potem montaż i domknięcie Poziomu 3."
                 akcja={wejdzP3}
                 akcjaLabel="Przejdź do ankiety i Poziomu 3"
               />
-            )}
-            {krok === 3 && profilFin && (
+            </>
+          )}
+          {ekran === "poziom3" && profilFin && (
+            <>
+              <Poziom3View p3={wynik.poziom3} />
               <BannerBramki
                 tytul="Studium gotowe — wygeneruj raport"
-                opis="Drukowalne podsumowanie: werdykt przesiewu, pewność sekcji, model zabudowy i finansowy, prowenancja danych."
-                akcja={() => setPokazRaport(true)}
+                opis="Drukowalne podsumowanie: werdykt, pewność sekcji, model zabudowy i finansowy, prowenancja."
+                akcja={() => { setEkran("raport"); setMaxKrok((m) => Math.max(m, 5)); }}
                 akcjaLabel="Otwórz studium (raport)"
               />
-            )}
-          </div>
+            </>
+          )}
         </div>
-      )}
-      </>
       )}
     </div>
   );
@@ -921,14 +946,3 @@ function Odczyt({ e, v }: { e: string; v: string }) {
   );
 }
 
-function SekcjaWynik({ numer, tytul, children }: { numer: string; tytul: string; children: React.ReactNode }) {
-  return (
-    <div className="mt-4">
-      <div className="flex items-center gap-3 mb-3">
-        <span className="mono flex items-center justify-center w-8 h-8 rounded-md bg-grunt-ink text-white font-bold text-sm">{numer}</span>
-        <h2 className="text-lg font-bold text-slate-800">{tytul}</h2>
-      </div>
-      <div className="space-y-4">{children}</div>
-    </div>
-  );
-}
