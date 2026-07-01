@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { DZIALKI_PRZYKLADOWE } from "../../data/sample";
 import { uruchomAnalize } from "../index";
 import { uruchomPoziom1 } from "../poziom1";
+import { statusZeSymbolu } from "../../mpzp";
 
 const [wzorcowa, senioralna, bialePlamy] = DZIALKI_PRZYKLADOWE;
 
@@ -112,6 +113,24 @@ test("P1: flagi/sygnały i realne białe plamy", () => {
   assert.ok(b.braki.some((x) => x.tytul.includes("MPZP")));
   assert.ok(b.braki.some((x) => x.tytul.toLowerCase().includes("najmu")));
   assert.ok(b.sygnaly.some((s) => s.ton === "ostrzezenie"));
+});
+
+test("MPZP: symbol → status planistyczny", () => {
+  assert.equal(statusZeSymbolu("MW").status, "mpzp_mieszkaniowy");
+  assert.equal(statusZeSymbolu("MW").sprzeczne, false);
+  assert.equal(statusZeSymbolu("MW/U").status, "mpzp_mieszkaniowy");
+  assert.equal(statusZeSymbolu("R").status, "sprzeczny");
+  assert.equal(statusZeSymbolu("P").sprzeczne, true);
+  assert.equal(statusZeSymbolu("U").status, "sprzeczny"); // usługi bez funkcji mieszkaniowej
+});
+
+test("MPZP: deklaracja wypełniającego zamyka brak planu (bez alertu)", () => {
+  const bez = uruchomPoziom1(bialePlamy);
+  assert.ok(bez.braki.some((b) => b.tytul.includes("MPZP"))); // przed deklaracją: brak
+
+  const zadekl = uruchomPoziom1({ ...bialePlamy, przeznaczenieSprzeczneZMieszkaniowa: false, mpzpZadeklarowany: true });
+  assert.ok(!zadekl.braki.some((b) => b.tytul.startsWith("MPZP /")));
+  assert.ok(!zadekl.sygnaly.some((s) => s.tekst.includes("Brak MPZP")));
 });
 
 test("Pipeline: każdy poziom zasila następny (spójność id)", () => {

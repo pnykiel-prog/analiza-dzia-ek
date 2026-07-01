@@ -62,6 +62,8 @@ export interface DaneDzialki {
 
   // B. Status planistyczny i prawny
   statusPlanistyczny: StatusPlanistyczny;
+  /** Czy pytanie o MPZP zostało rozstrzygnięte przez wypełniającego (ręczna deklaracja). */
+  mpzpZadeklarowany?: Maybe<boolean>;
   wskaznikiPlanistyczne: Maybe<WskaznikiPlanistyczne>;
   zabudowaMieszkaniowaWSasiedztwie: Maybe<boolean>;
   przeznaczenieSprzeczneZMieszkaniowa: Maybe<boolean>;
