@@ -136,18 +136,14 @@ export async function GET(req: Request) {
     }
   };
 
-  const katalog = u.searchParams.get("katalog");
-  const vars = u.searchParams.get("vars"); // subject-id → lista zmiennych tematu
-  const szukaj = u.searchParams.get("szukaj");
-  if (vars) {
-    diag.vars = { subjectId: vars, zmienne: listaZmiennych(await fetchTekst(url("variables", { "subject-id": vars }), { ...siec, naglowki })) };
-  } else if (katalog) {
+  // Autorytatywna nawigacja po drzewie tematów BDL (temat → zmienne).
+  const zbudujKatalog = async () => {
     const zmienneTematu = async (id: string) =>
       listaZmiennych(await fetchTekst(url("variables", { "subject-id": id }), { ...siec, naglowki }));
     const dzieci = async (id: string) =>
       listaTematow(await fetchTekst(url("subjects", { "parent-id": id }), { ...siec, naglowki }));
     const wynik: { subjectId: string; temat: string; zmienne: { id: string; nazwa: string }[] }[] = [];
-    for (const fraza of ["ludność", "bezrob"]) {
+    for (const fraza of ["ludność w wieku", "bezrobotni"]) {
       const tematy = listaTematow(await fetchTekst(url("subjects/search", { name: fraza }), { ...siec, naglowki }));
       for (const t of tematy) {
         const zmienne = await zmienneTematu(t.id);
@@ -162,23 +158,20 @@ export async function GET(req: Request) {
         }
       }
     }
-    diag.katalog = wynik;
+    return wynik;
+  };
+
+  const vars = u.searchParams.get("vars"); // subject-id → lista zmiennych tematu
+  const szukaj = u.searchParams.get("szukaj");
+  if (vars) {
+    diag.vars = { subjectId: vars, zmienne: listaZmiennych(await fetchTekst(url("variables", { "subject-id": vars }), { ...siec, naglowki })) };
   } else if (szukaj) {
     diag.szukaj = await szukajFraz(szukaj);
   } else {
-    // Zestaw fraz eksploracyjnych dla brakujących pojęć (ludność, wiek, bezrobocie).
+    // Domyślnie zwracamy OBA: katalog tematów (autorytatywny) i kandydatów po frazie.
+    diag.katalog = await zbudujKatalog();
     diag.kandydaci = await Promise.all(
-      [
-        "ludność ogółem",
-        "ludność w wieku 65 lat i więcej",
-        "ludność w wieku poprodukcyjnym",
-        "udział ludności w wieku 65 lat i więcej",
-        "ludność w wieku 20-39",
-        "ludność w wieku 25-39",
-        "ludność w wieku produkcyjnym",
-        "bezrobotni zarejestrowani ogółem",
-        "udział bezrobotnych zarejestrowanych",
-      ].map(szukajFraz)
+      ["ludność w wieku poprodukcyjnym", "ludność w wieku produkcyjnym", "bezrobotni"].map(szukajFraz)
     );
   }
 
