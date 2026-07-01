@@ -159,7 +159,9 @@ export function ocenPopyt(
   d: DaneDzialki,
   profil: Profil,
   cfgS: KonfiguracjaScoring,
-  cfg: KonfiguracjaPopyt = KONFIG_POPYT
+  cfg: KonfiguracjaPopyt = KONFIG_POPYT,
+  /** Poziom 1: bez mnożnika usług (usługi = Poziom 2) — patrz rewizja P1. */
+  bezUslug = false
 ): WynikPopytu {
   const grupa = grupaDocelowa(d, profil);
   const kwal = kwalifikacjaDochodowa(d, profil, cfg);
@@ -180,7 +182,8 @@ export function ocenPopyt(
   const potencjalny = c01(wagi.wewnetrzny * wewnetrzny + wagi.zewnetrzny * zewnetrzny);
 
   const mnoznikLuka = luka === null ? 1.0 : liniowo(luka, 0, 45, cfg.mnoznikLuka.min, cfg.mnoznikLuka.max);
-  const realizowalny = clamp(Math.round(potencjalny * mnoznikLuka * mUsl.m * 100));
+  const mnoznikUslugEfekt = bezUslug ? 1 : mUsl.m;
+  const realizowalny = clamp(Math.round(potencjalny * mnoznikLuka * mnoznikUslugEfekt * 100));
 
   // Interpretacja kombinacji (sekcja 7).
   const prog = cfg.progInterpretacji;

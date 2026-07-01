@@ -64,9 +64,12 @@ export default function NowaAnalizaPage() {
   const [licze, setLicze] = useState(false);
   const [recznaPow, setRecznaPow] = useState("");
   const [trybWejscia, setTrybWejscia] = useState<"kaskada" | "id">("id");
-  // Deklaracja MPZP przez wypełniającego (ekran wejścia).
-  const [mpzpIstnieje, setMpzpIstnieje] = useState<"" | "tak" | "nie">("");
+  // Podstawa planistyczna deklarowana ręcznie (ekran wejścia, S3 rewizji P1).
+  const [podstawaTyp, setPodstawaTyp] = useState<"" | "MPZP" | "WZ" | "PnB" | "BRAK">("");
   const [mpzpSymbol, setMpzpSymbol] = useState("");
+  const [podstawaFunkcja, setPodstawaFunkcja] = useState("");
+  // Ręczne wskaźniki podstawy planistycznej (pojemność P1); puste → fallback do danych auto.
+  const [wsk, setWsk] = useState<Record<string, string>>({ intensywnosc: "", maxKondygnacje: "", maxPowZabudowyPct: "", minPbcPct: "" });
 
   // Override P2 (A±/R) — wartości jako stringi + zbiór skorygowanych pól.
   const [p2, setP2] = useState<Record<string, string>>({});
@@ -93,15 +96,55 @@ export default function NowaAnalizaPage() {
     setPozycje((ps) => (ps.length > 1 ? ps.filter((_, idx) => idx !== i) : ps));
   }
 
-  // Nakłada deklarację MPZP wypełniającego na dane działki (przed analizą P1).
-  function zastosujMpzp(d: DaneDzialki | null): DaneDzialki | null {
+  // Buduje ręczne wskaźniki podstawy planistycznej (pojemność P1); null → fallback do danych auto.
+  function wskazniki(d: DaneDzialki): DaneDzialki["wskaznikiPlanistyczne"] {
+    const maZab = wsk.maxPowZabudowyPct.trim() !== "" && wsk.intensywnosc.trim() !== "";
+    if (!maZab) return d.wskaznikiPlanistyczne;
+    const kond = n(wsk.maxKondygnacje) ?? 4;
+    return {
+      intensywnosc: n(wsk.intensywnosc) ?? 1,
+      maxWysokoscM: d.wskaznikiPlanistyczne?.maxWysokoscM ?? Math.round(kond * 3.2),
+      maxKondygnacje: kond,
+      maxPowZabudowyPct: n(wsk.maxPowZabudowyPct) ?? 35,
+      minPbcPct: n(wsk.minPbcPct) ?? 25,
+      normatywParkingowy: d.wskaznikiPlanistyczne?.normatywParkingowy ?? 0.8,
+      udzialUslugPct: d.wskaznikiPlanistyczne?.udzialUslugPct ?? 15,
+    };
+  }
+
+  // Nakłada ręcznie zadeklarowaną podstawę planistyczną (typ + symbol/funkcja + wskaźniki) na dane (przed analizą P1).
+  function zastosujPodstawe(d: DaneDzialki | null): DaneDzialki | null {
     if (!d) return d;
-    if (mpzpIstnieje === "tak" && mpzpSymbol) {
-      const { status, sprzeczne } = statusZeSymbolu(mpzpSymbol);
-      return { ...d, statusPlanistyczny: status, przeznaczenieSprzeczneZMieszkaniowa: sprzeczne, mpzpZadeklarowany: true };
+    if (podstawaTyp === "") return d; // bez deklaracji — użyj danych automatycznych
+    if (podstawaTyp === "BRAK") {
+      return {
+        ...d,
+        statusPlanistyczny: "brak_danych",
+        podstawa: { typ: "BRAK", zrodlo: "ręczne" },
+        wskaznikiPlanistyczne: null,
+        mpzpZadeklarowany: false,
+      };
     }
-    if (mpzpIstnieje === "nie") return { ...d, przeznaczenieSprzeczneZMieszkaniowa: false, mpzpZadeklarowany: true };
-    return d;
+    if (podstawaTyp === "MPZP") {
+      const { status, sprzeczne } = statusZeSymbolu(mpzpSymbol);
+      return {
+        ...d,
+        statusPlanistyczny: status,
+        przeznaczenieSprzeczneZMieszkaniowa: sprzeczne,
+        mpzpZadeklarowany: true,
+        podstawa: { typ: "MPZP", symbol: mpzpSymbol, zrodlo: "ręczne" },
+        wskaznikiPlanistyczne: wskazniki(d),
+      };
+    }
+    // WZ / PnB — decyzja indywidualna, funkcja mieszkaniowa dopuszczona.
+    return {
+      ...d,
+      statusPlanistyczny: "plan_ogolny_sprzyjajacy",
+      przeznaczenieSprzeczneZMieszkaniowa: false,
+      mpzpZadeklarowany: true,
+      podstawa: { typ: podstawaTyp, funkcja: podstawaFunkcja.trim() || "mieszkaniowa wielorodzinna", zrodlo: "ręczne" },
+      wskaznikiPlanistyczne: wskazniki(d),
+    };
   }
 
   async function analizujP1(e: React.FormEvent) {
@@ -125,7 +168,7 @@ export default function NowaAnalizaPage() {
         setBlad(d.blad ?? "Błąd pobierania danych.");
         return;
       }
-      const dm = zastosujMpzp(d.dane);
+      const dm = zastosujPodstawe(d.dane);
       setDane(dm);
       setMeta(d.meta);
       setMediana(d.medianaRegionalna);
@@ -156,7 +199,7 @@ export default function NowaAnalizaPage() {
     }
     setBlad(null);
     setLicze(true);
-    const noweDane = zastosujMpzp({ ...dane, powierzchniaM2: pow })!;
+    const noweDane = zastosujPodstawe({ ...dane, powierzchniaM2: pow })!;
     setDane(noweDane);
     await przelicz(noweDane);
     setEkran("poziom1");
@@ -402,18 +445,20 @@ export default function NowaAnalizaPage() {
             </p>
           </Karta>
 
-          {/* MPZP — deklaracja wypełniającego (pod wprowadzonymi działkami) */}
+          {/* Podstawa planistyczna — deklaracja wypełniającego (S3 rewizji P1) */}
           <Karta
-            tytul="Plan miejscowy (MPZP)"
-            podtytul="Czy dla wprowadzonych działek obowiązuje MPZP? Deklaracja zastępuje automatyczne pobranie na tym etapie i wystarcza do Poziomu 1."
+            tytul="Podstawa planistyczna"
+            podtytul="Na jakiej podstawie można zabudować działkę? Wybór determinuje pojemność zabudowy na Poziomie 1. Deklaracja zastępuje automatyczne pobranie na tym etapie."
           >
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[12px] text-grunt-text-muted2 mr-1">Czy istnieje MPZP?</span>
-              <Chip selected={mpzpIstnieje === "tak"} onClick={() => setMpzpIstnieje("tak")}>Tak</Chip>
-              <Chip selected={mpzpIstnieje === "nie"} onClick={() => setMpzpIstnieje("nie")}>Nie</Chip>
+              <span className="text-[12px] text-grunt-text-muted2 mr-1">Rodzaj podstawy:</span>
+              <Chip selected={podstawaTyp === "MPZP"} onClick={() => setPodstawaTyp("MPZP")}>MPZP (plan miejscowy)</Chip>
+              <Chip selected={podstawaTyp === "WZ"} onClick={() => setPodstawaTyp("WZ")}>Decyzja WZ</Chip>
+              <Chip selected={podstawaTyp === "PnB"} onClick={() => setPodstawaTyp("PnB")}>Pozwolenie na budowę</Chip>
+              <Chip selected={podstawaTyp === "BRAK"} onClick={() => setPodstawaTyp("BRAK")}>Brak podstawy</Chip>
             </div>
 
-            {mpzpIstnieje === "tak" && (
+            {podstawaTyp === "MPZP" && (
               <label className="text-sm block mt-3 max-w-md">
                 <span className="text-[11px] font-medium text-grunt-text-muted2">Symbol przeznaczenia z MPZP</span>
                 <select value={mpzpSymbol} onChange={(e) => setMpzpSymbol(e.target.value)} className="inp bg-white mt-1">
@@ -425,25 +470,61 @@ export default function NowaAnalizaPage() {
                 {mpzpSymbol && (
                   <span className={`text-[11px] mt-1 block ${statusZeSymbolu(mpzpSymbol).sprzeczne ? "text-grunt-red" : "text-grunt-green"}`}>
                     {statusZeSymbolu(mpzpSymbol).sprzeczne
-                      ? "Przeznaczenie sprzeczne z funkcją mieszkaniową — twarde wykluczenie w bramkach."
+                      ? "Przeznaczenie sprzeczne z funkcją mieszkaniową — działka nieprzydatna pod budownictwo społeczne."
                       : "MPZP mieszkaniowy — zgodny z zabudową społeczną."}
                   </span>
                 )}
               </label>
             )}
-            {mpzpIstnieje === "nie" && (
-              <p className="text-[11px] text-grunt-text-faint2 mt-2">
-                Brak MPZP — Poziom 1 użyje sąsiedztwa jako odniesienia; alert o braku planu nie będzie pokazywany.
+
+            {(podstawaTyp === "WZ" || podstawaTyp === "PnB") && (
+              <label className="text-sm block mt-3 max-w-md">
+                <span className="text-[11px] font-medium text-grunt-text-muted2">
+                  Funkcja z {podstawaTyp === "WZ" ? "decyzji o warunkach zabudowy" : "pozwolenia na budowę"} (opcjonalnie)
+                </span>
+                <input
+                  value={podstawaFunkcja}
+                  onChange={(e) => setPodstawaFunkcja(e.target.value)}
+                  className="inp mt-1"
+                  placeholder="np. zabudowa mieszkaniowa wielorodzinna"
+                />
+                <span className="text-[11px] text-grunt-text-faint2 mt-1 block">
+                  Decyzja indywidualna dopuszcza funkcję mieszkaniową; wprowadź wskaźniki, by wyliczyć pojemność.
+                </span>
+              </label>
+            )}
+
+            {/* Wskaźniki zabudowy — dla MPZP/WZ/PnB. Puste → fallback do danych automatycznych. */}
+            {(podstawaTyp === "MPZP" || podstawaTyp === "WZ" || podstawaTyp === "PnB") && (
+              <div className="mt-4">
+                <div className="text-[11px] uppercase tracking-wide text-grunt-text-faint mb-2">
+                  Wskaźniki zabudowy (pojemność P1) — z wypisu / decyzji
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <WskPole label="Max pow. zabudowy" sufiks="%" k="maxPowZabudowyPct" wsk={wsk} setWsk={setWsk} />
+                  <WskPole label="Min pow. biol. czynna" sufiks="%" k="minPbcPct" wsk={wsk} setWsk={setWsk} />
+                  <WskPole label="Intensywność zabudowy" k="intensywnosc" wsk={wsk} setWsk={setWsk} krok="0.1" />
+                  <WskPole label="Max kondygnacje" k="maxKondygnacje" wsk={wsk} setWsk={setWsk} />
+                </div>
+                <p className="text-[11px] text-grunt-text-faint2 mt-2">
+                  Pozostaw puste, aby użyć wskaźników pobranych automatycznie. Brak wskaźników → tryb ograniczony (pojemność nieoznaczona).
+                </p>
+              </div>
+            )}
+
+            {podstawaTyp === "BRAK" && (
+              <p className="text-[11px] text-grunt-amber-text2 mt-3 bg-grunt-amber-bg border border-grunt-amber/25 rounded-md px-3 py-2">
+                Brak podstawy planistycznej — Poziom 1 przejdzie w tryb ograniczony: werdykt liczony z samego popytu, pojemność zabudowy nieoznaczona.
               </p>
             )}
-            {mpzpIstnieje === "" && (
+            {podstawaTyp === "" && (
               <p className="text-[11px] text-grunt-text-faint2 mt-2">
-                Bez odpowiedzi — jeśli plan jest w danych automatycznych, użyjemy go; w przeciwnym razie pojawi się biała plama MPZP.
+                Bez deklaracji — użyjemy podstawy i wskaźników z danych automatycznych (jeśli dostępne).
               </p>
             )}
           </Karta>
 
-          <button type="submit" disabled={licze || (mpzpIstnieje === "tak" && !mpzpSymbol)} className="btn-primary" style={{ height: "var(--grunt-h-cta)" }}>
+          <button type="submit" disabled={licze || (podstawaTyp === "MPZP" && !mpzpSymbol)} className="btn-primary" style={{ height: "var(--grunt-h-cta)" }}>
             {licze ? "Pobieram dane i liczę…" : "Pobierz dane i analizuj (Poziom 1)"}
           </button>
         </form>
@@ -626,7 +707,7 @@ export default function NowaAnalizaPage() {
           )}
           {ekran === "poziom2" && (
             <>
-              <Poziom2View p2={wynik.poziom2} profilRek={wynik.poziom1.profilRekomendowany} sygnaly={wynik.poziom1.sygnaly} braki={wynik.poziom1.braki} />
+              <Poziom2View p2={wynik.poziom2} profilRek={wynik.poziom1.profilRekomendowany} sygnaly={wynik.poziom2.sygnaly} braki={wynik.poziom2.braki} />
               <BannerBramki
                 tytul="Poziom 2 gotowy — czas na model finansowy"
                 opis="Najpierw ankieta finansowa (kto pyta i jak finansuje), potem montaż i domknięcie Poziomu 3."
@@ -982,6 +1063,15 @@ function PoleRynkowe({ label, k, p2, setP2, orig, N, sufiks }: P2Props & { N: nu
       {naglowekPola(`${label}${sufiks ? ` (${sufiks})` : ""}`, tryb, skor)}
       <input type="number" value={p2[k] ?? ""} onChange={(e) => setP2((s) => ({ ...s, [k]: e.target.value }))} className="inp mt-0.5" />
       <span className={`text-[11px] ${kolorStatus}`}>N={N} · {status} · {etykietaZrodla}</span>
+    </label>
+  );
+}
+
+function WskPole({ label, k, wsk, setWsk, sufiks, krok }: { label: string; k: string; wsk: Record<string, string>; setWsk: (f: (s: Record<string, string>) => Record<string, string>) => void; sufiks?: string; krok?: string }) {
+  return (
+    <label className="text-sm block">
+      <span className="text-[11px] text-grunt-text-muted2">{label}{sufiks ? ` (${sufiks})` : ""}</span>
+      <input type="number" step={krok ?? "any"} value={wsk[k] ?? ""} onChange={(e) => setWsk((s) => ({ ...s, [k]: e.target.value }))} className="inp mt-0.5" />
     </label>
   );
 }

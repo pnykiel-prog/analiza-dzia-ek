@@ -14,11 +14,11 @@ export function WynikiPoziomow({ p1, p2, p3 }: { p1: WynikPoziom1; p2: WynikPozi
         <a href="#poziom-3" className="badge bg-slate-200 text-slate-700 hover:bg-slate-300">3 · Finanse</a>
       </div>
 
-      <Sekcja numer="1" tytul="Poziom 1 — szybki przesiew" opis="Bramki + scoring 5 wymiarów dla dwóch profili">
+      <Sekcja numer="1" tytul="Poziom 1 — szybki przesiew" opis="Podstawa planistyczna → pojemność zabudowy ↔ popyt dla dwóch profili">
         <Poziom1View p1={p1} />
       </Sekcja>
       <Sekcja numer="2" tytul="Poziom 2 — ocena działki i model zabudowy" opis="Obwiednia → typologia → program pod profil (bez finansów)">
-        <Poziom2View p2={p2} profilRek={p1.profilRekomendowany} sygnaly={p1.sygnaly} braki={p1.braki} />
+        <Poziom2View p2={p2} profilRek={p1.profilRekomendowany} sygnaly={p2.sygnaly} braki={p2.braki} />
       </Sekcja>
       <Sekcja numer="3" tytul="Poziom 3 — model finansowy SIM" opis="Montaż, oś czasu, reżim as-of, domknięcie i wymagana dotacja">
         <Poziom3View p3={p3} />

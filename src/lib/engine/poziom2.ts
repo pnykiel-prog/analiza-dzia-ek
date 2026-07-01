@@ -20,7 +20,8 @@ import type {
   WynikPoziom2,
 } from "../types";
 import type { KonfiguracjaZabudowy } from "../config";
-import { KONFIG_ZABUDOWA } from "../config";
+import { KONFIG_ZABUDOWA, KONFIG_SCORING } from "../config";
+import { liczBramki, liczBraki, liczKluczoweLiczby, liczSygnaly } from "./uwarunkowania";
 
 interface WskaznikiUzyte {
   intensywnosc: number;
@@ -175,8 +176,6 @@ function flagiRyzyka(d: DaneDzialki, obw: Obwiednia, w: WskaznikiUzyte, cfg: Kon
     flagi.push("Wąska/skośna działka — obniżona efektywność rzutu.");
   if (obw.zrodloWskaznikow === "sasiedztwo_fallback")
     flagi.push("Brak MPZP — obwiednia oszacowana z sąsiedztwa, niska pewność.");
-  if (p1.flagi.includes("Wysoka dotacja / ryzyko rentowności"))
-    flagi.push("Wysoka wymagana dotacja (sygnał z modułu cenowego W5).");
   return flagi;
 }
 
@@ -227,10 +226,20 @@ export function uruchomPoziom2(
     }
   }
 
+  // Uwarunkowania przeniesione z P1: bramki środowiskowe/formalne, sygnały, braki.
+  const bramki = liczBramki(d);
+  const sygnaly = liczSygnaly(d, bramki.szczegoly, KONFIG_SCORING);
+  const braki = liczBraki(d, bramki.szczegoly);
+  const kluczoweLiczby = liczKluczoweLiczby(d, KONFIG_SCORING);
+
   return {
     dzialkaId: d.id,
     obwiednia,
     warianty,
     flagiRyzyka: flagiRyzyka(d, obwiednia, w, cfg, p1),
+    bramki,
+    sygnaly,
+    braki,
+    kluczoweLiczby,
   };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import type { WynikAnalizy, WynikWymiaru } from "@/lib/types";
+import type { WynikAnalizy } from "@/lib/types";
 import { WskaznikPewnosci, StosMontazu, type SegmentStosu } from "./grunt";
 import { etykietaTypologii, liczba, plnMln, statusSlowny } from "@/lib/format";
 
@@ -41,17 +41,21 @@ export function RaportView({ wynik, data }: { wynik: WynikAnalizy; data?: string
         </div>
       </SekcjaRap>
 
-      {/* 02 Ocena profesjonalna — pewność sekcji */}
-      <SekcjaRap numer="02" tytul="Ocena profesjonalna — pewność sekcji (wg kompletności danych)">
-        <div className="divide-y divide-grunt-divider-row">
-          {p1.wymiary.map((w) => (
-            <div key={w.kod} className="flex items-center justify-between py-2">
-              <span className="text-[13px] text-grunt-text-3">
-                <span className="text-grunt-text-faint2 mr-1.5">{w.kod}</span>{w.nazwa}
-              </span>
-              <WskaznikPewnosci pewnosc={pewnoscWymiaru(w)} etykieta={false} rozmiar="sm" />
+      {/* 02 Pojemność zabudowy vs popyt (Poziom 1) */}
+      <SekcjaRap numer="02" tytul="Pojemność zabudowy i popyt (Poziom 1)">
+        <div className="grid grid-cols-2 gap-4 text-[12px]">
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-grunt-text-faint mb-1">Podstawa planistyczna</div>
+            <div className="text-grunt-text font-medium">
+              {p1.podstawa.typ}{p1.podstawa.symbol ? ` · ${p1.podstawa.symbol}` : ""} · {p1.tryb === "ograniczony" ? "tryb ograniczony" : "tryb pełny"}
             </div>
-          ))}
+            <div className="mt-2 text-grunt-text-muted2">Pojemność (szac. mieszkań): <span className="mono text-grunt-text">M {liczba(p1.pojemnosc.szacLiczbaMieszkanMlodzi)} / S {liczba(p1.pojemnosc.szacLiczbaMieszkanSeniorzy)}</span></div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-grunt-text-faint mb-1">Dopasowanie popyt ↔ pojemność</div>
+            <div className="text-grunt-text-muted2">Młodzi: <span className="mono text-grunt-text">{p1.dopasowanie.mlodzi.score}/100</span> · popyt {p1.dopasowanie.mlodzi.popyt}</div>
+            <div className="text-grunt-text-muted2">Seniorzy: <span className="mono text-grunt-text">{p1.dopasowanie.seniorzy.score}/100</span> · popyt {p1.dopasowanie.seniorzy.popyt}</div>
+          </div>
         </div>
       </SekcjaRap>
 
@@ -127,13 +131,6 @@ export function RaportView({ wynik, data }: { wynik: WynikAnalizy; data?: string
 }
 
 // ── Pomocnicze ───────────────────────────────────────────────────────────────
-
-/** Pewność sekcji = udział metryk z danymi (bez fallbacków) w wymiarze. */
-function pewnoscWymiaru(w: WynikWymiaru): number {
-  if (!w.metryki.length) return 0;
-  const zDanymi = w.metryki.filter((m) => !m.fallback).length;
-  return Math.round((zDanymi / w.metryki.length) * 100);
-}
 
 function montazRaport(s: WynikAnalizy["poziom3"]["scenariusze"][number]): SegmentStosu[] {
   const koszt = s.koszt.razem || 1;
