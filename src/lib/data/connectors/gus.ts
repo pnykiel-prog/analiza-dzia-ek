@@ -86,12 +86,33 @@ async function idZmiennej(klucz: KluczZmiennej): Promise<string | null> {
 async function wartosc(unitId: string, klucz: KluczZmiennej): Promise<number | null> {
   const varId = await idZmiennej(klucz);
   if (!varId) return null;
-  // BDL: unit-id jest segmentem ścieżki (data/by-unit/{id}), nie parametrem zapytania.
+  return wartoscId(unitId, varId);
+}
+
+/** Wartość zmiennej BDL po jawnym ID (data/by-unit/{unitId}?var-id=…). */
+async function wartoscId(unitId: string, varId: string): Promise<number | null> {
   const odp = await fetchJson(url(`data/by-unit/${encodeURIComponent(unitId)}`, { "var-id": varId, year: String(gus.rok) }), {
     ...KONFIG_KONEKTORY.siec,
     naglowki: naglowki(),
   });
   return wartoscZmiennej(odp, gus.rok);
+}
+
+/**
+ * Zmienne BDL „Ludność wg grup wieku i płci" (temat P2137), kolumna „· ogółem":
+ *  72305 = ogółem (razem); 72306 = 0-4; każda kolejna 5-letnia grupa = +1
+ *  (72307=5-9, 72308=10-14, …). Potwierdzone diagnostyką /api/diag-gus.
+ */
+const P2137_OGOLEM_TOTAL = "72305";
+const P2137_OGOLEM_0_4 = 72306;
+const idPasma = (k: number): string => String(P2137_OGOLEM_0_4 + k); // k=0 → 0-4, k=4 → 20-24, k=12 → 60-64
+const PASMA_0_64 = Array.from({ length: 13 }, (_, k) => idPasma(k)); // 0-4 … 60-64
+const PASMA_20_39 = [4, 5, 6, 7].map(idPasma); // 20-24, 25-29, 30-34, 35-39
+
+/** Suma wartości pasm (null, gdy któregokolwiek brak — nie zaniżamy udziału). */
+function sumaPasm(wartosci: (number | null)[]): number | null {
+  if (wartosci.some((v) => v === null)) return null;
+  return (wartosci as number[]).reduce((s, v) => s + v, 0);
 }
 
 export const konektorGUS: Konektor = {
@@ -125,24 +146,26 @@ export const konektorGUS: Konektor = {
       meta.push({ pole, zrodlo: this.zrodlo, czas, pewnosc, status: "ok", tryb: "A" });
     };
 
-    // Liczebności do wyliczenia udziałów + gotowe wskaźniki.
-    const [ogolem, l65, l2039, bezrobocie, podmioty, saldo] = await Promise.all([
-      wartosc(jednostka.id, "ludnoscOgolem"),
-      wartosc(jednostka.id, "ludnosc65"),
-      wartosc(jednostka.id, "ludnosc2039"),
-      wartosc(jednostka.id, "bezrobocie"),
-      wartosc(jednostka.id, "podmiotyNa10k"),
-      wartosc(jednostka.id, "saldoMigracji"),
+    // Demografia z pasm wieku (P2137, kolumna „· ogółem") + wskaźniki po ID.
+    const u = jednostka.id;
+    const [ogolem, pasma0_64, pasma20_39, podmioty, saldo] = await Promise.all([
+      wartoscId(u, P2137_OGOLEM_TOTAL),
+      Promise.all(PASMA_0_64.map((id) => wartoscId(u, id))).then(sumaPasm),
+      Promise.all(PASMA_20_39.map((id) => wartoscId(u, id))).then(sumaPasm),
+      wartosc(u, "podmiotyNa10k"),
+      wartosc(u, "saldoMigracji"),
     ]);
 
-    if (ogolem && l65) dodaj("udzial65PlusPct", (l65 / ogolem) * 100, 80);
-    if (ogolem && l2039) {
-      dodaj("udzial2039Pct", (l2039 / ogolem) * 100, 80);
-      // Baza odniesienia dla grupy „młodzi" (krajowa mediana) — bez niej udział sam nie liczy grupy.
-      dodaj("mediana2039Woj", gus.medianaWiek2039Pct, 55);
+    if (ogolem && ogolem > 0) {
+      // 65+ = ogółem − (0–64); udział 20–39 z sumy pasm. „Brak danych ≠ nie" — gdy pasma niepełne, pomijamy.
+      if (pasma0_64 !== null) dodaj("udzial65PlusPct", ((ogolem - pasma0_64) / ogolem) * 100, 80);
+      if (pasma20_39 !== null) {
+        dodaj("udzial2039Pct", (pasma20_39 / ogolem) * 100, 80);
+        dodaj("mediana2039Woj", gus.medianaWiek2039Pct, 55); // baza odniesienia dla „młodych"
+      }
     }
-    dodaj("bezrobociePct", bezrobocie);
-    dodaj("liczbaPodmiotowGosp", podmioty);
+    // BDL 60530 to podmioty „na 10 tys." — model/UI używa „na 1000", więc /10.
+    dodaj("liczbaPodmiotowGosp", podmioty === null ? null : podmioty / 10);
     dodaj("saldoMigracjiMlodzi", saldo, 70); // proxy: saldo ogółem (nie tylko 25–39)
 
     if (Object.keys(dane).length === 0) {

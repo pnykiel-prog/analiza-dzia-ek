@@ -16,10 +16,10 @@ const ETYK_PODSTAWA: Record<string, string> = {
  */
 export function Poziom1View({ p1, pelny = true }: { p1: WynikPoziom1; pelny?: boolean }) {
   const poj = p1.pojemnosc;
-  // Ile składników popytu opiera się na fallbacku (brak danych demograficznych/rynkowych).
-  const fallbackM = p1.popyt.mlodzi.skladniki.filter((s) => s.fallback).length;
-  const fallbackS = p1.popyt.seniorzy.skladniki.filter((s) => s.fallback).length;
-  const brakDanychPopytu = Math.max(fallbackM, fallbackS) >= 3;
+  // Sygnał braku danych demograficznych: „Grupa docelowa" na fallbacku dla obu profili
+  // (tzn. GUS nie dostarczył udziałów wiekowych) — wtedy werdykt jest orientacyjny.
+  const grupaFallback = (p: WynikPopytu) => p.skladniki.find((s) => s.nazwa === "Grupa docelowa")?.fallback ?? false;
+  const brakDanychPopytu = grupaFallback(p1.popyt.mlodzi) && grupaFallback(p1.popyt.seniorzy);
   return (
     <>
       {brakDanychPopytu && (
