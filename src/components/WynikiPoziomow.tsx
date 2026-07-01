@@ -18,7 +18,7 @@ export function WynikiPoziomow({ p1, p2, p3 }: { p1: WynikPoziom1; p2: WynikPozi
         <Poziom1View p1={p1} />
       </Sekcja>
       <Sekcja numer="2" tytul="Poziom 2 — ocena działki i model zabudowy" opis="Obwiednia → typologia → program pod profil (bez finansów)">
-        <Poziom2View p2={p2} />
+        <Poziom2View p2={p2} profilRek={p1.profilRekomendowany} />
       </Sekcja>
       <Sekcja numer="3" tytul="Poziom 3 — model finansowy SIM" opis="Montaż, oś czasu, reżim as-of, domknięcie i wymagana dotacja">
         <Poziom3View p3={p3} />
