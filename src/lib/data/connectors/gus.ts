@@ -103,12 +103,19 @@ export const konektorGUS: Konektor = {
     const czas = new Date().toISOString();
     if (!teren.gmina) return brakWyniku(this.klucz, this.zrodlo, czas, "Brak nazwy gminy.");
 
+    // Wyszukanie jednostki: najpierw z filtrem poziomu (gmina), a gdy brak trafienia —
+    // bez filtra (miasta na prawach powiatu bywają na innym poziomie niż zwykła gmina).
     const jedn = await fetchJson(url("units/search", { name: teren.gmina, level: String(gus.poziomGmina) }), {
       ...KONFIG_KONEKTORY.siec,
       naglowki: naglowki(),
     });
-    const jednostka = wybierzJednostke(jedn, teren.gmina);
-    if (!jednostka) return brakWyniku(this.klucz, this.zrodlo, czas, "Nie znaleziono jednostki BDL dla gminy.");
+    if (jedn === null) return brakWyniku(this.klucz, this.zrodlo, czas, "BDL nieosiągalny (units/search) — sieć/egress.");
+    let jednostka = wybierzJednostke(jedn, teren.gmina);
+    if (!jednostka) {
+      const jedn2 = await fetchJson(url("units/search", { name: teren.gmina }), { ...KONFIG_KONEKTORY.siec, naglowki: naglowki() });
+      jednostka = wybierzJednostke(jedn2, teren.gmina);
+    }
+    if (!jednostka) return brakWyniku(this.klucz, this.zrodlo, czas, `Nie znaleziono jednostki BDL dla gminy „${teren.gmina}".`);
 
     const dane: Partial<DaneDzialki> = {};
     const meta: MetaPola[] = [];
@@ -129,13 +136,22 @@ export const konektorGUS: Konektor = {
     ]);
 
     if (ogolem && l65) dodaj("udzial65PlusPct", (l65 / ogolem) * 100, 80);
-    if (ogolem && l2039) dodaj("udzial2039Pct", (l2039 / ogolem) * 100, 80);
+    if (ogolem && l2039) {
+      dodaj("udzial2039Pct", (l2039 / ogolem) * 100, 80);
+      // Baza odniesienia dla grupy „młodzi" (krajowa mediana) — bez niej udział sam nie liczy grupy.
+      dodaj("mediana2039Woj", gus.medianaWiek2039Pct, 55);
+    }
     dodaj("bezrobociePct", bezrobocie);
     dodaj("liczbaPodmiotowGosp", podmioty);
     dodaj("saldoMigracjiMlodzi", saldo, 70); // proxy: saldo ogółem (nie tylko 25–39)
 
     if (Object.keys(dane).length === 0) {
-      return brakWyniku(this.klucz, this.zrodlo, czas, "Brak wartości zmiennych dla jednostki (sprawdź frazy/ID w konfiguracji).");
+      return brakWyniku(
+        this.klucz,
+        this.zrodlo,
+        czas,
+        `Jednostka „${jednostka.name}" (id ${jednostka.id}) znaleziona, ale brak wartości — frazy nie trafiają w ID zmiennych BDL. Ustaw gus.zmienneId w konfiguracji (diagnostyka: /api/diag-gus?gmina=${encodeURIComponent(teren.gmina)}).`
+      );
     }
     return { klucz: this.klucz, zrodlo: this.zrodlo, status: "ok", czas, dane, meta };
   },
