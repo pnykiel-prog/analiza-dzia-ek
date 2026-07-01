@@ -1,5 +1,6 @@
-import type { WynikPoziom3, WynikScenariusza } from "@/lib/types";
+import type { OsCzasu, WynikPoziom3, WynikScenariusza } from "@/lib/types";
 import { Karta, Statystyka, Flagi } from "./ui";
+import { StosMontazu, type SegmentStosu } from "./grunt";
 import { AnalizaFinansowaView } from "./AnalizaFinansowaView";
 import { etykietaRezimu, etykietaScenariusza, liczba, pct, plnMln } from "@/lib/format";
 
@@ -20,28 +21,18 @@ export function Poziom3View({ p3 }: { p3: WynikPoziom3 }) {
       {/* Analiza z ankiety finansowej — dobrany montaż (brama P3) */}
       {p3.analizaFinansowa && <AnalizaFinansowaView a={p3.analizaFinansowa} />}
 
-      {/* Oś czasu */}
-      <Karta
-        tytul="Oś czasu realizacji"
-        podtytul="Parametry liczone na datę naboru/startu budowy i oddania, nie na dziś"
-        prawy={
-          <span className="text-xs text-slate-500">
-            Start budowy: <strong>{os.rokStartuBudowy}</strong> · Oddanie: <strong>{os.rokOddania}</strong>
-          </span>
-        }
-      >
-        <div className="flex flex-wrap gap-2">
-          {os.fazy.map((f, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs">
-                <div className="font-medium text-slate-700">{f.nazwa}</div>
-                <div className="text-slate-400">{f.miesiace > 0 ? `${f.miesiace} mies.` : "T0"}</div>
-              </div>
-              {i < os.fazy.length - 1 && <span className="text-slate-300">→</span>}
-            </div>
-          ))}
-        </div>
+      {/* Oś czasu — proporcjonalny pasek faz z markerem reżimu */}
+      <Karta tytul="Oś czasu realizacji" podtytul="Parametry liczone na datę naboru/startu budowy i oddania, nie na dziś">
+        <OsCzasuBar os={os} />
       </Karta>
+
+      {/* Hero: stos montażu + domknięcie (jak w prototypie) */}
+      <div className="grid lg:grid-cols-2 gap-4">
+        <Karta tytul="Stos montażu finansowego" prawy={<span className="mono text-[15px] font-semibold text-grunt-text">{plnMln(oczekiwany.koszt.razem)}</span>}>
+          <StosMontazu segmenty={segmentyMontazu(oczekiwany)} />
+        </Karta>
+        <DomkniecieKarta p3={p3} oczekiwany={oczekiwany} />
+      </div>
 
       {/* Werdykt ekonomiczny — przedział scenariuszowy */}
       <Karta
@@ -94,10 +85,9 @@ export function Poziom3View({ p3 }: { p3: WynikPoziom3 }) {
         )}
       </Karta>
 
-      {/* Montaż finansowy scenariusza oczekiwanego */}
+      {/* Montaż finansowy scenariusza oczekiwanego — szczegóły liczbowe */}
       <Karta tytul="Montaż finansowy (scenariusz oczekiwany)" podtytul="Grant + kredyt + partycypacje + wkład = koszt przedsięwzięcia">
-        <MontazPasek s={oczekiwany} />
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <Statystyka etykieta="Koszt przedsięwzięcia" wartosc={plnMln(oczekiwany.koszt.razem)} akcent />
           <Statystyka etykieta="Grant (bezzwrotny)" wartosc={plnMln(oczekiwany.montaz.grant)} />
           <Statystyka etykieta="Kredyt BGK" wartosc={plnMln(oczekiwany.montaz.kredyt)} />
@@ -170,28 +160,107 @@ function Wiersz({ e, v }: { e: string; v: number }) {
   );
 }
 
-function MontazPasek({ s }: { s: WynikScenariusza }) {
-  const koszt = s.koszt.razem;
-  const czesci = [
-    { e: "Grant", v: s.montaz.grant, kolor: "bg-grunt-chart-1" },
-    { e: "Kredyt", v: s.montaz.kredyt, kolor: "bg-grunt-ink" },
-    { e: "Partycypacja", v: s.montaz.partycypacjaNajemcow, kolor: "bg-grunt-chart-4" },
-    { e: "Wkład gminy", v: s.montaz.wkladGminy, kolor: "bg-grunt-chart-6" },
-    { e: "Luka / środki własne", v: s.montaz.srodkiWlasne, kolor: "bg-grunt-border-soft" },
-  ].filter((c) => c.v > 0);
+/** Segmenty stosu montażu (udziały w koszcie przedsięwzięcia). */
+function segmentyMontazu(s: WynikScenariusza): SegmentStosu[] {
+  const koszt = s.koszt.razem || 1;
+  const def: { nazwa: string; v: number; kolor: string }[] = [
+    { nazwa: "Grant", v: s.montaz.grant, kolor: "bg-grunt-chart-1" },
+    { nazwa: "Kredyt", v: s.montaz.kredyt, kolor: "bg-grunt-ink" },
+    { nazwa: "Partycypacja", v: s.montaz.partycypacjaNajemcow, kolor: "bg-grunt-chart-4" },
+    { nazwa: "Wkład gminy", v: s.montaz.wkladGminy, kolor: "bg-grunt-chart-6" },
+    { nazwa: "Luka / środki własne", v: s.montaz.srodkiWlasne, kolor: "bg-grunt-border-soft" },
+  ];
+  return def
+    .filter((c) => c.v > 0)
+    .map((c) => ({ nazwa: c.nazwa, kolor: c.kolor, udzialPct: Math.round((c.v / koszt) * 100), wartosc: plnMln(c.v) }));
+}
+
+/** Proporcjonalny pasek osi czasu z markerem „reżim liczony tu" (start budowy). */
+function OsCzasuBar({ os }: { os: OsCzasu }) {
+  // Fazy z konfiguracji + syntetyczny ogon „Najem / eksploatacja" (~40% szerokości).
+  const fazy = os.fazy.filter((f) => f.miesiace > 0);
+  const sumaFaz = fazy.reduce((a, f) => a + f.miesiace, 0) || 1;
+  const ogon = Math.round(sumaFaz * 0.8); // eksploatacja — pas orientacyjny
+  const total = sumaFaz + ogon;
+  const kolory = ["bg-grunt-chart-5", "bg-grunt-chart-4", "bg-grunt-chart-3", "bg-grunt-ink"];
+  const markerPct = (os.miesiacyDoStartuBudowy / total) * 100;
   return (
     <div>
-      <div className="flex h-6 rounded-lg overflow-hidden">
-        {czesci.map((c, i) => (
-          <div key={i} className={`${c.kolor} flex items-center justify-center`} style={{ width: `${(c.v / koszt) * 100}%` }} title={`${c.e}: ${plnMln(c.v)}`} />
+      <div className="relative flex h-9 rounded-sm overflow-hidden" style={{ gap: "2px" }}>
+        {fazy.map((f, i) => (
+          <div key={i} className={`${kolory[Math.min(i, kolory.length - 2)]} grid place-items-center px-2`} style={{ width: `${(f.miesiace / total) * 100}%` }}>
+            <span className="text-[10px] text-white/90 truncate">{f.nazwa}</span>
+          </div>
         ))}
+        <div className="bg-grunt-ink grid place-items-center px-2" style={{ width: `${(ogon / total) * 100}%` }}>
+          <span className="text-[10px] text-white/90 truncate">Najem / eksploatacja</span>
+        </div>
+        {/* marker reżimu */}
+        <div className="absolute top-0 bottom-0" style={{ left: `${markerPct}%` }}>
+          <span className="absolute -top-0.5 -translate-x-1/2 badge bg-grunt-senior text-white text-[9px] whitespace-nowrap">⚑ Reżim liczony tu</span>
+          <span className="absolute top-5 bottom-0 w-px bg-grunt-senior -translate-x-1/2" />
+        </div>
       </div>
-      <div className="flex flex-wrap gap-3 mt-2 text-xs">
-        {czesci.map((c, i) => (
-          <span key={i} className="flex items-center gap-1.5 text-slate-600">
-            <span className={`w-2.5 h-2.5 rounded-sm ${c.kolor}`} /> {c.e} ({pct((c.v / koszt) * 100)})
-          </span>
-        ))}
+      <div className="flex justify-between mt-1.5 text-[10px] text-grunt-text-faint2 mono">
+        <span>{os.rokStartuBudowy - Math.round(os.miesiacyDoStartuBudowy / 12)}</span>
+        <span>start budowy {os.rokStartuBudowy}</span>
+        <span>oddanie {os.rokOddania}</span>
+      </div>
+    </div>
+  );
+}
+
+/** Karta domknięcia: werdykt DSCR (próg 1,20), przedział DSCR i czynsz vs pułap. */
+function DomkniecieKarta({ p3, oczekiwany }: { p3: WynikPoziom3; oczekiwany: WynikScenariusza }) {
+  const PROG = 1.2;
+  const spina = oczekiwany.dscr >= PROG;
+  const dscry = p3.scenariusze.map((s) => s.dscr);
+  const minD = Math.min(...dscry, PROG) * 0.95;
+  const maxD = Math.max(...dscry, PROG) * 1.05;
+  const pozycja = (v: number) => `${((v - minD) / (maxD - minD || 1)) * 100}%`;
+  const czynsz = oczekiwany.czynszWynikowyM2;
+  const pulap = oczekiwany.pulapCzynszuM2;
+  const maxCzynsz = Math.max(czynsz, pulap) * 1.15 || 1;
+  return (
+    <div className={`card p-[18px] border-l-4 ${spina ? "border-l-grunt-green" : "border-l-grunt-amber"}`}>
+      <div className="flex items-center gap-2">
+        <span className={`w-3 h-3 rounded-full ${spina ? "bg-grunt-green" : "bg-grunt-amber"}`} />
+        <span className={`text-[16px] font-semibold ${spina ? "text-grunt-green" : "text-grunt-amber-text"}`}>
+          {spina ? "Inwestycja się spina" : "Domknięcie na granicy"}
+        </span>
+      </div>
+      <p className="text-[12px] text-grunt-text-muted mt-1">
+        DSCR {spina ? "powyżej" : "poniżej"} progu {PROG.toFixed(2).replace(".", ",")} w scenariuszu oczekiwanym.
+      </p>
+
+      {/* DSCR — przedział */}
+      <div className="mt-4">
+        <div className="flex justify-between text-[10px] uppercase tracking-wide text-grunt-text-faint mb-1">
+          <span>DSCR — przedział</span>
+          <span className="mono">próg {PROG.toFixed(2).replace(".", ",")}</span>
+        </div>
+        <div className="relative h-2 bg-grunt-surface-3 rounded-full">
+          <span className="absolute top-0 bottom-0 w-px bg-grunt-text-faint" style={{ left: pozycja(PROG) }} />
+          <span className="absolute -top-0.5 h-3 w-3 rounded-full bg-grunt-ink -translate-x-1/2" style={{ left: pozycja(oczekiwany.dscr) }} />
+        </div>
+        <div className="flex justify-between mt-1 text-[11px] mono text-grunt-text-muted2">
+          <span>konserw. {liczba(dscry[0], "", 2)}</span>
+          <span className="font-semibold text-grunt-text">oczek. {liczba(oczekiwany.dscr, "", 2)}</span>
+          <span>korzyst. {liczba(dscry[2], "", 2)}</span>
+        </div>
+      </div>
+
+      {/* Czynsz wynikowy vs pułap */}
+      <div className="mt-4">
+        <div className="text-[10px] uppercase tracking-wide text-grunt-text-faint mb-1">Czynsz wynikowy vs pułap zł/m²/mc</div>
+        <div className="relative h-2 bg-grunt-surface-3 rounded-full">
+          <div className="absolute top-0 bottom-0 left-0 rounded-full bg-grunt-chart-1" style={{ width: `${(czynsz / maxCzynsz) * 100}%` }} />
+          <span className="absolute -top-1 text-grunt-amber" style={{ left: `${(pulap / maxCzynsz) * 100}%` }}>▏</span>
+        </div>
+        <div className="flex justify-between mt-1 text-[11px] mono text-grunt-text-muted2">
+          <span className="text-grunt-chart-1 font-semibold">wynikowy {liczba(czynsz, "", 1)}</span>
+          <span className="text-grunt-amber-text">pułap {liczba(pulap, "", 1)}</span>
+        </div>
       </div>
     </div>
   );

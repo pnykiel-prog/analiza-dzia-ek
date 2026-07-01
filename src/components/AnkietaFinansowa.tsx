@@ -71,6 +71,7 @@ export function AnkietaFinansowa({
   const walidacja = profil ? walidujUprawnienia(profil) : null;
 
   return (
+    <div className="grid lg:grid-cols-[1fr_minmax(0,320px)] gap-4 items-start">
     <Karta
       tytul="Ankieta finansowa — kto pyta o analizę (brama Poziomu 3)"
       podtytul="Typ inwestora, zasób, reżim i sposób wniesienia działki determinują montaż i wynik finansowy"
@@ -166,6 +167,35 @@ export function AnkietaFinansowa({
         {licze ? "Składam montaż i liczę…" : "Zatwierdź profil i złóż montaż →"}
       </button>
     </Karta>
+
+    {/* Live profil finansowy (sticky) */}
+    <div className="lg:sticky" style={{ top: "var(--grunt-sticky-top)" }}>
+      <Karta tytul="Profil finansowy">
+        <dl className="divide-y divide-grunt-divider-row">
+          <ProfilRow k="Inwestor" v={ETYK_INWESTORA[typInwestora]} />
+          <ProfilRow k="Zasób" v={zasobEff ? ETYK_ZASOBU[zasobEff] : "—"} />
+          <ProfilRow k="Reżim" v={ETYK_REZIMU[rezimEff]} />
+          <ProfilRow k="Wniesienie działki" v={ETYK_GRUNTU[sposobWniesieniaDzialki]} />
+          <ProfilRow k="Współpraca z gminą" v={ETYK_WSPOLPRACY[wspolpracaGmina]} />
+          <ProfilRow k="Efektywność / OZE" v={efektywnoscEnergetyczna ? "Tak (FEnIKS)" : "Nie"} />
+          <ProfilRow k="Mieszkanie na Start" v={mieszkanieNaStart ? "Tak" : "Nie"} />
+          {KWALIFIKACJA_INVESTEU.includes(typInwestora) && (
+            <ProfilRow k="Nowy podmiot (InvestEU)" v={nowyPodmiot ? "Tak" : "Nie"} />
+          )}
+          <ProfilRow k="Data wniosku" v={dataWniosku} mono />
+        </dl>
+      </Karta>
+    </div>
+    </div>
+  );
+}
+
+function ProfilRow({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 py-2">
+      <dt className="text-[11px] text-grunt-text-muted2 shrink-0">{k}</dt>
+      <dd className={`text-[12.5px] font-medium text-grunt-text text-right ${mono ? "mono" : ""}`}>{v}</dd>
+    </div>
   );
 }
 

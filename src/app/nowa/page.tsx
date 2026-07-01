@@ -277,6 +277,14 @@ export default function NowaAnalizaPage() {
     <div className="space-y-5">
       <div className="-mx-6 -mt-6">
         <Stepper aktywny={stepAktywny} maxOsiagniety={stepMax} onKrok={nawigujStepper} />
+        {dane && (
+          <div className="bg-grunt-surface border-b border-grunt-border px-6 py-2 flex flex-wrap items-center gap-x-6 gap-y-1">
+            <span className="text-[10px] uppercase tracking-wider text-grunt-text-faint">Teren inwestycji</span>
+            <span className="mono text-[12px] text-grunt-text">{dane.id}</span>
+            {dane.powierzchniaM2 > 0 && <span className="mono text-[12px] text-grunt-text-muted">{liczba(dane.powierzchniaM2, " m²")}</span>}
+            {dane.gmina && <span className="text-[12px] text-grunt-text-muted">{dane.gmina}</span>}
+          </div>
+        )}
       </div>
 
       <div className="card p-[18px]">
