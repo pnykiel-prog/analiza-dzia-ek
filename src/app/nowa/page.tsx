@@ -626,7 +626,7 @@ export default function NowaAnalizaPage() {
           )}
           {ekran === "poziom2" && (
             <>
-              <Poziom2View p2={wynik.poziom2} profilRek={wynik.poziom1.profilRekomendowany} />
+              <Poziom2View p2={wynik.poziom2} profilRek={wynik.poziom1.profilRekomendowany} sygnaly={wynik.poziom1.sygnaly} braki={wynik.poziom1.braki} />
               <BannerBramki
                 tytul="Poziom 2 gotowy — czas na model finansowy"
                 opis="Najpierw ankieta finansowa (kto pyta i jak finansuje), potem montaż i domknięcie Poziomu 3."

@@ -64,48 +64,6 @@ export function Poziom1View({ p1, pelny = true }: { p1: WynikPoziom1; pelny?: bo
         </div>
       </Karta>
 
-      {/* Flagi i sygnały + realne białe plamy (czego nie pobrano) */}
-      <div className="grid md:grid-cols-2 gap-4 items-start">
-        <Karta tytul="Flagi i sygnały">
-          {p1.sygnaly.length === 0 ? (
-            <p className="text-[12px] text-grunt-text-muted2">Brak istotnych flag — brak twardych ograniczeń ani wyróżniających atutów.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {p1.sygnaly.map((s, i) => {
-                const kl =
-                  s.ton === "pozytyw"
-                    ? "bg-grunt-green-bg text-grunt-green"
-                    : s.ton === "ostrzezenie"
-                      ? "bg-grunt-amber-bg text-grunt-amber-text"
-                      : "bg-grunt-neutral-bg text-grunt-text-muted";
-                const kropka = s.ton === "pozytyw" ? "bg-grunt-green" : s.ton === "ostrzezenie" ? "bg-grunt-amber" : "bg-grunt-neutral";
-                return (
-                  <span key={i} className={`badge ${kl}`}>
-                    <span className={`w-2 h-2 rounded-full ${kropka}`} /> {s.tekst}
-                  </span>
-                );
-              })}
-            </div>
-          )}
-        </Karta>
-
-        <Karta tytul="Czego nie pobrano" prawy={<span className="badge bg-grunt-surface-3 text-grunt-text-muted mono">{p1.braki.length}</span>}>
-          {p1.braki.length === 0 ? (
-            <p className="text-[12px] text-grunt-text-muted2">Komplet danych wejściowych — brak białych plam dla tej działki.</p>
-          ) : (
-            <div className="space-y-2">
-              {p1.braki.map((b, i) => (
-                <div key={i} className="rounded-md border border-dashed border-grunt-border-soft px-3 py-2">
-                  <div className="text-[13px] font-semibold text-grunt-text">{b.tytul}</div>
-                  <div className="text-[12px] text-grunt-text-muted2">{b.opis}</div>
-                  <div className="mono text-[11px] text-grunt-amber-text2 mt-0.5">{b.wplyw}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Karta>
-      </div>
-
       {pelny && (
       <>
       {/* Kluczowe liczby */}

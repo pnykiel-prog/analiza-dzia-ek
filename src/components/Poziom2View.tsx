@@ -1,4 +1,4 @@
-import type { ProfilRekomendowany, WariantZabudowy, WynikPoziom2 } from "@/lib/types";
+import type { BrakDanych, ProfilRekomendowany, Sygnal, WariantZabudowy, WynikPoziom2 } from "@/lib/types";
 import { Karta, Statystyka, Flagi } from "./ui";
 import { WskaznikPewnosci } from "./grunt";
 import { etykietaTypologii, liczba } from "@/lib/format";
@@ -12,7 +12,17 @@ const ZRODLO_OBWIEDNI: Record<string, string> = {
 // Kolory segmentów mix metraży (skala chart, monochromatyczna).
 const KOLORY_MIX = ["bg-grunt-ink", "bg-grunt-chart-4", "bg-grunt-chart-5", "bg-grunt-chart-3"];
 
-export function Poziom2View({ p2, profilRek }: { p2: WynikPoziom2; profilRek?: ProfilRekomendowany }) {
+export function Poziom2View({
+  p2,
+  profilRek,
+  sygnaly,
+  braki,
+}: {
+  p2: WynikPoziom2;
+  profilRek?: ProfilRekomendowany;
+  sygnaly?: Sygnal[];
+  braki?: BrakDanych[];
+}) {
   const o = p2.obwiednia;
   // Rekomendowany wariant: pierwszy zgodny z rekomendowanym profilem (fallback: pierwszy).
   const idxRek = Math.max(
@@ -26,6 +36,52 @@ export function Poziom2View({ p2, profilRek }: { p2: WynikPoziom2; profilRek?: P
 
   return (
     <>
+      {(sygnaly || braki) && (
+        <div className="grid md:grid-cols-2 gap-4 items-start">
+          {sygnaly && (
+            <Karta tytul="Flagi i sygnały">
+              {sygnaly.length === 0 ? (
+                <p className="text-[12px] text-grunt-text-muted2">Brak istotnych flag — brak twardych ograniczeń ani wyróżniających atutów.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {sygnaly.map((s, i) => {
+                    const kl =
+                      s.ton === "pozytyw"
+                        ? "bg-grunt-green-bg text-grunt-green"
+                        : s.ton === "ostrzezenie"
+                          ? "bg-grunt-amber-bg text-grunt-amber-text"
+                          : "bg-grunt-neutral-bg text-grunt-text-muted";
+                    const kropka = s.ton === "pozytyw" ? "bg-grunt-green" : s.ton === "ostrzezenie" ? "bg-grunt-amber" : "bg-grunt-neutral";
+                    return (
+                      <span key={i} className={`badge ${kl}`}>
+                        <span className={`w-2 h-2 rounded-full ${kropka}`} /> {s.tekst}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </Karta>
+          )}
+          {braki && (
+            <Karta tytul="Czego nie pobrano" prawy={<span className="badge bg-grunt-surface-3 text-grunt-text-muted mono">{braki.length}</span>}>
+              {braki.length === 0 ? (
+                <p className="text-[12px] text-grunt-text-muted2">Komplet danych wejściowych — brak białych plam dla tej działki.</p>
+              ) : (
+                <div className="space-y-2">
+                  {braki.map((b, i) => (
+                    <div key={i} className="rounded-md border border-dashed border-grunt-border-soft px-3 py-2">
+                      <div className="text-[13px] font-semibold text-grunt-text">{b.tytul}</div>
+                      <div className="text-[12px] text-grunt-text-muted2">{b.opis}</div>
+                      <div className="mono text-[11px] text-grunt-amber-text2 mt-0.5">{b.wplyw}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Karta>
+          )}
+        </div>
+      )}
+
       <Karta
         tytul="Obwiednia zabudowy"
         podtytul="Twardy limit: ile wolno i co się zmieści (z parametrów planistycznych)"
