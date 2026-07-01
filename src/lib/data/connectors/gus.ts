@@ -183,35 +183,36 @@ export const konektorGUS: Konektor = {
       meta.push({ pole, zrodlo: this.zrodlo, czas, pewnosc, status: "ok", tryb: "A" });
     };
 
-    // Demografia z pasm wieku (P2137) — samodobór pasm z katalogu (ID nieciągłe),
-    // potem JEDNO zbiorcze data/by-unit (limity BDL: serie równoległe bywają odrzucane).
+    // Demografia — pobieramy TYLKO potrzebne zmienne (jedna paczka, bez ryzyka dławienia):
+    //  20–39 = 20-24…35-39 (4 pasma); 65+ = 65-69 + „70 i więcej" (agregat) — 2 pasma,
+    //  odporne (nie wymaga kompletu 13 pasm 0–64). Plus ludność ogółem, podmioty, saldo.
     const idPodmioty = gus.zmienneId.podmiotyNa10k ?? "60530";
     const idSaldo = gus.zmienneId.saldoMigracji ?? "1365234";
     const pasma = await pasmaWiekuOgolem();
-    const potrzebne = [...new Set([P2137_OGOLEM_TOTAL, ...pasma.map((p) => p.id), idPodmioty, idSaldo])];
+    const p2039 = pasma.filter((p) => p.lo >= 20 && p.hi <= 39 && p.hi - p.lo === 4);
+    const p65_69 = pasma.find((p) => p.lo === 65 && p.hi === 69);
+    const p70plus = pasma.find((p) => p.lo === 70 && p.hi === Infinity); // agregat „70 i więcej"
+    const p65 = [p65_69, p70plus].filter(Boolean) as PasmoWieku[];
+    const potrzebne = [...new Set([P2137_OGOLEM_TOTAL, ...p2039.map((p) => p.id), ...p65.map((p) => p.id), idPodmioty, idSaldo])];
     const m = await wartosciWielu(jednostka.id, potrzebne);
     if ([...m.values()].every((v) => v === null)) {
       return brakWyniku(
         this.klucz,
         this.zrodlo,
         czas,
-        `Jednostka „${jednostka.name}" (id ${jednostka.id}) znaleziona, ale zbiorcze data/by-unit nie zwróciło wartości (limit BDL/rok ${gus.rok}?). Diagnostyka: /api/diag-gus?gmina=${encodeURIComponent(teren.gmina)}.`
+        `Jednostka „${jednostka.name}" (id ${jednostka.id}) znaleziona, ale data/by-unit nie zwróciło wartości (limit BDL / brak klucza X-ClientId?). Diagnostyka: /api/diag-gus?gmina=${encodeURIComponent(teren.gmina)}.`
       );
     }
     const ogolem = m.get(P2137_OGOLEM_TOTAL) ?? null;
-    // WAŻNE: temat zawiera też pasma zbiorcze („0-14", „70 i więcej") nakładające się
-    // na 5-letnie — sumujemy WYŁĄCZNIE pasma 5-letnie (szerokość == 4), by nie liczyć podwójnie.
-    const piecioletnie = pasma.filter((p) => p.hi - p.lo === 4);
-    // 65+ = ogółem − (0–64); 20–39 = pasma 20-24…35-39. Sumy null, gdy pasmo bez danych.
-    const pasma0_64 = sumaPasm(piecioletnie.filter((p) => p.hi <= 64), m);
-    const pasma20_39 = sumaPasm(piecioletnie.filter((p) => p.lo >= 20 && p.hi <= 39), m);
+    const pop2039 = sumaPasm(p2039, m);
+    const pop65 = p65.length === 2 ? sumaPasm(p65, m) : null; // 65-69 + 70+
     const podmioty = m.get(idPodmioty) ?? null;
     const saldo = m.get(idSaldo) ?? null;
 
     if (ogolem && ogolem > 0) {
-      if (pasma0_64 !== null) dodaj("udzial65PlusPct", ((ogolem - pasma0_64) / ogolem) * 100, 80);
-      if (pasma20_39 !== null) {
-        dodaj("udzial2039Pct", (pasma20_39 / ogolem) * 100, 80);
+      if (pop65 !== null) dodaj("udzial65PlusPct", (pop65 / ogolem) * 100, 80);
+      if (pop2039 !== null) {
+        dodaj("udzial2039Pct", (pop2039 / ogolem) * 100, 80);
         dodaj("mediana2039Woj", gus.medianaWiek2039Pct, 55); // baza odniesienia dla „młodych"
       }
     }
