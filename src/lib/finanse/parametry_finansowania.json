@@ -1,0 +1,584 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "metadata": {
+    "version": "1.0",
+    "date": "2026-06-30",
+    "author": "SLE PSA",
+    "purpose": "Strukturalna baza reguł finansowania publicznego inwestycji mieszkaniowych w Polsce do wykorzystania przez symulator oceny działki",
+    "status": "draft",
+    "language": "pl",
+    "currency": "PLN",
+    "companion_document": "kompendium_finansowanie_inwestycji_mieszkaniowych.md",
+    "notes": "Parametry oznaczone tbc=true wymagają potwierdzenia po publikacji finalnego tekstu nowej ustawy i rozporządzeń wykonawczych"
+  },
+  "regimes": {
+    "current": {
+      "id": "current",
+      "name": "Reżim obecny",
+      "period_end": "2027-2028 (oczekiwane)",
+      "legal_basis": [
+        "Ustawa z 8 grudnia 2006 r. o finansowym wsparciu niektórych przedsięwzięć mieszkaniowych",
+        "Ustawa z 26 października 1995 r. o społecznych formach rozwoju mieszkalnictwa",
+        "Ustawa z 20 lipca 2018 r. o pomocy państwa w ponoszeniu wydatków mieszkaniowych"
+      ]
+    },
+    "future": {
+      "id": "future",
+      "name": "Reżim nowy",
+      "period_start": "2027-2028 (oczekiwane)",
+      "legal_basis": [
+        "Projekt ustawy o społecznych zasobach mieszkaniowych oraz o wsparciu inwestycji mieszkaniowych"
+      ],
+      "status": "procedowany w MRiT, przed publikacją na RCL"
+    }
+  },
+  "investor_types": [
+    {
+      "id": "SIM_GMINNY",
+      "name": "SIM gminny",
+      "legal_form": "spółka kapitałowa",
+      "capital_structure": "100% gmina",
+      "profit_distribution": "non-profit",
+      "can_build_resources": ["socjalny_warunkowo", "komunalny", "społeczny_czynszowy"]
+    },
+    {
+      "id": "SIM_MIESZANY",
+      "name": "SIM mieszany prywatno-gminny",
+      "legal_form": "spółka kapitałowa",
+      "capital_structure": "gmina + prywatny inwestor",
+      "profit_distribution": "non-profit",
+      "can_build_resources": ["komunalny_warunkowo", "społeczny_czynszowy"]
+    },
+    {
+      "id": "SIM_PRYWATNY",
+      "name": "SIM prywatny",
+      "legal_form": "spółka kapitałowa",
+      "capital_structure": "100% prywatny",
+      "profit_distribution": "non-profit",
+      "can_build_resources": ["społeczny_czynszowy"]
+    },
+    {
+      "id": "TBS",
+      "name": "TBS (Towarzystwo Budownictwa Społecznego)",
+      "legal_form": "spółka kapitałowa",
+      "capital_structure": "zazwyczaj gminny lub mieszany",
+      "profit_distribution": "non-profit",
+      "can_build_resources": ["społeczny_czynszowy", "komunalny_warunkowo"],
+      "notes": "Forma legacy SIM, używana przez podmioty utworzone przed 2021 r."
+    },
+    {
+      "id": "SPOLDZIELNIA",
+      "name": "Spółdzielnia mieszkaniowa",
+      "legal_form": "spółdzielnia",
+      "capital_structure": "członkowie spółdzielni (wkłady mieszkaniowe)",
+      "profit_distribution": "non-profit",
+      "can_build_resources": ["spółdzielczy_lokatorski", "społeczny_czynszowy_warunkowo"]
+    },
+    {
+      "id": "SPOLKA_GMINNA",
+      "name": "Spółka gminna",
+      "legal_form": "spółka kapitałowa (poza SIM/TBS)",
+      "capital_structure": "gmina ponad 50%",
+      "profit_distribution": "może wypłacać dywidendę do gminy",
+      "can_build_resources": ["socjalny", "komunalny", "społeczny_czynszowy_warunkowo"]
+    },
+    {
+      "id": "GMINA",
+      "name": "Gmina bezpośrednio",
+      "legal_form": "jednostka samorządu terytorialnego",
+      "capital_structure": "budżet gminy",
+      "profit_distribution": "nie dotyczy",
+      "can_build_resources": ["socjalny", "komunalny"]
+    }
+  ],
+  "resource_types": [
+    {
+      "id": "SOCJALNY",
+      "name": "Zasób socjalny",
+      "target_group": "Osoby w najtrudniejszej sytuacji materialnej",
+      "rent_level": "najniższy",
+      "contract_type": "najem socjalny",
+      "buyout_current": false,
+      "buyout_future": false
+    },
+    {
+      "id": "KOMUNALNY",
+      "name": "Zasób komunalny",
+      "target_group": "Mieszkańcy gminy o dochodach niskich",
+      "rent_level": "niski (30-50% rynkowego)",
+      "contract_type": "najem na czas nieoznaczony",
+      "buyout_current": true,
+      "buyout_future": false,
+      "buyout_future_exception": "tylko dla mieszkań finansowanych wyłącznie kredytem (bez grantu)"
+    },
+    {
+      "id": "SPOLECZNY_CZYNSZOWY",
+      "name": "Zasób społeczny czynszowy",
+      "target_group": "Gospodarstwa w luce czynszowej",
+      "rent_level": "umiarkowany (15-30 PLN/m²/m-c)",
+      "contract_type": "najem cywilnoprawny",
+      "buyout_current": true,
+      "buyout_future": false,
+      "buyout_future_exception": "tylko dla mieszkań finansowanych wyłącznie kredytem",
+      "tenant_participation_max_current": 0.30,
+      "tenant_participation_max_future": 0.10,
+      "tenant_participation_under_35_future": 0.00,
+      "income_verification_current": "roczne PIT",
+      "income_verification_future": "cykliczna, co 3 lata"
+    },
+    {
+      "id": "SPOLDZIELCZY_LOKATORSKI",
+      "name": "Zasób spółdzielczy lokatorski",
+      "target_group": "Członkowie spółdzielni mieszkaniowej",
+      "rent_level": "opłata eksploatacyjna",
+      "contract_type": "spółdzielcze lokatorskie prawo do lokalu",
+      "buyout_current": true,
+      "buyout_future": false,
+      "buyout_future_exception": "tylko dla mieszkań finansowanych wyłącznie kredytem",
+      "member_contribution": "wkład mieszkaniowy zgodnie z regulaminem (zazwyczaj 20-40% kosztów)"
+    }
+  ],
+  "support_instruments": {
+    "current_regime": [
+      {
+        "id": "BSK_GRANT",
+        "name": "Grant BSK (Fundusz Dopłat)",
+        "type": "bezzwrotny_grant",
+        "administrator": "BGK",
+        "applicant": "gmina (główny), SIM/TBS przez gminę",
+        "covered_costs": ["budowa", "infrastruktura_towarzysząca"],
+        "excluded_costs": ["nabycie_gruntu"],
+        "funding_percentage": {
+          "komunalny_socjalny": {"base": 0.50, "max": 0.85, "factor": "rodzaj inwestycji"},
+          "spoleczny_czynszowy": {"base": 0.20, "max": 0.35},
+          "pustostany_remont": {"max": 0.80}
+        },
+        "key_constraint": "wymaga aktywnej roli gminy jako wnioskodawcy lub partnera",
+        "processing_months": [3, 6]
+      },
+      {
+        "id": "SBC_KREDYT",
+        "name": "Kredyt preferencyjny SBC",
+        "type": "kredyt_preferencyjny",
+        "administrator": "BGK",
+        "applicant": ["TBS", "SIM", "SPOLDZIELNIA", "SPOLKA_GMINNA"],
+        "covered_costs": ["budowa", "infrastruktura_towarzysząca", "nabycie_gruntu"],
+        "excluded_costs": [],
+        "max_share_of_capex": 0.80,
+        "aport_constraint": "jeśli grunt aportem od gminy, max 20% CAPEX z kredytu na grunt",
+        "interest_rate": {
+          "type": "zmienne",
+          "formula": "WIBOR 3M + dopłata państwa",
+          "effective_range": [0.02, 0.04]
+        },
+        "loan_period_years": 30,
+        "commission": 0.0075,
+        "collateral_options": ["hipoteka", "InvestEU_dla_nowych"],
+        "processing_months": [3, 6]
+      },
+      {
+        "id": "FENIKS_GRANT",
+        "name": "Grant FEnIKS na efektywność energetyczną",
+        "type": "bezzwrotny_grant",
+        "administrator": "NFOŚiGW/WFOŚiGW",
+        "applicant": ["TBS", "SIM", "SPOLDZIELNIA", "GMINA", "SPOLKA_GMINNA"],
+        "covered_costs": ["efektywność_energetyczna", "termomodernizacja", "OZE"],
+        "excluded_costs": ["nabycie_gruntu", "twarda_budowa"],
+        "funding_percentage_typical": 0.22,
+        "active_period_end": "2029-12-31",
+        "key_constraint": "wymaga spełnienia kryteriów efektywności energetycznej"
+      },
+      {
+        "id": "OZE_CIEPLOWNICTWO_PREMIE",
+        "name": "Premie OZE i ciepłownictwo",
+        "type": "bezzwrotny_grant",
+        "administrator": "BGK/NFOŚiGW",
+        "applicant_types_all": true,
+        "covered_costs": ["instalacje_OZE", "wymiana_źródeł_ciepła", "podłączenie_sieci_ciepłowniczej"],
+        "funding_percentage_typical": 0.045
+      },
+      {
+        "id": "INVESTEU_GWARANCJA",
+        "name": "Gwarancja InvestEU",
+        "type": "gwarancja_kredytu",
+        "administrator": "BGK + EIF",
+        "applicant": ["TBS", "SIM", "SPOLDZIELNIA", "SPOLKA_GMINNA"],
+        "applicant_constraint": "nowo utworzone podmioty bez zdolności kredytowej",
+        "guarantee_coverage": 0.30,
+        "max_credit_with_guarantee_EUR": 10000000,
+        "max_credit_share_of_capex": 0.70,
+        "total_pool_PLN": 1500000000,
+        "cost_to_beneficiary": 0,
+        "active_since": "2026-01-01"
+      },
+      {
+        "id": "MIESZKANIE_NA_START",
+        "name": "Mieszkanie na Start (dopłata do czynszu)",
+        "type": "doplata_do_czynszu",
+        "administrator": "BGK przez gminę",
+        "beneficiary": "najemcy społecznego zasobu czynszowego",
+        "amount_PLN_per_m2_per_month": 16.60,
+        "duration_years": 15,
+        "relevance": "wpływa na OPEX/płynność czynszową, nie na CAPEX"
+      }
+    ],
+    "future_regime": [
+      {
+        "id": "NOWY_GRANT",
+        "name": "Nowy grant z budżetu państwa (po reformie)",
+        "type": "bezzwrotny_grant",
+        "administrator": "BGK (jeden zintegrowany wniosek z kredytem)",
+        "applicant": "bezpośrednio inwestor (bez pośrednictwa gminy)",
+        "covered_costs_tbc": true,
+        "excluded_costs_assumed": ["nabycie_gruntu"],
+        "funding_percentage": {
+          "spoleczny_czynszowy": 0.20,
+          "spoldzielczy_lokatorski": 0.15,
+          "komunalny": {"base": 0.60, "max": 0.80, "conditions_for_max": ["LzG_lub_ZPI", "zamozność_gminy_tbc"]},
+          "socjalny": {"max": 0.80, "tbc": true}
+        },
+        "key_change": "bezpośrednie kierowanie środków do inwestora, eliminacja pośrednictwa gminy dla SIM/TBS/spółdzielni",
+        "requires_gmina_approval": true
+      },
+      {
+        "id": "NOWY_KREDYT_BGK",
+        "name": "Nowy kredyt preferencyjny BGK (po reformie)",
+        "type": "kredyt_preferencyjny",
+        "administrator": "BGK",
+        "applicant": ["TBS", "SIM", "SPOLDZIELNIA", "SPOLKA_GMINNA"],
+        "covered_costs": ["budowa", "infrastruktura_towarzysząca", "nabycie_gruntu_tbc"],
+        "max_share_of_capex_tbc": [0.70, 0.80],
+        "interest_rate": {
+          "type": "stałe",
+          "options": [0.01, 0.02],
+          "differentiation_criteria_tbc": true
+        },
+        "loan_period_years": 50,
+        "annuity_factor_2pct_50yr": 0.0318,
+        "annuity_factor_1pct_50yr": 0.0255,
+        "key_change_vs_current": [
+          "stała stopa zamiast zmiennej",
+          "50 lat zamiast 30 lat",
+          "jeden zintegrowany wniosek",
+          "spadek obsługi długu o ~40-55%"
+        ]
+      }
+    ]
+  },
+  "cooperation_mechanisms": [
+    {
+      "id": "LOKAL_ZA_GRUNT",
+      "name": "Lokal za Grunt",
+      "legal_basis": "Ustawa z 16 grudnia 2020 r.",
+      "description": "Gmina sprzedaje grunt inwestorowi w zamian za lokale do zasobu komunalnego",
+      "applicable_for_max_grant_komunalny_future": true
+    },
+    {
+      "id": "ZINTEGROWANE_PLANY_INWESTYCYJNE",
+      "name": "Zintegrowane Plany Inwestycyjne (ZPI)",
+      "legal_basis": "Ustawa o planowaniu i zagospodarowaniu przestrzennym (od 2023)",
+      "description": "Umowa urbanistyczna gmina-inwestor; przyspieszone uzgodnienia planistyczne w zamian za inwestycje towarzyszące",
+      "applicable_for_max_grant_komunalny_future": true
+    },
+    {
+      "id": "UMOWA_PARTNERSKA",
+      "name": "Umowa partnerska SIM-gmina",
+      "description": "Podstawowa forma współpracy SIM (zwłaszcza prywatnego) z gminą",
+      "forms": ["z_aportem_gruntu", "bez_aportu", "z_udziałem_kapitałowym"]
+    },
+    {
+      "id": "APORT_GRUNTU",
+      "name": "Aport gruntu gminnego do SIM",
+      "description": "Gmina wnosi nieruchomość do SIM jako wkład niepieniężny",
+      "benefit_for_SIM": "eliminuje konieczność finansowania zakupu działki"
+    }
+  ],
+  "investor_resource_matrix": {
+    "current_regime": {
+      "SIM_GMINNY": {
+        "SOCJALNY": "ograniczony",
+        "KOMUNALNY": "pełen",
+        "SPOLECZNY_CZYNSZOWY": "pełen",
+        "SPOLDZIELCZY_LOKATORSKI": "brak"
+      },
+      "SIM_MIESZANY": {
+        "SOCJALNY": "brak",
+        "KOMUNALNY": "ograniczony",
+        "SPOLECZNY_CZYNSZOWY": "pełen",
+        "SPOLDZIELCZY_LOKATORSKI": "brak"
+      },
+      "SIM_PRYWATNY": {
+        "SOCJALNY": "brak",
+        "KOMUNALNY": "brak",
+        "SPOLECZNY_CZYNSZOWY": "pełen",
+        "SPOLDZIELCZY_LOKATORSKI": "brak"
+      },
+      "TBS": {
+        "SOCJALNY": "ograniczony",
+        "KOMUNALNY": "ograniczony",
+        "SPOLECZNY_CZYNSZOWY": "pełen",
+        "SPOLDZIELCZY_LOKATORSKI": "brak"
+      },
+      "SPOLDZIELNIA": {
+        "SOCJALNY": "brak",
+        "KOMUNALNY": "brak",
+        "SPOLECZNY_CZYNSZOWY": "ograniczony",
+        "SPOLDZIELCZY_LOKATORSKI": "pełen"
+      },
+      "SPOLKA_GMINNA": {
+        "SOCJALNY": "pełen",
+        "KOMUNALNY": "pełen",
+        "SPOLECZNY_CZYNSZOWY": "ograniczony",
+        "SPOLDZIELCZY_LOKATORSKI": "brak"
+      },
+      "GMINA": {
+        "SOCJALNY": "pełen",
+        "KOMUNALNY": "pełen",
+        "SPOLECZNY_CZYNSZOWY": "brak",
+        "SPOLDZIELCZY_LOKATORSKI": "brak"
+      }
+    },
+    "future_regime": {
+      "SIM_GMINNY": {
+        "SOCJALNY": "ograniczony",
+        "KOMUNALNY": "pełen",
+        "SPOLECZNY_CZYNSZOWY": "pełen",
+        "SPOLDZIELCZY_LOKATORSKI": "brak"
+      },
+      "SIM_MIESZANY": {
+        "SOCJALNY": "brak",
+        "KOMUNALNY": "ograniczony",
+        "SPOLECZNY_CZYNSZOWY": "pełen",
+        "SPOLDZIELCZY_LOKATORSKI": "brak"
+      },
+      "SIM_PRYWATNY": {
+        "SOCJALNY": "brak",
+        "KOMUNALNY": "brak",
+        "SPOLECZNY_CZYNSZOWY": "pełen",
+        "SPOLDZIELCZY_LOKATORSKI": "brak"
+      },
+      "TBS": {
+        "SOCJALNY": "ograniczony",
+        "KOMUNALNY": "ograniczony",
+        "SPOLECZNY_CZYNSZOWY": "pełen",
+        "SPOLDZIELCZY_LOKATORSKI": "brak"
+      },
+      "SPOLDZIELNIA": {
+        "SOCJALNY": "brak",
+        "KOMUNALNY": "brak",
+        "SPOLECZNY_CZYNSZOWY": "ograniczony",
+        "SPOLDZIELCZY_LOKATORSKI": "pełen"
+      },
+      "SPOLKA_GMINNA": {
+        "SOCJALNY": "pełen",
+        "KOMUNALNY": "pełen",
+        "SPOLECZNY_CZYNSZOWY": "ograniczony",
+        "SPOLDZIELCZY_LOKATORSKI": "brak"
+      },
+      "GMINA": {
+        "SOCJALNY": "pełen",
+        "KOMUNALNY": "pełen",
+        "SPOLECZNY_CZYNSZOWY": "brak",
+        "SPOLDZIELCZY_LOKATORSKI": "brak"
+      }
+    }
+  },
+  "funding_stacks": {
+    "current_regime": {
+      "SIM_PRYWATNY_SPOLECZNY_CZYNSZOWY": {
+        "grants": {
+          "BSK": {"min": 0.0, "max": 0.20, "note": "ograniczony dostęp przez gminę"},
+          "FENIKS": {"typical": 0.22},
+          "OZE": {"typical": 0.045}
+        },
+        "loan": {
+          "SBC_max": 0.80,
+          "covers_land": true
+        },
+        "participation_max": 0.30,
+        "constraints": [
+          "wymaga zgody gminy",
+          "wymaga umowy partnerskiej z gminą",
+          "BSK trudno dostępne dla SIM prywatnego"
+        ],
+        "buyout_allowed": true,
+        "income_verification": "roczne PIT",
+        "application_procedure": "dwa_wnioski",
+        "expected_processing_months": [6, 12]
+      },
+      "SIM_GMINNY_SPOLECZNY_CZYNSZOWY": {
+        "grants": {
+          "BSK": {"min": 0.20, "max": 0.35, "note": "pełen dostęp"},
+          "FENIKS": {"typical": 0.22},
+          "OZE": {"typical": 0.045}
+        },
+        "loan": {
+          "SBC_max": 0.80,
+          "covers_land": true
+        },
+        "participation_max": 0.30,
+        "constraints": [
+          "gmina jako wspólnik decyduje",
+          "łatwy dostęp do wszystkich instrumentów"
+        ],
+        "buyout_allowed": true,
+        "income_verification": "roczne PIT",
+        "application_procedure": "dwa_wnioski"
+      },
+      "GMINA_KOMUNALNY": {
+        "grants": {
+          "BSK": {"min": 0.50, "max": 0.85},
+          "FENIKS": {"typical": 0.22}
+        },
+        "loan": {
+          "available": false
+        },
+        "own_capital_required_min": 0.15,
+        "buyout_allowed": true,
+        "buyout_with_discount_up_to": 0.95
+      },
+      "SPOLDZIELNIA_SPOLDZIELCZY_LOKATORSKI": {
+        "grants": {
+          "BSK": {"min": 0.0, "max": 0.20, "note": "trudno dostępne przez gminę"},
+          "FENIKS": {"typical": 0.22},
+          "OZE": {"typical": 0.045}
+        },
+        "loan": {
+          "SBC_max": 0.80,
+          "covers_land": true
+        },
+        "member_contribution": "zgodnie z regulaminem",
+        "constraints": [
+          "BSK praktycznie niedostępne",
+          "gmina rzadko formalnie współpracuje"
+        ]
+      }
+    },
+    "future_regime": {
+      "SIM_PRYWATNY_SPOLECZNY_CZYNSZOWY": {
+        "grants": {
+          "NOWY_GRANT": 0.20
+        },
+        "loan": {
+          "NOWY_KREDYT_BGK_max_tbc": [0.70, 0.80],
+          "covers_land_tbc": true,
+          "rate_options": [0.01, 0.02],
+          "period_years": 50
+        },
+        "participation_max": 0.10,
+        "participation_under_35": 0.00,
+        "constraints": [
+          "wymaga zgody gminy",
+          "zakaz wykupu mieszkań z grantem",
+          "weryfikacja dochodowa co 3 lata",
+          "rada najemców z prawem opiniowania"
+        ],
+        "buyout_allowed": false,
+        "income_verification": "co 3 lata",
+        "application_procedure": "jeden_zintegrowany_wniosek",
+        "key_advantage_vs_current": [
+          "grant bezpośrednio do SIM, bez pośrednictwa gminy",
+          "kredyt 1-2% stała stopa, 50 lat",
+          "obsługa długu spadek o ~40-55%"
+        ]
+      },
+      "SIM_GMINNY_SPOLECZNY_CZYNSZOWY": {
+        "grants": {
+          "NOWY_GRANT": 0.20
+        },
+        "loan": {
+          "NOWY_KREDYT_BGK_max_tbc": [0.70, 0.80],
+          "covers_land_tbc": true,
+          "rate_options": [0.01, 0.02],
+          "period_years": 50
+        },
+        "participation_max": 0.10,
+        "application_procedure": "jeden_zintegrowany_wniosek"
+      },
+      "GMINA_KOMUNALNY": {
+        "grants": {
+          "NOWY_GRANT": {
+            "base": 0.60,
+            "max": 0.80,
+            "conditions_for_max": [
+              "współpraca z sektorem prywatnym przez Lokal za Grunt",
+              "LUB udział w Zintegrowanych Planach Inwestycyjnych"
+            ],
+            "modulating_factor": "zamożność gminy (tbc)"
+          }
+        },
+        "loan": {
+          "available_tbc": true
+        },
+        "buyout_allowed": false,
+        "income_verification": "wszystkie umowy, co 5 lat"
+      },
+      "SPOLDZIELNIA_SPOLDZIELCZY_LOKATORSKI": {
+        "grants": {
+          "NOWY_GRANT": 0.15
+        },
+        "loan": {
+          "NOWY_KREDYT_BGK_max_tbc": [0.70, 0.80],
+          "rate_options": [0.01, 0.02],
+          "period_years": 50
+        },
+        "member_contribution": "zgodnie z regulaminem",
+        "key_change_vs_current": "grant bezpośrednio do spółdzielni — przełomowa zmiana"
+      }
+    }
+  },
+  "key_comparisons": {
+    "debt_service_per_1M_PLN_loan": {
+      "current_SBC_30yr_3pct": 55000,
+      "new_BGK_50yr_2pct": 32000,
+      "new_BGK_50yr_1pct": 26000,
+      "savings_pct_new_vs_current": [0.42, 0.53]
+    },
+    "regime_differences": {
+      "number_of_acts": {"current": 3, "future": 1},
+      "number_of_applications": {"current": 2, "future": 1},
+      "grant_pathway_for_SIM": {"current": "via_gmina", "future": "direct"},
+      "grant_pathway_for_spoldzielnia": {"current": "via_gmina_difficult", "future": "direct"},
+      "loan_interest_rate_type": {"current": "variable", "future": "fixed"},
+      "loan_period_max_years": {"current": 30, "future": 50},
+      "participation_max_pct": {"current": 0.30, "future": 0.10},
+      "buyout_with_grant": {"current": true, "future": false}
+    }
+  },
+  "transition_rules": {
+    "application_before_new_law": "zachowanie reżimu obecnego",
+    "application_after_new_law": "nowy reżim",
+    "project_in_progress_at_transition": "zachowanie pierwotnych warunków",
+    "uncertainty_window_years": "2027-2028",
+    "strategic_consideration": "decyzja o czasie złożenia wniosku może istotnie wpłynąć na strukturę finansowania"
+  },
+  "tbc_parameters": {
+    "description": "Parametry wymagające potwierdzenia po publikacji finalnego tekstu nowej ustawy i rozporządzeń wykonawczych",
+    "items": [
+      "Katalog kosztów kwalifikowanych nowego kredytu BGK (czy obejmuje grunt)",
+      "Maksymalny udział nowego kredytu w CAPEX (70% czy 80%)",
+      "Progi między stawkami 1% i 2% nowego kredytu",
+      "Katalog kosztów kwalifikowanych nowego grantu 20%",
+      "Status FEnIKS w nowym reżimie",
+      "Status premii OZE/ciepłownictwo w nowym reżimie",
+      "Algorytm różnicowania grantu 60-80% dla gmin wg zamożności",
+      "Dostęp gminy do nowego kredytu BGK",
+      "Czas rozpatrzenia zintegrowanego wniosku",
+      "Zasady przejściowe dla wniosków SBC złożonych przed wejściem w życie nowej ustawy"
+    ]
+  },
+  "monitoring_sources": {
+    "primary": [
+      "https://legislacja.rcl.gov.pl",
+      "https://www.gov.pl/web/rozwoj-technologia",
+      "https://www.bgk.pl"
+    ],
+    "secondary": [
+      "https://www.rp.pl/nieruchomosci",
+      "https://www.money.pl",
+      "https://www.prawo.pl",
+      "https://samorzad.pap.pl",
+      "https://www.portalsamorzadowy.pl"
+    ]
+  }
+}

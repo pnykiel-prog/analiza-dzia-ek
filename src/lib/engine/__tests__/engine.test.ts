@@ -79,6 +79,27 @@ test("P3: koszt przedsięwzięcia = suma składników", () => {
   assert.equal(k.razem, suma);
 });
 
+test("P3+ankieta: profil finansowy steruje montażem i reżimem P3", () => {
+  const bez = uruchomAnalize(wzorcowa);
+  assert.equal(bez.poziom3.analizaFinansowa, null); // bez ankiety — kompatybilność wstecz
+
+  const zAnkieta = uruchomAnalize(wzorcowa, undefined, {
+    typInwestora: "SIM_GMINNY",
+    typZasobu: "SPOLECZNY_CZYNSZOWY",
+    rezim: "current",
+    sposobWniesieniaDzialki: "APORT_GMINNY",
+    wspolpracaGmina: "UMOWA_PARTNERSKA",
+    efektywnoscEnergetyczna: false,
+    mieszkanieNaStart: false,
+    dataWniosku: "2026-05-01",
+  });
+  assert.ok(zAnkieta.poziom3.analizaFinansowa);
+  assert.equal(zAnkieta.poziom3.analizaFinansowa!.zablokowana, false);
+  // Reżim obecny → kredyt 30 lat mapowany na model P3.
+  assert.equal(zAnkieta.poziom3.rezimDomyslny, "A_SBC_2026");
+  assert.equal(zAnkieta.poziom3.scenariusze[1].rezim, "A_SBC_2026");
+});
+
 test("Pipeline: każdy poziom zasila następny (spójność id)", () => {
   for (const d of DZIALKI_PRZYKLADOWE) {
     const a = uruchomAnalize(d);

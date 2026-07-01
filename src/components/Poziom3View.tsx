@@ -1,5 +1,6 @@
 import type { WynikPoziom3, WynikScenariusza } from "@/lib/types";
 import { Karta, Statystyka, Flagi } from "./ui";
+import { AnalizaFinansowaView } from "./AnalizaFinansowaView";
 import { etykietaRezimu, etykietaScenariusza, liczba, pct, plnMln } from "@/lib/format";
 
 function KomorkaDomyka({ s }: { s: WynikScenariusza }) {
@@ -16,6 +17,9 @@ export function Poziom3View({ p3 }: { p3: WynikPoziom3 }) {
 
   return (
     <>
+      {/* Analiza z ankiety finansowej — dobrany montaż (brama P3) */}
+      {p3.analizaFinansowa && <AnalizaFinansowaView a={p3.analizaFinansowa} />}
+
       {/* Oś czasu */}
       <Karta
         tytul="Oś czasu realizacji"
