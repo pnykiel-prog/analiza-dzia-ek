@@ -22,8 +22,11 @@ export async function GET(req: Request) {
   const siec = { timeoutMs: 8000, proby: 1 as const };
 
   const naglowki: Record<string, string> = gus.clientId ? { "X-ClientId": gus.clientId } : {};
-  const url = (sciezka: string, params: Record<string, string>) =>
-    `${gus.endpoint}/${sciezka}?${new URLSearchParams({ format: "json", ...params }).toString()}`;
+  const url = (sciezka: string, params: Record<string, string>) => {
+    const bazowe: Record<string, string> = { format: "json", ...params };
+    if (gus.clientId) bazowe["client-id"] = gus.clientId;
+    return `${gus.endpoint}/${sciezka}?${new URLSearchParams(bazowe).toString()}`;
+  };
 
   const diag: Record<string, unknown> = {
     endpoint: gus.endpoint,
@@ -250,6 +253,7 @@ export async function GET(req: Request) {
     if (jednostka) {
       const ids = ["72305", "72310", "72311", "72312", "72313", "60530", "1365234"];
       const qs = new URLSearchParams({ format: "json", year: String(gus.rok) });
+      if (gus.clientId) qs.set("client-id", gus.clientId);
       ids.forEach((id) => qs.append("var-id", id));
       const zbUrl = `${gus.endpoint}/data/by-unit/${encodeURIComponent(jednostka.id)}?${qs.toString()}`;
       const raw = await fetchTekst(zbUrl, { ...siec, naglowki });

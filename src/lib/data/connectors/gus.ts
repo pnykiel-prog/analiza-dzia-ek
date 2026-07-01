@@ -58,8 +58,10 @@ export function wartoscZmiennej(json: unknown, rok?: number): number | null {
 const gus = KONFIG_KONEKTORY.gus;
 
 function url(sciezka: string, params: Record<string, string>): string {
-  const qs = new URLSearchParams({ format: "json", ...params }).toString();
-  return `${gus.endpoint}/${sciezka}?${qs}`;
+  const bazowe: Record<string, string> = { format: "json", ...params };
+  // Klucz API także jako parametr URL (obok nagłówka) — odporność na proxy zdejmujące nagłówki.
+  if (gus.clientId) bazowe["client-id"] = gus.clientId;
+  return `${gus.endpoint}/${sciezka}?${new URLSearchParams(bazowe).toString()}`;
 }
 function naglowki(): Record<string, string> {
   return gus.clientId ? { "X-ClientId": gus.clientId } : {};
@@ -77,6 +79,7 @@ async function wartosciWielu(unitId: string, varIds: string[]): Promise<Map<stri
   for (let i = 0; i < varIds.length; i += ROZMIAR_PACZKI) {
     const paczka = varIds.slice(i, i + ROZMIAR_PACZKI);
     const qs = new URLSearchParams({ format: "json", year: String(gus.rok) });
+    if (gus.clientId) qs.set("client-id", gus.clientId);
     for (const id of paczka) qs.append("var-id", id);
     const odp = await fetchJson<{ results?: { id?: string | number; values?: { year?: string | number; val?: number; attrId?: number }[] }[] }>(
       `${gus.endpoint}/data/by-unit/${encodeURIComponent(unitId)}?${qs.toString()}`,
