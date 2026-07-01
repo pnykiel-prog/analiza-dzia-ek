@@ -12,7 +12,7 @@ import { DZIALKI_PRZYKLADOWE } from "../../data/sample";
 import { ocenOdpowiedzWms, znajdzWarstwe } from "../../data/connectors/wms";
 import { klasyfikujPoi } from "../../data/connectors/overpass";
 import { terytGminy, powiaty } from "../../teryt";
-import { wartoscOdtworzeniowaDla, medianaRynkowa } from "../../config-rynek";
+import { wartoscOdtworzeniowaDla, medianaRynkowa, drabinaRynkowa, pewnoscOfert } from "../../config-rynek";
 
 const KW = (x0: number, y0: number, b: number) =>
   `POLYGON((${x0} ${y0},${x0 + b} ${y0},${x0 + b} ${y0 + b},${x0} ${y0 + b},${x0} ${y0}))`;
@@ -62,6 +62,14 @@ test("kimpzp: rozpoznanie przeznaczenia z tekstu", () => {
   assert.equal(rozpoznajPrzeznaczenie(""), null);
 });
 
+test("kimpzp: opisy wielowyrazowe i symbole (MU/MN) → mieszkaniowy; usługowe → null", () => {
+  assert.equal(rozpoznajPrzeznaczenie("Zabudowa mieszkaniowo-usługowa (MU)"), "mpzp_mieszkaniowy");
+  assert.equal(rozpoznajPrzeznaczenie("Teren zabudowy mieszkaniowej jednorodzinnej MN"), "mpzp_mieszkaniowy");
+  assert.equal(rozpoznajPrzeznaczenie("budynki mieszkalne wielorodzinne"), "mpzp_mieszkaniowy");
+  // Sam „tereny zabudowy usługowej" (bez funkcji mieszkaniowej) nie może udawać mieszkaniowego.
+  assert.equal(rozpoznajPrzeznaczenie("Tereny zabudowy usługowej U"), null);
+});
+
 test("wms: ocena odpowiedzi GetFeatureInfo (obecny/pusty/błąd)", () => {
   assert.equal(ocenOdpowiedzWms('{"type":"FeatureCollection","features":[{"x":1}]}'), "obecny");
   assert.equal(ocenOdpowiedzWms('{"type":"FeatureCollection","features":[]}'), "pusty");
@@ -107,6 +115,24 @@ test("M3: wartość odtworzeniowa — miasto wojewódzkie vs reszta", () => {
 test("M3: mediana rynkowa zwraca czynsz i cenę dla województwa", () => {
   const m = medianaRynkowa("mazowieckie");
   assert.ok(m.czynsz > 0 && m.cenaNowych > 0);
+});
+
+test("rynek: drabina przestrzenna — brak ofert lokalnych → fallback wojewódzki (N=0)", () => {
+  const d = drabinaRynkowa("mazowieckie", "Warszawa", "Warszawa");
+  assert.equal(d.poziom, "wojewodztwo");
+  assert.equal(d.n, 0);
+  assert.equal(pewnoscOfert(d.n), 45); // niewystarczające
+});
+
+test("rynek: drabina schodzi do najniższego szczebla z wystarczającą próbą", () => {
+  // Symulacja źródła ofert: gmina ma 12 ofert (szacunek), powiat 40 (wiarygodne).
+  const proba = (poziom: string) =>
+    poziom === "gmina" ? { czynsz: 55, cenaNowych: 12000, n: 12 } : poziom === "powiat" ? { czynsz: 50, cenaNowych: 11000, n: 40 } : null;
+  const d = drabinaRynkowa("mazowieckie", "X", "Y", proba as never);
+  assert.equal(d.poziom, "gmina"); // najniższy z N≥10 wygrywa
+  assert.equal(d.n, 12);
+  assert.equal(pewnoscOfert(40), 85); // ≥30 → wiarygodne
+  assert.equal(pewnoscOfert(12), 60); // 10–29 → szacunek
 });
 
 test("runner: brak konfiguracji/geometrii → status brak, raport pełny, bez wyjątku", async () => {

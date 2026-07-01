@@ -82,6 +82,21 @@ export interface KonfiguracjaPopyt {
   mnoznikLuka: { min: number; max: number };
   /** Próg (0–100) rozdzielający „wysoki/niski" popyt w interpretacji (sekcja 7). */
   progInterpretacji: number;
+  /** Udział ofert krótkoterminowych, powyżej którego flaga „rynek turystyczny". */
+  progTurystycznyUdzial: number;
+  /** Napięcie mieszkaniowe: zakres pustostanów [%] i wagi składników. */
+  napiecie: { pustostanyMin: number; pustostanyMax: number; wagaPustostany: number; wagaTrend: number };
+  /** Progi bezrobocia [%] → punkt (0–1); poniżej ostatniego progu = `bezrobociePoza`. */
+  bezrobocieProgi: { max: number; pkt: number }[];
+  bezrobociePoza: number;
+  /** Zakres liczby podmiotów gosp. na 1000 mieszk. do interpolacji pull-u. */
+  podmiotyZakres: { min: number; max: number };
+  /** Siła luki cenowej: progi luki [%] → indeks (0–1), malejąco. */
+  lukaProgi: { prog: number; idx: number }[];
+  lukaPoza: number;
+  /** Progi czasu dojazdu do aglomeracji [min] → punkt (0–1); poza = `dojazdPoza`. */
+  dojazdProgi: { max: number; pkt: number }[];
+  dojazdPoza: number;
 }
 
 export const KONFIG_POPYT: KonfiguracjaPopyt = {
@@ -95,6 +110,20 @@ export const KONFIG_POPYT: KonfiguracjaPopyt = {
   mnoznikUslug: { min: 0.6, wklad: 0.5 }, // [0,60–1,10]
   mnoznikLuka: { min: 0.9, max: 1.15 },
   progInterpretacji: 50,
+  progTurystycznyUdzial: 0.4,
+  napiecie: { pustostanyMin: 2, pustostanyMax: 12, wagaPustostany: 0.6, wagaTrend: 0.4 },
+  bezrobocieProgi: [{ max: 3, pkt: 1 }, { max: 5, pkt: 0.75 }, { max: 8, pkt: 0.4 }],
+  bezrobociePoza: 0.2,
+  podmiotyZakres: { min: 80, max: 220 },
+  lukaProgi: [
+    { prog: 45, idx: 1 },
+    { prog: 30, idx: 0.8 },
+    { prog: 15, idx: 0.5 },
+    { prog: 5, idx: 0.3 },
+  ],
+  lukaPoza: 0.15,
+  dojazdProgi: [{ max: 30, pkt: 1 }, { max: 45, pkt: 0.6 }, { max: 60, pkt: 0.3 }],
+  dojazdPoza: 0.1,
 };
 
 // ── POZIOM 2: parametry zabudowy ────────────────────────────────────────────

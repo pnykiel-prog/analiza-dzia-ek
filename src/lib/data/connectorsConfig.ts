@@ -51,7 +51,8 @@ export interface KonfiguracjaKonektorow {
 }
 
 export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
-  siec: { timeoutMs: 8000, proby: 2, backoffMs: 500 },
+  // Spec §3.1: jedna próba + timeout (bez ponawiania). Backoff nieużywany przy proby=1.
+  siec: { timeoutMs: 8000, proby: 1, backoffMs: 500 },
   gus: {
     aktywny: true,
     endpoint: "https://bdl.stat.gov.pl/api/v1",

@@ -13,23 +13,33 @@
 import type { DaneDzialki } from "../../types";
 import type { Konektor, Teren, WynikKonektora, MetaPola } from "./types";
 import { brakWyniku } from "./types";
-import { medianaRynkowa } from "../../config-rynek";
+import { drabinaRynkowa, pewnoscOfert, type PoziomDrabiny } from "../../config-rynek";
+
+const ETYK_POZIOM: Record<PoziomDrabiny, string> = {
+  miejscowosc: "oferty w miejscowości",
+  gmina: "oferty w gminie",
+  powiat: "oferty w powiecie",
+  wojewodztwo: "mediana wojewódzka (fallback)",
+};
 
 export const konektorRynek: Konektor = {
   klucz: "RYNEK",
-  zrodlo: "Dane rynkowe (mediana regionalna — fallback)",
+  zrodlo: "Dane rynkowe (drabina przestrzenna)",
   poziom: "P2",
   aktywny: true,
   async pobierz(teren: Teren): Promise<WynikKonektora> {
     const czas = new Date().toISOString();
     if (!teren.wojewodztwo) return brakWyniku(this.klucz, this.zrodlo, czas, "Brak województwa.");
-    const m = medianaRynkowa(teren.wojewodztwo);
-    const dane: Partial<DaneDzialki> = { czynszRynkowyM2: m.czynsz, cenaNowychM2: m.cenaNowych };
-    // Pewność obniżona — to fallback regionalny, nie oferty lokalne (N < próg).
+    // Drabina miejscowość→gmina→powiat→województwo (jedna próba na szczebel; §7).
+    // Brak podłączonego źródła ofert lokalnych → schodzimy do mediany wojewódzkiej.
+    const d = drabinaRynkowa(teren.wojewodztwo, teren.gmina, teren.powiat);
+    const pewnosc = pewnoscOfert(d.n);
+    const zrodlo = `${this.zrodlo} — ${ETYK_POZIOM[d.poziom]}${d.n > 0 ? ` (N=${d.n})` : ""}`;
+    const dane: Partial<DaneDzialki> = { czynszRynkowyM2: d.czynsz, cenaNowychM2: d.cenaNowych };
     const meta: MetaPola[] = [
-      { pole: "czynszRynkowyM2", zrodlo: this.zrodlo, czas, pewnosc: 45, status: "ok", tryb: "A" },
-      { pole: "cenaNowychM2", zrodlo: this.zrodlo, czas, pewnosc: 45, status: "ok", tryb: "A" },
+      { pole: "czynszRynkowyM2", zrodlo, czas, pewnosc, status: "ok", tryb: "A" },
+      { pole: "cenaNowychM2", zrodlo, czas, pewnosc, status: "ok", tryb: "A" },
     ];
-    return { klucz: this.klucz, zrodlo: this.zrodlo, status: "ok", czas, dane, meta };
+    return { klucz: this.klucz, zrodlo, status: "ok", czas, dane, meta };
   },
 };

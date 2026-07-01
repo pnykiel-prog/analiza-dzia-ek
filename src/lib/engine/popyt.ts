@@ -32,7 +32,10 @@ const WZORZEC_KROTKOTERMINOWY = /doba|dob[eę]|noc|nocleg|weekend|airbnb|booking
  * dobowe/turystyczne. Zwraca oferty czyste i udział krótkoterminowych w podaży
  * (sygnał „rynek turystyczny").
  */
-export function filtrujNajemDlugoterminowy(oferty: OfertaNajmu[]): {
+export function filtrujNajemDlugoterminowy(
+  oferty: OfertaNajmu[],
+  progTurystyczny: number = KONFIG_POPYT.progTurystycznyUdzial
+): {
   dlugoterminowe: OfertaNajmu[];
   udzialKrotkoterminowego: number; // 0–1
   rynekTurystyczny: boolean;
@@ -44,7 +47,7 @@ export function filtrujNajemDlugoterminowy(oferty: OfertaNajmu[]): {
     (o.opis !== undefined && WZORZEC_KROTKOTERMINOWY.test(o.opis));
   const dlugoterminowe = oferty.filter((o) => !krotki(o));
   const udzial = (oferty.length - dlugoterminowe.length) / oferty.length;
-  return { dlugoterminowe, udzialKrotkoterminowego: udzial, rynekTurystyczny: udzial >= 0.4 };
+  return { dlugoterminowe, udzialKrotkoterminowego: udzial, rynekTurystyczny: udzial >= progTurystyczny };
 }
 
 // ── Składowe indeksy (0–1) ────────────────────────────────────────────────────
@@ -80,12 +83,13 @@ function kwalifikacjaDochodowa(
 }
 
 /** Napięcie mieszkaniowe (0–1): niskie pustostany + rosnąca ludność. */
-function napiecieMieszkaniowe(d: DaneDzialki): { idx: number; fallback: boolean } {
+function napiecieMieszkaniowe(d: DaneDzialki, cfg: KonfiguracjaPopyt): { idx: number; fallback: boolean } {
+  const n = cfg.napiecie;
   const pustFallback = d.pustostanyPct === null;
-  const pustIdx = pustFallback ? 0.55 : liniowo(d.pustostanyPct as number, 2, 12, 1, 0.15);
+  const pustIdx = pustFallback ? 0.55 : liniowo(d.pustostanyPct as number, n.pustostanyMin, n.pustostanyMax, 1, 0.15);
   const trendIdx =
     d.trendLudnosc === null ? 0.55 : d.trendLudnosc === "rosnaca" ? 1 : d.trendLudnosc === "stabilna" ? 0.6 : 0.25;
-  return { idx: c01(0.6 * pustIdx + 0.4 * trendIdx), fallback: pustFallback && d.trendLudnosc === null };
+  return { idx: c01(n.wagaPustostany * pustIdx + n.wagaTrend * trendIdx), fallback: pustFallback && d.trendLudnosc === null };
 }
 
 /** Baza grupy docelowej (0–1) — intensywność grupy z korektą trendu (seniorzy). */
@@ -110,11 +114,11 @@ function grupaDocelowa(d: DaneDzialki, profil: Profil): { idx: number; opis: str
 }
 
 /** Pull gospodarczy (0–1): niskie bezrobocie + gęstość podmiotów. */
-function pullGospodarczy(d: DaneDzialki): { idx: number; fallback: boolean } {
+function pullGospodarczy(d: DaneDzialki, cfg: KonfiguracjaPopyt): { idx: number; fallback: boolean } {
   const bFallback = d.bezrobociePct === null;
   const pFallback = d.liczbaPodmiotowGosp === null;
-  const bIdx = bFallback ? 0.55 : progi(d.bezrobociePct as number, [{ max: 3, pkt: 1 }, { max: 5, pkt: 0.75 }, { max: 8, pkt: 0.4 }], 0.2);
-  const pIdx = pFallback ? 0.55 : c01(liniowo(d.liczbaPodmiotowGosp as number, 80, 220, 0.4, 1));
+  const bIdx = bFallback ? 0.55 : progi(d.bezrobociePct as number, cfg.bezrobocieProgi, cfg.bezrobociePoza);
+  const pIdx = pFallback ? 0.55 : c01(liniowo(d.liczbaPodmiotowGosp as number, cfg.podmiotyZakres.min, cfg.podmiotyZakres.max, 0.4, 1));
   return { idx: c01(0.5 * bIdx + 0.5 * pIdx), fallback: bFallback && pFallback };
 }
 
@@ -127,16 +131,16 @@ function naplyw(d: DaneDzialki, profil: Profil): { idx: number; opis: string; fa
 }
 
 /** Siła luki cenowej (0–1) — pull dla wypchniętych z rynku. */
-function silaLuki(luka: number | null): { idx: number; fallback: boolean } {
+function silaLuki(luka: number | null, cfg: KonfiguracjaPopyt): { idx: number; fallback: boolean } {
   if (luka === null) return { idx: 0.5, fallback: true };
-  const idx = luka >= 45 ? 1 : luka >= 30 ? 0.8 : luka >= 15 ? 0.5 : luka >= 5 ? 0.3 : 0.15;
-  return { idx, fallback: false };
+  const trafiony = cfg.lukaProgi.find((p) => luka >= p.prog); // progi malejąco
+  return { idx: trafiony ? trafiony.idx : cfg.lukaPoza, fallback: false };
 }
 
 /** Mnożnik usług/dostępności (profil) — gate konwersji popytu (sekcja 6). */
 function mnoznikUslug(d: DaneDzialki, profil: Profil, cfg: KonfiguracjaPopyt): { m: number; fallback: boolean } {
   const dojazdIdx =
-    d.czasDojazdAglomeracjaMin === null ? 0.6 : progi(d.czasDojazdAglomeracjaMin, [{ max: 30, pkt: 1 }, { max: 45, pkt: 0.6 }, { max: 60, pkt: 0.3 }], 0.1);
+    d.czasDojazdAglomeracjaMin === null ? 0.6 : progi(d.czasDojazdAglomeracjaMin, cfg.dojazdProgi, cfg.dojazdPoza);
   let raw: number;
   let fallback: boolean;
   if (profil === "mlodzi") {
@@ -165,11 +169,11 @@ export function ocenPopyt(
 ): WynikPopytu {
   const grupa = grupaDocelowa(d, profil);
   const kwal = kwalifikacjaDochodowa(d, profil, cfg);
-  const nap = napiecieMieszkaniowe(d);
+  const nap = napiecieMieszkaniowe(d, cfg);
   const luka = lukaCenowaPct(d, cfgS);
   const napl = naplyw(d, profil);
-  const pull = pullGospodarczy(d);
-  const sila = silaLuki(luka);
+  const pull = pullGospodarczy(d, cfg);
+  const sila = silaLuki(luka, cfg);
   const mUsl = mnoznikUslug(d, profil, cfg);
 
   // Popyt wewnętrzny = grupa × kwalifikacja × napięcie.

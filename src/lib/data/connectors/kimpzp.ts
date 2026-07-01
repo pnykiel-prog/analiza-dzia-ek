@@ -23,8 +23,11 @@ export function rozpoznajPrzeznaczenie(tekst: string): StatusPlanistyczny | null
   if (!t.trim()) return null;
   // Sprzeczne z mieszkaniową (przemysł, las, drogi, tereny zamknięte).
   if (/\b(przemys|produkcyj|tereny zamkn|las|leśn|cmentar|górnicz)/.test(t)) return "sprzeczny";
-  // Mieszkaniowe (MN/MW lub słownie).
-  if (/\b(mieszkanio|zabudow[ay] mieszkan|\bmn\b|\bmw\b|\bmnw\b)/.test(t)) return "mpzp_mieszkaniowy";
+  // Mieszkaniowe: symbole (MN/MW/MU/MWn) oraz opisy wielowyrazowe
+  // („zabudowa … mieszkaniowa/wielofunkcyjna", „funkcja mieszkaniowa").
+  // „mieszkanio” łapie deklinacje (mieszkaniowa/-ej/-ych); „mieszkalni” — budynki mieszkalne.
+  if (/mieszkanio|mieszkaln|funkcja mieszkan|zabudow[ay][^.]{0,40}mieszkan|\bm[nwu]\b|\bmwn\b/.test(t))
+    return "mpzp_mieszkaniowy";
   return null;
 }
 
