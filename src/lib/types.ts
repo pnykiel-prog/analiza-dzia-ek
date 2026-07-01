@@ -64,6 +64,8 @@ export interface DaneDzialki {
   statusPlanistyczny: StatusPlanistyczny;
   /** Czy pytanie o MPZP zostało rozstrzygnięte przez wypełniającego (ręczna deklaracja). */
   mpzpZadeklarowany?: Maybe<boolean>;
+  /** Ręcznie wprowadzona podstawa planistyczna (P1, S3): typ + symbol/funkcja. */
+  podstawa?: PodstawaPlanistyczna;
   wskaznikiPlanistyczne: Maybe<WskaznikiPlanistyczne>;
   zabudowaMieszkaniowaWSasiedztwie: Maybe<boolean>;
   przeznaczenieSprzeczneZMieszkaniowa: Maybe<boolean>;
@@ -190,29 +192,55 @@ export interface BrakDanych {
   wplyw: string; // wpływ na wynik/pewność
 }
 
+// ── Poziom 1 (rewizja): działka → podstawa planistyczna → pojemność × popyt ──
+
+export type PodstawaTyp = "MPZP" | "WZ" | "PnB" | "BRAK";
+
+/** Ręcznie wprowadzona podstawa planistyczna (S3) — determinizm, bez auto-parsowania. */
+export interface PodstawaPlanistyczna {
+  typ: PodstawaTyp;
+  symbol?: string; // symbol MPZP (np. MW, MN)
+  funkcja?: string; // opis funkcji dla WZ/PnB
+  zrodlo: "ręczne";
+}
+
+/** Pojemność zabudowy wyliczona z powierzchni działki i ręcznych wskaźników. */
+export interface PojemnoscP1 {
+  maxPowZabudowyM2: number | null;
+  powCalkowitaM2: number | null;
+  pumM2: number | null;
+  szacLiczbaMieszkanMlodzi: number | null;
+  szacLiczbaMieszkanSeniorzy: number | null;
+}
+
+/** Dopasowanie pojemność↔popyt per profil → werdykt. */
+export interface DopasowanieProfil {
+  profil: Profil;
+  popyt: number; // 0–100 (popyt realizowalny bez usług)
+  pojemnoscMieszkan: number | null;
+  score: number; // 0–100 (dopasowanie)
+  werdykt: Werdykt;
+  komentarz: string;
+}
+
 export interface WynikPoziom1 {
   dzialkaId: string;
-  bramki: {
-    status: StatusBramki; // zagregowany
-    flagi: string[];
-    szczegoly: WynikBramki[];
-  };
-  scoreMlodzi: number; // 0–100
-  scoreSeniorzy: number; // 0–100
+  powierzchniaM2: number;
+  podstawa: PodstawaPlanistyczna;
+  funkcjaMieszkaniowaDozwolona: boolean;
+  pojemnosc: PojemnoscP1;
+  /** Popyt per profil (na P1 bez mnożnika usług). */
+  popyt: { mlodzi: WynikPopytu; seniorzy: WynikPopytu };
+  dopasowanie: { mlodzi: DopasowanieProfil; seniorzy: DopasowanieProfil };
+  scoreMlodzi: number; // = dopasowanie.mlodzi.score
+  scoreSeniorzy: number;
   profilRekomendowany: ProfilRekomendowany;
   werdyktMlodzi: Werdykt;
   werdyktSeniorzy: Werdykt;
-  werdykt: Werdykt; // werdykt rekomendowanego profilu, po nałożeniu bramek
+  werdykt: Werdykt;
   pewnosc: number; // 0–100
-  wymiary: WynikWymiaru[];
-  kluczoweLiczby: KluczoweLiczby;
+  tryb: "pelny" | "ograniczony"; // ograniczony = brak podstawy planistycznej
   flagi: string[];
-  /** Dekompozycja popytu (W2) per profil — wewnętrzny/zewnętrzny + mnożniki. */
-  popyt: { mlodzi: WynikPopytu; seniorzy: WynikPopytu };
-  /** Flagi i sygnały (ostrzeżenia + pozytywy) do panelu wyników. */
-  sygnaly: Sygnal[];
-  /** Realne białe plamy — czego aplikacja nie pobrała (z wpływem na pewność). */
-  braki: BrakDanych[];
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -262,6 +290,11 @@ export interface WynikPoziom2 {
   obwiednia: Obwiednia;
   warianty: WariantZabudowy[];
   flagiRyzyka: string[];
+  /** Uwarunkowania przeniesione z P1: bramki środowiskowe/formalne, sygnały, braki, kluczowe liczby. */
+  bramki: { status: StatusBramki; flagi: string[]; szczegoly: WynikBramki[] };
+  sygnaly: Sygnal[];
+  braki: BrakDanych[];
+  kluczoweLiczby: KluczoweLiczby;
 }
 
 // ────────────────────────────────────────────────────────────────────────────

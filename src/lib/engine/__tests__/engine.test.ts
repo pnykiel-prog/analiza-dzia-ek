@@ -1,6 +1,9 @@
 /**
  * Testy silników P1/P2/P3 na danych przykładowych.
  * Uruchom: `npm test`
+ *
+ * Po rewizji Poziomu 1: P1 ocenia tylko podstawę planistyczną → pojemność ↔ popyt.
+ * Uwarunkowania (bramki/sygnały/braki/kluczowe liczby) przeniesiono do Poziomu 2.
  */
 
 import { test } from "node:test";
@@ -8,37 +11,55 @@ import assert from "node:assert/strict";
 import { DZIALKI_PRZYKLADOWE } from "../../data/sample";
 import { uruchomAnalize } from "../index";
 import { uruchomPoziom1 } from "../poziom1";
+import { uruchomPoziom2 } from "../poziom2";
 import { statusZeSymbolu } from "../../mpzp";
 
 const [wzorcowa, senioralna, bialePlamy] = DZIALKI_PRZYKLADOWE;
 
-test("P1: działka wzorcowa → rekomendacja młodzi, werdykt zielony/żółty", () => {
+test("P1: działka wzorcowa → tryb pełny, funkcja dozwolona, rekomendacja młodzi", () => {
   const w = uruchomPoziom1(wzorcowa);
-  assert.equal(w.bramki.status === "fail", false);
+  assert.equal(w.funkcjaMieszkaniowaDozwolona, true);
+  assert.equal(w.tryb, "pelny");
   assert.ok(w.scoreMlodzi >= w.scoreSeniorzy);
   assert.ok(["mlodzi", "oba"].includes(w.profilRekomendowany));
   assert.ok(w.pewnosc >= 80, `pewność powinna być wysoka, jest ${w.pewnosc}`);
-  assert.ok(w.kluczoweLiczby.pulapCzynszuSimM2! > 30 && w.kluczoweLiczby.pulapCzynszuSimM2! < 35);
+  // Pojemność wyliczona z ręcznych wskaźników podstawy planistycznej.
+  assert.ok(w.pojemnosc.pumM2 !== null && w.pojemnosc.pumM2! > 0);
+  assert.ok(w.pojemnosc.szacLiczbaMieszkanMlodzi! >= 15);
 });
 
-test("P1: działka senioralna → seniorzy nie gorsi niż młodzi", () => {
+test("P1: działka senioralna → podstawa MPZP, tryb pełny, oba profile ocenione", () => {
+  // Po rewizji P1 nie stosuje mnożnika usług (POZ/usługi = Poziom 2), więc
+  // przewaga seniorów wynikająca z usług ujawnia się dopiero na P2.
   const w = uruchomPoziom1(senioralna);
-  assert.ok(w.scoreSeniorzy >= w.scoreMlodzi - 5);
+  assert.equal(w.podstawa.typ, "MPZP");
+  assert.equal(w.tryb, "pelny");
+  assert.equal(w.funkcjaMieszkaniowaDozwolona, true);
   assert.notEqual(w.werdyktSeniorzy, undefined);
+  assert.notEqual(w.werdyktMlodzi, undefined);
+  assert.ok(w.pojemnosc.szacLiczbaMieszkanSeniorzy! > 0);
 });
 
-test("P1: białe plamy → Natura 2000 warunkowo, obniżona pewność, brak fail", () => {
+test("P1: białe plamy → tryb ograniczony, funkcja nieprzesądzona, obniżona pewność", () => {
   const w = uruchomPoziom1(bialePlamy);
-  assert.ok(w.flagi.includes("Natura 2000"));
-  assert.equal(w.bramki.status, "warunkowo"); // Natura 2000 → max żółty
+  assert.equal(w.tryb, "ograniczony"); // brak wskaźników planistycznych
+  assert.equal(w.funkcjaMieszkaniowaDozwolona, true); // BRAK podstawy → nie blokujemy
+  assert.equal(w.pojemnosc.pumM2, null);
   assert.notEqual(w.werdykt, "zielony");
   assert.ok(w.pewnosc < 90, `pewność powinna być obniżona przez braki, jest ${w.pewnosc}`);
 });
 
-test("P1: pułap czynszu = wartość odtworzeniowa × 5% ÷ 12", () => {
-  const w = uruchomPoziom1(wzorcowa);
+test("P2: pułap czynszu = wartość odtworzeniowa × 5% ÷ 12", () => {
+  const a = uruchomAnalize(wzorcowa);
   const oczek = (wzorcowa.wartoscOdtworzeniowaM2! * 0.05) / 12;
-  assert.ok(Math.abs(w.kluczoweLiczby.pulapCzynszuSimM2! - oczek) < 0.2);
+  assert.ok(Math.abs(a.poziom2.kluczoweLiczby.pulapCzynszuSimM2! - oczek) < 0.2);
+  assert.ok(a.poziom2.kluczoweLiczby.pulapCzynszuSimM2! > 30 && a.poziom2.kluczoweLiczby.pulapCzynszuSimM2! < 35);
+});
+
+test("P2: białe plamy → Natura 2000 warunkowo w bramkach", () => {
+  const a = uruchomAnalize(bialePlamy);
+  assert.ok(a.poziom2.bramki.flagi.includes("Natura 2000"));
+  assert.equal(a.poziom2.bramki.status, "warunkowo"); // Natura 2000 → warunkowo (nie fail)
 });
 
 test("P2: obwiednia z MPZP ma wyższą pewność niż fallback z sąsiedztwa", () => {
@@ -51,10 +72,25 @@ test("P2: obwiednia z MPZP ma wyższą pewność niż fallback z sąsiedztwa", (
 });
 
 test("P2: wariant senioralny zawsze ma windę", () => {
-  const z = uruchomAnalize(senioralna);
-  const senior = z.poziom2.warianty.find((w) => w.profil === "seniorzy");
+  // Wymuszamy rekomendację senioralną, by P2 zbudował wariant senioralny.
+  const p1 = { ...uruchomPoziom1(senioralna), profilRekomendowany: "seniorzy" as const };
+  const p2 = uruchomPoziom2(senioralna, p1);
+  const senior = p2.warianty.find((w) => w.profil === "seniorzy");
   assert.ok(senior);
   assert.equal(senior!.windaWymagana, true);
+});
+
+test("P2: sygnały i realne białe plamy", () => {
+  const a = uruchomAnalize(wzorcowa);
+  // Komplet danych → brak białych plam; sygnały pozytywne (dostępność/rynek).
+  assert.equal(a.poziom2.braki.length, 0);
+  assert.ok(a.poziom2.sygnaly.some((s) => s.ton === "pozytyw"));
+
+  const b = uruchomAnalize(bialePlamy);
+  // Brak czynszu → biała plama rynku najmu; Natura 2000 → sygnał ostrzegawczy.
+  assert.ok(b.poziom2.braki.length >= 1, `braki=${b.poziom2.braki.length}`);
+  assert.ok(b.poziom2.braki.some((x) => x.tytul.toLowerCase().includes("najmu")));
+  assert.ok(b.poziom2.sygnaly.some((s) => s.ton === "ostrzezenie"));
 });
 
 test("P3: trzy scenariusze, reżim domyślny B, oś czasu sensowna", () => {
@@ -101,20 +137,6 @@ test("P3+ankieta: profil finansowy steruje montażem i reżimem P3", () => {
   assert.equal(zAnkieta.poziom3.scenariusze[1].rezim, "A_SBC_2026");
 });
 
-test("P1: flagi/sygnały i realne białe plamy", () => {
-  const w = uruchomPoziom1(wzorcowa);
-  // Komplet danych → brak białych plam; sygnały pozytywne (dostępność/rynek).
-  assert.equal(w.braki.length, 0);
-  assert.ok(w.sygnaly.some((s) => s.ton === "pozytyw"));
-
-  const b = uruchomPoziom1(bialePlamy);
-  // Brak MPZP i brak czynszu → realne braki; Natura 2000 → sygnał ostrzegawczy.
-  assert.ok(b.braki.length >= 2, `braki=${b.braki.length}`);
-  assert.ok(b.braki.some((x) => x.tytul.includes("MPZP")));
-  assert.ok(b.braki.some((x) => x.tytul.toLowerCase().includes("najmu")));
-  assert.ok(b.sygnaly.some((s) => s.ton === "ostrzezenie"));
-});
-
 test("MPZP: symbol → status planistyczny", () => {
   assert.equal(statusZeSymbolu("MW").status, "mpzp_mieszkaniowy");
   assert.equal(statusZeSymbolu("MW").sprzeczne, false);
@@ -124,16 +146,22 @@ test("MPZP: symbol → status planistyczny", () => {
   assert.equal(statusZeSymbolu("U").status, "sprzeczny"); // usługi bez funkcji mieszkaniowej
 });
 
-test("MPZP: deklaracja wypełniającego zamyka brak planu (bez alertu)", () => {
-  const bez = uruchomPoziom1(bialePlamy);
-  assert.ok(bez.braki.some((b) => b.tytul.includes("MPZP"))); // przed deklaracją: brak
-
-  const zadekl = uruchomPoziom1({ ...bialePlamy, przeznaczenieSprzeczneZMieszkaniowa: false, mpzpZadeklarowany: true });
-  assert.ok(!zadekl.braki.some((b) => b.tytul.startsWith("MPZP /")));
-  assert.ok(!zadekl.sygnaly.some((s) => s.tekst.includes("Brak MPZP")));
+test("P1: podstawa z symbolem mieszkaniowym → funkcja dozwolona", () => {
+  const d = { ...bialePlamy, podstawa: { typ: "MPZP" as const, symbol: "MW", zrodlo: "ręczne" as const } };
+  const w = uruchomPoziom1(d);
+  assert.equal(w.funkcjaMieszkaniowaDozwolona, true);
+  assert.equal(w.podstawa.symbol, "MW");
 });
 
-test("MPZP budowlany wyłącza bramki środowiskowe/formalne z braków P1 (przenosi na P2)", () => {
+test("P1: podstawa ze sprzecznym symbolem → funkcja niedozwolona, werdykt czerwony", () => {
+  const d = { ...bialePlamy, podstawa: { typ: "MPZP" as const, symbol: "R", zrodlo: "ręczne" as const } };
+  const w = uruchomPoziom1(d);
+  assert.equal(w.funkcjaMieszkaniowaDozwolona, false);
+  assert.equal(w.werdykt, "czerwony");
+  assert.equal(w.profilRekomendowany, "zaden");
+});
+
+test("MPZP budowlany wyłącza bramki środowiskowe/formalne z braków (przesądzone w planie)", () => {
   const d = {
     ...wzorcowa,
     statusPlanistyczny: "mpzp_mieszkaniowy" as const,
@@ -148,11 +176,11 @@ test("MPZP budowlany wyłącza bramki środowiskowe/formalne z braków P1 (przen
     przeznaczenieSprzeczneZMieszkaniowa: null,
     zabudowaMieszkaniowaWSasiedztwie: null,
   };
-  const w = uruchomPoziom1(d);
+  const a = uruchomAnalize(d);
   // Żadna bramka nie jest „do weryfikacji" — plan je przesądza.
-  assert.ok(w.bramki.szczegoly.every((b) => b.status !== "do_weryfikacji"));
-  // Te pozycje nie pojawiają się w „Czego nie pobrano" na P1.
-  assert.ok(!w.braki.some((b) => /powodzi|natura|osuwisk|drogi|leśny|rolny|przeznaczenie|sąsiedztw/i.test(b.tytul)));
+  assert.ok(a.poziom2.bramki.szczegoly.every((b) => b.status !== "do_weryfikacji"));
+  // Te pozycje nie pojawiają się w „Czego nie pobrano".
+  assert.ok(!a.poziom2.braki.some((b) => /powodzi|natura|osuwisk|drogi|leśny|rolny|przeznaczenie|sąsiedztw/i.test(b.tytul)));
 });
 
 test("Pipeline: każdy poziom zasila następny (spójność id)", () => {

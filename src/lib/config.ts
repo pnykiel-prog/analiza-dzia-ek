@@ -42,6 +42,29 @@ export const KONFIG_SCORING: KonfiguracjaScoring = {
   progFlagaWysokaDotacjaPct: 160,
 };
 
+// ── POZIOM 1 (rewizja): pojemność zabudowy × popyt → werdykt ────────────────
+
+export interface KonfiguracjaPoziom1 {
+  /** Pasma werdyktu dopasowania pojemność↔popyt (per profil). */
+  pasma: { zielony: number; zolty: number };
+  /** Liczba mieszkań uznawana za „pełną" wykonalność projektu społecznego. */
+  progMieszkanViable: number;
+  /** Współczynnik efektywności PUM (pow. całkowita → PUM). */
+  wspolczynnikEfektywnosci: number;
+  /** Średni metraż mieszkania per profil [m²] (do szacunku liczby mieszkań). */
+  metrazSredniM2: Record<Profil, number>;
+  /** Symbole MPZP z dozwoloną zabudową mieszkaniową (wielorodzinna istotna). */
+  symboleMieszkaniowe: string[];
+}
+
+export const KONFIG_POZIOM1: KonfiguracjaPoziom1 = {
+  pasma: { zielony: 65, zolty: 40 },
+  progMieszkanViable: 15,
+  wspolczynnikEfektywnosci: 0.8,
+  metrazSredniM2: { mlodzi: 41, seniorzy: 45 },
+  symboleMieszkaniowe: ["MW", "MWn", "MU", "MW/U", "MN/U", "MN"],
+};
+
 // ── MODEL OCENY POPYTU (pod-model wymiaru W2) ───────────────────────────────
 
 export interface KonfiguracjaPopyt {
