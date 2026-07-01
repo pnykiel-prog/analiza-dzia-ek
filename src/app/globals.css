@@ -2,23 +2,216 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   GRUNT — tokeny wizualne (design tokens). Wersja 1.0.
+   Dosłownie wg „GRUNT — wytyczne wizualne" (sekcja 10).
+   ============================================================ */
 :root {
-  --bg: #f8fafc;
+  /* --- MARKA / INK --- */
+  --grunt-ink:        #16263F;
+  --grunt-ink-2:      #23395c;
+  --grunt-ink-3:      #1d3354;
+  --grunt-mint:       #6FE3C4;
+
+  /* --- POWIERZCHNIE --- */
+  --grunt-bg:         #E9EDF2;
+  --grunt-bg-report:  #E1E6EC;
+  --grunt-surface:    #FFFFFF;
+  --grunt-surface-2:  #FAFBFC;
+  --grunt-surface-3:  #F4F6F9;
+  --grunt-map-bg:     #EFF2F6;
+
+  /* --- OBRYSY / LINIE --- */
+  --grunt-border-input: #C7D0DC;
+  --grunt-border:       #DDE3EB;
+  --grunt-border-2:     #E2E6EC;
+  --grunt-divider:      #EEF1F5;
+  --grunt-divider-row:  #F2F4F7;
+  --grunt-border-soft:  #B9C4D2;
+
+  /* --- TEKST --- */
+  --grunt-text:        #16263F;
+  --grunt-text-2:      #2A3F5F;
+  --grunt-text-3:      #3A4D6B;
+  --grunt-text-muted:  #5C6B82;
+  --grunt-text-muted2: #6B7A92;
+  --grunt-text-faint:  #8E9BAE;
+  --grunt-text-faint2: #9AA7BA;
+  --grunt-text-ghost:  #A9B5C6;
+
+  /* --- PROFILE DEMOGRAFICZNE --- */
+  --grunt-young:       #0E7C8B;
+  --grunt-young-bg:    #E0F0F2;
+  --grunt-senior:      #7A4A86;
+  --grunt-senior-bg:   #F0E8F2;
+
+  /* --- KOLORY SEMANTYCZNE --- */
+  --grunt-green:       #1C8A5A; --grunt-green-bg:  #E4F3EB;
+  --grunt-amber:       #B5790B; --grunt-amber-bg:  #FBF0DA;
+  --grunt-amber-text:  #8A5C08;
+  --grunt-amber-text2: #9A6608;
+  --grunt-red:         #C0392B; --grunt-red-bg:    #FBE7E4;
+  --grunt-neutral:     #6B7A92; --grunt-neutral-bg:#EDF0F4;
+
+  /* --- SKALA DANYCH / WYKRESY --- */
+  --grunt-chart-1: #2A6FA8;
+  --grunt-chart-2: #16263F;
+  --grunt-chart-3: #4A6491;
+  --grunt-chart-4: #6E8BB0;
+  --grunt-chart-5: #9DB1CE;
+  --grunt-chart-6: #B3C2D6;
+
+  /* --- PROMIENIE --- */
+  --grunt-r-card:   14px;
+  --grunt-r-panel:  12px;
+  --grunt-r-md:     10px;
+  --grunt-r-input:   9px;
+  --grunt-r-sm:      8px;
+  --grunt-r-xs:      6px;
+  --grunt-r-tag:     5px;
+
+  /* --- CIENIE --- */
+  --grunt-shadow-card:     0 1px 2px rgba(20,38,63,.04);
+  --grunt-shadow-raised:   0 6px 22px rgba(20,38,63,.10);
+  --grunt-shadow-elevated: 0 8px 24px rgba(20,38,63,.12);
+  --grunt-shadow-sheet:    0 8px 40px rgba(20,38,63,.12);
+  --grunt-shadow-modal:    0 24px 60px rgba(8,18,34,.4);
+
+  /* --- WYSOKOŚCI --- */
+  --grunt-h-header:   58px;
+  --grunt-h-subnav:   54px;
+  --grunt-h-cta:      48px;
+  --grunt-h-btn-lg:   44px;
+  --grunt-h-btn:      38px;
+  --grunt-h-btn-sm:   34px;
+  --grunt-h-input:    40px;
+  --grunt-h-input-sm: 36px;
+
+  /* --- UKŁAD --- */
+  --grunt-page-max:   1340px;
+  --grunt-page-pad-x: 24px;
+  --grunt-sticky-top: 130px;
+
+  /* --- TYPOGRAFIA (rodziny; ładowane przez <link> Google Fonts) --- */
+  --font-sans:        'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono:        'IBM Plex Mono', ui-monospace, monospace;
+  --grunt-font-sans:  var(--font-sans);
+  --grunt-font-mono:  var(--font-mono);
 }
 
 body {
-  background: var(--bg);
-  color: #0f172a;
+  background: var(--grunt-bg);
+  color: var(--grunt-text);
+  font-family: var(--grunt-font-sans, "IBM Plex Sans", system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
 }
 
+/* Liczby, ID, jednostki, kwoty — zawsze mono + tabular. */
+.mono {
+  font-family: var(--grunt-font-mono, "IBM Plex Mono", ui-monospace, monospace);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Prymitywy powierzchni ─────────────────────────────────── */
 .card {
-  @apply bg-white rounded-xl border border-slate-200 shadow-sm;
+  background: var(--grunt-surface);
+  border: 1px solid var(--grunt-border);
+  border-radius: var(--grunt-r-card);
+  box-shadow: var(--grunt-shadow-card);
+}
+.panel {
+  background: var(--grunt-surface);
+  border: 1px solid var(--grunt-border);
+  border-radius: var(--grunt-r-panel);
 }
 
+/* ── Badge / tag ───────────────────────────────────────────── */
 .badge {
-  @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
+/* ── Pola formularza ───────────────────────────────────────── */
 .inp {
-  @apply w-full border border-slate-200 rounded px-2 py-1.5 text-sm;
+  width: 100%;
+  height: var(--grunt-h-input);
+  border: 1px solid var(--grunt-border-input);
+  border-radius: var(--grunt-r-input);
+  background: var(--grunt-surface);
+  padding: 0 0.7rem;
+  font-size: 13px;
+  color: var(--grunt-text);
 }
+.inp:focus {
+  outline: none;
+  border-color: var(--grunt-ink);
+  box-shadow: 0 0 0 3px rgba(22, 38, 63, 0.08);
+}
+select.inp { padding-right: 0.4rem; }
+textarea.inp { height: auto; padding: 0.5rem 0.7rem; }
+
+/* ── Przyciski ─────────────────────────────────────────────── */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: var(--grunt-h-btn);
+  padding: 0 1.1rem;
+  border-radius: var(--grunt-r-input);
+  background: var(--grunt-ink);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.15s ease;
+}
+.btn-primary:hover { background: var(--grunt-ink-2); }
+.btn-primary:disabled { background: var(--grunt-border-input); cursor: not-allowed; }
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: var(--grunt-h-btn);
+  padding: 0 1rem;
+  border-radius: var(--grunt-r-input);
+  background: var(--grunt-surface);
+  border: 1px solid var(--grunt-border-input);
+  color: var(--grunt-text-2);
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.15s ease;
+}
+.btn-secondary:hover { background: #F4F6F9; }
+.btn-secondary:disabled { color: var(--grunt-text-ghost); cursor: not-allowed; }
+
+/* ── Chip wyboru (ankieta) ─────────────────────────────────── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--grunt-r-input);
+  border: 1px solid var(--grunt-border);
+  background: var(--grunt-surface);
+  color: var(--grunt-text-3);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.chip:hover { background: var(--grunt-surface-3); }
+.chip[data-selected="true"] {
+  background: var(--grunt-ink);
+  border-color: var(--grunt-ink);
+  color: #fff;
+  font-weight: 600;
+}
+.chip[data-limited="true"] { border-color: var(--grunt-amber); }

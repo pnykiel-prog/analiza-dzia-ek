@@ -12,6 +12,7 @@ import { Poziom1View } from "@/components/Poziom1View";
 import { Poziom2View } from "@/components/Poziom2View";
 import { Poziom3View } from "@/components/Poziom3View";
 import { AnkietaFinansowa } from "@/components/AnkietaFinansowa";
+import { Stepper, BannerBramki } from "@/components/grunt";
 import { liczba } from "@/lib/format";
 
 interface MetaRozw {
@@ -262,17 +263,29 @@ export default function NowaAnalizaPage() {
 
   const korektyP2 = Object.keys(p2).filter((k) => p2orig[k] !== undefined && p2[k] !== p2orig[k]);
 
+  // Mapowanie kroku kreatora (1|2|3) na 5-krokowy stepper GRUNT (Wejście·P1·P2·P3·Raport).
+  const stepAktywny = krok === 1 ? (wynik ? 2 : 1) : krok === 2 ? 3 : 4;
+  const stepMax = !wynik ? 1 : krok >= 2 ? 4 : 3;
+  function nawigujStepper(nr: number) {
+    if (nr <= 2) setKrok(1);
+    else if (nr === 3 && wynik) setKrok(2);
+    else if (nr >= 4 && wynik && krok >= 2) setKrok(3);
+  }
+
   return (
     <div className="space-y-5">
-      <div className="card p-5">
-        <h1 className="text-xl font-bold text-slate-800">Nowa analiza — kreator 3-poziomowy</h1>
-        <p className="text-slate-600 mt-1 text-sm max-w-3xl">
+      <div className="-mx-6 -mt-6">
+        <Stepper aktywny={stepAktywny} maxOsiagniety={stepMax} onKrok={nawigujStepper} />
+      </div>
+
+      <div className="card p-[18px]">
+        <h1 className="text-[25px] font-semibold text-grunt-text tracking-[-0.01em]">Nowa analiza — kreator poziomowy</h1>
+        <p className="text-grunt-text-muted mt-1 text-[13px] max-w-3xl">
           Pola odsłaniają się stopniowo wraz z poziomem. Na <strong>Poziomie 1</strong> wprowadzasz wyłącznie
           identyfikację działek — całe scoringowanie liczy się automatycznie. Na <strong>Poziomie 2</strong> i{" "}
           <strong>3</strong> odsłaniają się parametry oceny i montażu (tryby A° / A± / R).
         </p>
         <Legenda />
-        <Kroki krok={krok} maPoziom2={!!wynik} />
       </div>
 
       {blad && <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{blad}</p>}
@@ -327,7 +340,7 @@ export default function NowaAnalizaPage() {
               pre-wypełniają kolejne. Tylko numer jest wymagany dla każdej kolejnej pozycji.
             </p>
           </Karta>
-          <button type="submit" disabled={licze} className="bg-slate-900 text-white px-5 py-2.5 rounded-lg hover:bg-slate-700 disabled:opacity-50">
+          <button type="submit" disabled={licze} className="btn-primary" style={{ height: "var(--grunt-h-cta)" }}>
             {licze ? "Pobieram dane i liczę…" : "Pobierz dane i analizuj (Poziom 1)"}
           </button>
         </form>
@@ -357,7 +370,7 @@ export default function NowaAnalizaPage() {
                 placeholder="np. 4000"
               />
             </label>
-            <button onClick={analizujZPowierzchnia} disabled={licze} className="bg-slate-900 text-white px-5 py-2.5 rounded-lg hover:bg-slate-700 disabled:opacity-50">
+            <button onClick={analizujZPowierzchnia} disabled={licze} className="btn-primary" style={{ height: "var(--grunt-h-cta)" }}>
               {licze ? "Liczę…" : "Analizuj z podaną powierzchnią"}
             </button>
           </div>
@@ -420,10 +433,10 @@ export default function NowaAnalizaPage() {
           )}
 
           <div className="flex gap-3">
-            <button onClick={przeliczP2} disabled={licze} className="bg-slate-900 text-white px-5 py-2.5 rounded-lg hover:bg-slate-700 disabled:opacity-50">
+            <button onClick={przeliczP2} disabled={licze} className="btn-primary" style={{ height: "var(--grunt-h-cta)" }}>
               {licze ? "Liczę…" : "Przelicz Poziom 2"}
             </button>
-            <button onClick={() => setKrok(1)} className="border border-slate-300 px-4 py-2.5 rounded-lg hover:bg-slate-50 text-sm">← Poziom 1</button>
+            <button onClick={() => setKrok(1)} className="btn-secondary" style={{ height: "var(--grunt-h-cta)" }}>← Poziom 1</button>
           </div>
         </div>
       )}
@@ -466,10 +479,10 @@ export default function NowaAnalizaPage() {
           </Karta>
 
           <div className="flex gap-3">
-            <button onClick={() => przeliczP3()} disabled={licze} className="bg-slate-900 text-white px-5 py-2.5 rounded-lg hover:bg-slate-700 disabled:opacity-50">
+            <button onClick={() => przeliczP3()} disabled={licze} className="btn-primary" style={{ height: "var(--grunt-h-cta)" }}>
               {licze ? "Liczę…" : "Przelicz Poziom 3"}
             </button>
-            <button onClick={() => setKrok(2)} className="border border-slate-300 px-4 py-2.5 rounded-lg hover:bg-slate-50 text-sm">← Poziom 2</button>
+            <button onClick={() => setKrok(2)} className="btn-secondary" style={{ height: "var(--grunt-h-cta)" }}>← Poziom 2</button>
           </div>
         </div>
       )}
@@ -486,10 +499,24 @@ export default function NowaAnalizaPage() {
           )}
           {krok === 3 && profilFin && <SekcjaWynik numer="3" tytul="Wynik Poziomu 3 — model finansowy"><Poziom3View p3={wynik.poziom3} /></SekcjaWynik>}
 
-          {/* Przejścia między poziomami */}
-          <div className="flex gap-3 mt-4">
-            {krok === 1 && <button onClick={wejdzP2} className="bg-slate-900 text-white px-5 py-2.5 rounded-lg hover:bg-slate-700">Przejdź do Poziomu 2 →</button>}
-            {krok === 2 && <button onClick={wejdzP3} className="bg-slate-900 text-white px-5 py-2.5 rounded-lg hover:bg-slate-700">Przejdź do Poziomu 3 →</button>}
+          {/* Bramki między poziomami */}
+          <div className="mt-4">
+            {krok === 1 && (
+              <BannerBramki
+                tytul="Poziom 1 zaliczony — przejdź do oceny działki"
+                opis="Poziom 2 odsłania planistykę, rynek i uwarunkowania oraz rekomenduje warianty zabudowy."
+                akcja={wejdzP2}
+                akcjaLabel="Przejdź do Poziomu 2"
+              />
+            )}
+            {krok === 2 && (
+              <BannerBramki
+                tytul="Poziom 2 gotowy — czas na model finansowy"
+                opis="Najpierw ankieta finansowa (kto pyta i jak finansuje), potem montaż i domknięcie Poziomu 3."
+                akcja={wejdzP3}
+                akcjaLabel="Przejdź do ankiety i Poziomu 3"
+              />
+            )}
           </div>
         </div>
       )}
@@ -517,23 +544,6 @@ function Legenda() {
         <span key={t} className="flex items-center gap-1">
           <TrybBadge tryb={t} /> <span className="text-slate-500">{OPIS_TRYBU[t].opis}</span>
         </span>
-      ))}
-    </div>
-  );
-}
-
-function Kroki({ krok, maPoziom2 }: { krok: number; maPoziom2: boolean }) {
-  const etap = [
-    { n: 1, t: "Identyfikacja" },
-    { n: 2, t: "Ocena działki" },
-    { n: 3, t: "Ankieta + model finansowy" },
-  ];
-  return (
-    <div className="flex gap-2 mt-4">
-      {etap.map((e) => (
-        <div key={e.n} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${krok === e.n ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500"}`}>
-          <span className="font-bold">{e.n}</span> {e.t}
-        </div>
       ))}
     </div>
   );
@@ -813,7 +823,7 @@ function SekcjaWynik({ numer, tytul, children }: { numer: string; tytul: string;
   return (
     <div className="mt-4">
       <div className="flex items-center gap-3 mb-3">
-        <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-900 text-white font-bold text-sm">{numer}</span>
+        <span className="mono flex items-center justify-center w-8 h-8 rounded-md bg-grunt-ink text-white font-bold text-sm">{numer}</span>
         <h2 className="text-lg font-bold text-slate-800">{tytul}</h2>
       </div>
       <div className="space-y-4">{children}</div>
