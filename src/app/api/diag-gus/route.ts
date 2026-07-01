@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { KONFIG_KONEKTORY } from "@/lib/data/connectorsConfig";
 import { fetchTekst } from "@/lib/data/connectors/net";
-import { wybierzJednostke, pierwszaZmienna, wartoscZmiennej } from "@/lib/data/connectors/gus";
+import { wybierzJednostke, pierwszaZmienna, wartoscZmiennej, konektorGUS } from "@/lib/data/connectors/gus";
+import type { Teren } from "@/lib/data/connectors/types";
 
 /**
  * Diagnostyka konektora GUS BDL — uruchamiana po stronie serwera (Vercel), gdzie
@@ -31,6 +32,14 @@ export async function GET(req: Request) {
     rok: gus.rok,
     gmina,
   };
+
+  // NAJWAŻNIEJSZE: uruchom REALNY konektor GUS dla gminy i pokaż jego wynik (to samo,
+  // co dostaje aplikacja). Jeśli `dane` zawiera udzial2039Pct/udzial65PlusPct — działa.
+  const terenDiag: Teren = {
+    id: "diag", teryt: "", wojewodztwo: "", powiat: "", gmina,
+    centroid2180: null, centroid4326: null, wktList: [], powierzchniaM2: 0,
+  };
+  diag.konektorWynik = await konektorGUS.pobierz(terenDiag);
 
   // 1) Wyszukanie jednostki (z filtrem poziomu i bez — miasta na prawach powiatu
   //    bywają na innym poziomie niż gmina, dlatego próbujemy obu wariantów).
