@@ -389,12 +389,17 @@ export default function NowaAnalizaPage() {
       {/* KROK 2 — ocena działki */}
       {krok === 2 && dane && (
         <div className="space-y-4">
-          <PodgladTerenu
-            mode={meta?.przylegajace === false ? "nonadjacent" : "ok"}
-            view="level2"
-            height={340}
-            layers={warstwyP2(dane, wynik?.poziom1.profilRekomendowany)}
-          />
+          <div className="grid lg:grid-cols-[minmax(0,430px)_1fr] gap-4 items-start">
+            <div className="lg:sticky" style={{ top: "var(--grunt-sticky-top)" }}>
+              <PodgladTerenu
+                mode={meta?.przylegajace === false ? "nonadjacent" : "ok"}
+                view="level2"
+                height={340}
+                layers={warstwyP2(dane, wynik?.poziom1.profilRekomendowany)}
+              />
+            </div>
+            <KompletnoscOceny p2={p2} />
+          </div>
           <Karta tytul="Poziom 2 — planistyka (A±)" podtytul="Uzupełnione automatycznie, profesjonalista koryguje wg wypisu (override)">
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <SelPole label="Status planistyczny" tryb="A±" k="statusPlanistyczny" p2={p2} setP2={setP2} orig={p2orig}
@@ -509,7 +514,7 @@ export default function NowaAnalizaPage() {
           {krok === 2 && (
             <>
               <SekcjaWynik numer="1" tytul="Poziom 1 (zaktualizowany)"><Poziom1View p1={wynik.poziom1} /></SekcjaWynik>
-              <SekcjaWynik numer="2" tytul="Wynik Poziomu 2 — model zabudowy"><Poziom2View p2={wynik.poziom2} /></SekcjaWynik>
+              <SekcjaWynik numer="2" tytul="Wynik Poziomu 2 — model zabudowy"><Poziom2View p2={wynik.poziom2} profilRek={wynik.poziom1.profilRekomendowany} /></SekcjaWynik>
             </>
           )}
           {krok === 3 && profilFin && <SekcjaWynik numer="3" tytul="Wynik Poziomu 3 — model finansowy"><Poziom3View p3={wynik.poziom3} /></SekcjaWynik>}
@@ -548,6 +553,46 @@ function warstwyP2(dane: DaneDzialki, profil?: string): WarstwyMapy {
     iso_m: profil === "mlodzi" || profil === "oba",
     iso_s: profil === "seniorzy" || profil === "oba",
   };
+}
+
+// Panel kompletności oceny — udział wypełnionych pól ręcznych (R/R?).
+function KompletnoscOceny({ p2 }: { p2: Record<string, string> }) {
+  const pola = [
+    { k: "wlasnoscKW", label: "Własność / KW / obciążenia" },
+    { k: "warunkiPrzylaczenia", label: "Warunki i koszt przyłączenia" },
+    { k: "geotechnika", label: "Geotechnika / nośność" },
+  ];
+  const wypelnione = pola.filter((p) => (p2[p.k] ?? "").trim() !== "").length;
+  const pct = Math.round((wypelnione / pola.length) * 100);
+  return (
+    <Karta
+      tytul="Pola ręczne — kompletność oceny"
+      prawy={<span className="mono text-[13px] font-semibold text-grunt-text">{wypelnione}/{pola.length} · {pct}%</span>}
+    >
+      <div className="h-2 bg-grunt-surface-3 rounded-full overflow-hidden mb-3">
+        <div className="h-full bg-grunt-ink rounded-full transition-all" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="grid sm:grid-cols-2 gap-2">
+        {pola.map((p) => {
+          const done = (p2[p.k] ?? "").trim() !== "";
+          return (
+            <div key={p.k} className="flex items-start gap-2 text-[12.5px]">
+              <span className={`mt-0.5 grid place-items-center w-4 h-4 rounded-full text-[10px] shrink-0 ${done ? "bg-grunt-green text-white" : "border border-grunt-border text-grunt-text-ghost"}`}>
+                {done ? "✓" : ""}
+              </span>
+              <div>
+                <div className="text-grunt-text-3">{p.label}</div>
+                <div className={done ? "text-grunt-text font-medium" : "text-grunt-amber-text2"}>{done ? p2[p.k] : "Do uzupełnienia"}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-[11px] text-grunt-text-faint2 mt-3">
+        Pola ręczne (R) nie blokują analizy — sygnalizują braki obniżające pewność. Uzupełnij je niżej.
+      </p>
+    </Karta>
+  );
 }
 
 // ── Pomocnicze konwersje ─────────────────────────────────────────────────────
