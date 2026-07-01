@@ -87,7 +87,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       pole: "natura2000",
       wersjaWms: "1.1.1",
       infoFormat: "application/json",
-      aktywny: true,
+      aktywny: false,
     },
     {
       klucz: "GDOS_OCHRONA",
@@ -98,7 +98,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       pole: "ochronaWykluczajaca",
       wersjaWms: "1.1.1",
       infoFormat: "application/json",
-      aktywny: true,
+      aktywny: false,
     },
     {
       klucz: "ISOK_POWODZ",
@@ -109,7 +109,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       pole: "ryzykoPowodzioweSzczegolne",
       wersjaWms: "1.1.1",
       infoFormat: "application/json",
-      aktywny: true,
+      aktywny: false,
     },
     {
       klucz: "PIG_SOPO",
@@ -120,7 +120,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       pole: "osuwisko",
       wersjaWms: "1.1.1",
       infoFormat: "application/json",
-      aktywny: true,
+      aktywny: false,
     },
     {
       klucz: "NID_ZABYTKI",
@@ -131,11 +131,11 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       pole: "strefaKonserwatorska",
       wersjaWms: "1.1.1",
       infoFormat: "application/json",
-      aktywny: true,
+      aktywny: false,
     },
   ],
   overpass: {
-    aktywny: true,
+    aktywny: false,
     // Kilka instancji — publiczny overpass-api.de bywa blokowany dla IP centrów
     // danych (np. Vercel); przy niepowodzeniu próbujemy kolejnej (mirror).
     endpointy: [
