@@ -215,3 +215,22 @@ textarea.inp { height: auto; padding: 0.5rem 0.7rem; }
   font-weight: 600;
 }
 .chip[data-limited="true"] { border-color: var(--grunt-amber); }
+
+/* ── Druk raportu (arkusz A4) ──────────────────────────────────────────────── */
+@media print {
+  body { background: #fff; }
+  /* Ukryj wszystko poza arkuszem raportu. */
+  body * { visibility: hidden; }
+  .raport-arkusz, .raport-arkusz * { visibility: visible; }
+  .raport-arkusz {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: 100%;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 0;
+  }
+  .brak-druku { display: none !important; }
+}

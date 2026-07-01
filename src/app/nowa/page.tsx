@@ -14,6 +14,7 @@ import { Poziom3View } from "@/components/Poziom3View";
 import { AnkietaFinansowa } from "@/components/AnkietaFinansowa";
 import { Stepper, BannerBramki } from "@/components/grunt";
 import { PodgladTerenu, type TrybMapy, type WarstwyMapy } from "@/components/GruntMap";
+import { RaportView } from "@/components/RaportView";
 import { liczba } from "@/lib/format";
 
 interface MetaRozw {
@@ -64,6 +65,8 @@ export default function NowaAnalizaPage() {
   const [p3, setP3] = useState<Record<string, string>>({});
   // Profil finansowy z ankiety (brama P3).
   const [profilFin, setProfilFin] = useState<ProfilFinansowy | null>(null);
+  // Raport (studium) — ekran końcowy.
+  const [pokazRaport, setPokazRaport] = useState(false);
 
   // ── Krok 1: identyfikacja → rozwiązanie → P1 ──────────────────────────────
   function patchPozycje(i: number, patch: Partial<PozycjaDzialki>) {
@@ -265,9 +268,11 @@ export default function NowaAnalizaPage() {
   const korektyP2 = Object.keys(p2).filter((k) => p2orig[k] !== undefined && p2[k] !== p2orig[k]);
 
   // Mapowanie kroku kreatora (1|2|3) na 5-krokowy stepper GRUNT (Wejście·P1·P2·P3·Raport).
-  const stepAktywny = krok === 1 ? (wynik ? 2 : 1) : krok === 2 ? 3 : 4;
-  const stepMax = !wynik ? 1 : krok >= 2 ? 4 : 3;
+  const stepAktywny = pokazRaport ? 5 : krok === 1 ? (wynik ? 2 : 1) : krok === 2 ? 3 : 4;
+  const stepMax = !wynik ? 1 : profilFin ? 5 : krok >= 2 ? 4 : 3;
   function nawigujStepper(nr: number) {
+    if (nr >= 5 && profilFin) { setPokazRaport(true); return; }
+    setPokazRaport(false);
     if (nr <= 2) setKrok(1);
     else if (nr === 3 && wynik) setKrok(2);
     else if (nr >= 4 && wynik && krok >= 2) setKrok(3);
@@ -297,6 +302,16 @@ export default function NowaAnalizaPage() {
         <Legenda />
       </div>
 
+      {pokazRaport && wynik ? (
+        <div className="space-y-4">
+          <div className="brak-druku flex justify-end gap-3">
+            <button onClick={() => window.print()} className="btn-primary" style={{ height: "var(--grunt-h-cta)" }}>↓ Pobierz PDF (drukuj)</button>
+            <button onClick={() => setPokazRaport(false)} className="btn-secondary" style={{ height: "var(--grunt-h-cta)" }}>← Wróć do analizy</button>
+          </div>
+          <RaportView wynik={wynik} data={new Date().toLocaleDateString("pl-PL")} />
+        </div>
+      ) : (
+      <>
       {blad && <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{blad}</p>}
 
       {/* KROK 1 — identyfikacja */}
@@ -537,8 +552,18 @@ export default function NowaAnalizaPage() {
                 akcjaLabel="Przejdź do ankiety i Poziomu 3"
               />
             )}
+            {krok === 3 && profilFin && (
+              <BannerBramki
+                tytul="Studium gotowe — wygeneruj raport"
+                opis="Drukowalne podsumowanie: werdykt przesiewu, pewność sekcji, model zabudowy i finansowy, prowenancja danych."
+                akcja={() => setPokazRaport(true)}
+                akcjaLabel="Otwórz studium (raport)"
+              />
+            )}
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );
