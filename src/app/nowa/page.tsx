@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { DaneDzialki, WynikAnalizy } from "@/lib/types";
+import type { ProfilFinansowy } from "@/lib/finanse/typy";
 import { domyslnaKonfiguracja, type Konfiguracja } from "@/lib/config";
 import { WOJEWODZTWA } from "@/lib/wojewodztwa";
 import type { PozycjaDzialki } from "@/lib/teryt";
@@ -10,6 +11,7 @@ import { Karta } from "@/components/ui";
 import { Poziom1View } from "@/components/Poziom1View";
 import { Poziom2View } from "@/components/Poziom2View";
 import { Poziom3View } from "@/components/Poziom3View";
+import { AnkietaFinansowa } from "@/components/AnkietaFinansowa";
 import { liczba } from "@/lib/format";
 
 interface MetaRozw {
@@ -58,6 +60,8 @@ export default function NowaAnalizaPage() {
   const [p2orig, setP2orig] = useState<Record<string, string>>({});
   // Override P3 — parametry reżimu/montażu.
   const [p3, setP3] = useState<Record<string, string>>({});
+  // Profil finansowy z ankiety (brama P3).
+  const [profilFin, setProfilFin] = useState<ProfilFinansowy | null>(null);
 
   // ── Krok 1: identyfikacja → rozwiązanie → P1 ──────────────────────────────
   function patchPozycje(i: number, patch: Partial<PozycjaDzialki>) {
@@ -133,11 +137,11 @@ export default function NowaAnalizaPage() {
     setLicze(false);
   }
 
-  async function przelicz(daneDoLiczenia: DaneDzialki, konfiguracja?: Partial<Konfiguracja>) {
+  async function przelicz(daneDoLiczenia: DaneDzialki, konfiguracja?: Partial<Konfiguracja>, profil?: ProfilFinansowy | null) {
     const r = await fetch("/api/analiza-adhoc", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dane: daneDoLiczenia, konfiguracja }),
+      body: JSON.stringify({ dane: daneDoLiczenia, konfiguracja, profilFinansowy: profil ?? undefined }),
     });
     const d = await r.json();
     if (!r.ok) {
@@ -222,8 +226,15 @@ export default function NowaAnalizaPage() {
     setKrok(3);
   }
 
-  async function przeliczP3() {
+  // Zatwierdzenie ankiety = brama P3: zapis profilu i przeliczenie z montażem.
+  async function zatwierdzAnkiete(profil: ProfilFinansowy) {
+    setProfilFin(profil);
+    await przeliczP3(profil);
+  }
+
+  async function przeliczP3(profilOverride?: ProfilFinansowy) {
     if (!dane) return;
+    const profil = profilOverride ?? profilFin;
     setLicze(true);
     const k = domyslnaKonfiguracja();
     const b = k.finanse.rezimy.B_program_2027;
@@ -245,7 +256,7 @@ export default function NowaAnalizaPage() {
       cenaGruntu: n(p3.cenaGruntu),
     };
     setDane(noweDane);
-    await przelicz(noweDane, k);
+    await przelicz(noweDane, k, profil);
     setLicze(false);
   }
 
@@ -417,8 +428,19 @@ export default function NowaAnalizaPage() {
         </div>
       )}
 
-      {/* KROK 3 — montaż finansowy */}
+      {/* KROK 3 — ankieta finansowa (brama) → montaż finansowy */}
       {krok === 3 && dane && (
+        <div className="space-y-4">
+          <AnkietaFinansowa onSubmit={zatwierdzAnkiete} licze={licze} />
+          {!profilFin && (
+            <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+              Wypełnij ankietę i zatwierdź profil — dopiero wtedy odsłonią się parametry montażu i wynik finansowy.
+            </p>
+          )}
+        </div>
+      )}
+
+      {krok === 3 && dane && profilFin && (
         <div className="space-y-4">
           <Karta tytul="Poziom 3 — parametry reżimu i montażu (A±)" podtytul="Bazowo z konfiguracji reżimu B (program 2027+); modyfikowalne dla scenariuszy">
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -444,7 +466,7 @@ export default function NowaAnalizaPage() {
           </Karta>
 
           <div className="flex gap-3">
-            <button onClick={przeliczP3} disabled={licze} className="bg-slate-900 text-white px-5 py-2.5 rounded-lg hover:bg-slate-700 disabled:opacity-50">
+            <button onClick={() => przeliczP3()} disabled={licze} className="bg-slate-900 text-white px-5 py-2.5 rounded-lg hover:bg-slate-700 disabled:opacity-50">
               {licze ? "Liczę…" : "Przelicz Poziom 3"}
             </button>
             <button onClick={() => setKrok(2)} className="border border-slate-300 px-4 py-2.5 rounded-lg hover:bg-slate-50 text-sm">← Poziom 2</button>
@@ -462,7 +484,7 @@ export default function NowaAnalizaPage() {
               <SekcjaWynik numer="2" tytul="Wynik Poziomu 2 — model zabudowy"><Poziom2View p2={wynik.poziom2} /></SekcjaWynik>
             </>
           )}
-          {krok === 3 && <SekcjaWynik numer="3" tytul="Wynik Poziomu 3 — model finansowy"><Poziom3View p3={wynik.poziom3} /></SekcjaWynik>}
+          {krok === 3 && profilFin && <SekcjaWynik numer="3" tytul="Wynik Poziomu 3 — model finansowy"><Poziom3View p3={wynik.poziom3} /></SekcjaWynik>}
 
           {/* Przejścia między poziomami */}
           <div className="flex gap-3 mt-4">
@@ -504,7 +526,7 @@ function Kroki({ krok, maPoziom2 }: { krok: number; maPoziom2: boolean }) {
   const etap = [
     { n: 1, t: "Identyfikacja" },
     { n: 2, t: "Ocena działki" },
-    { n: 3, t: "Model finansowy" },
+    { n: 3, t: "Ankieta + model finansowy" },
   ];
   return (
     <div className="flex gap-2 mt-4">

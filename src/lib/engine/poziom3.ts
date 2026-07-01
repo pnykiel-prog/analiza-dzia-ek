@@ -23,6 +23,32 @@ import type {
 import type { KonfiguracjaFinanse, ParametryRezimu } from "../config";
 import { KONFIG_FINANSE } from "../config";
 import { annuita, indeksuj } from "./utils";
+import type { AnalizaFinansowa, ProfilFinansowy } from "../finanse/typy";
+import { zlozMontaz } from "../finanse";
+
+/**
+ * Mapuje montaż z ankiety finansowej na parametry reżimu modelu P3 (grant %,
+ * udział kredytu, oprocentowanie, okres, partycypacja). Dla wartości `tbc`
+ * (przyszły reżim) bierze środek zakresu; ustawia flagę niepewności.
+ */
+function parametryRezimuZAnalizy(a: AnalizaFinansowa, bazowy: ParametryRezimu): ParametryRezimu {
+  const grant = a.montaz.find((m) => m.klucz === "grant");
+  const partyc = a.montaz.find((m) => m.klucz === "partycypacja");
+  const srodek = (z: { min: number; max: number }) => (z.min + z.max) / 2;
+  const k = a.kredyt;
+  return {
+    ...bazowy,
+    nazwa: `Montaż z ankiety — ${a.rezim === "current" ? "reżim obecny" : "reżim nowy"}`,
+    maxUdzialKredytuPct: k ? Math.round(k.maxUdzialCapexPct.max) : 0,
+    oprocentowanie: k ? srodek(k.oprocentowanie) : bazowy.oprocentowanie,
+    okresKredytuLata: k ? k.okresLat : bazowy.okresKredytuLata,
+    prowizjaPct: k?.prowizjaPct ?? bazowy.prowizjaPct,
+    maxGrantPct: grant ? Math.round(srodek(grant.udzialPct)) : 0,
+    maxPartycypacjaNajemcowPct: partyc ? Math.round(partyc.udzialPct.max) : 0,
+    flagaNiepewnosci: a.rezim === "future" || a.flagiTbc.length > 0,
+    opis: a.traktowanieGruntu,
+  };
+}
 
 function liczOsCzasu(cfg: KonfiguracjaFinanse): OsCzasu {
   const o = cfg.osCzasu;
@@ -187,16 +213,23 @@ function liczWrazliwosc(
 export function uruchomPoziom3(
   d: DaneDzialki,
   wariant: WariantZabudowy,
-  cfg: KonfiguracjaFinanse = KONFIG_FINANSE
+  cfg: KonfiguracjaFinanse = KONFIG_FINANSE,
+  profilFinansowy?: ProfilFinansowy
 ): WynikPoziom3 {
   const os = liczOsCzasu(cfg);
-  const rezimDom = cfg.rezimy[cfg.rezimDomyslny];
+
+  // Gdy przekazano profil z ankiety — montaż steruje parametrami reżimu bazowego.
+  const analizaFinansowa: AnalizaFinansowa | null = profilFinansowy ? zlozMontaz(profilFinansowy) : null;
+  const rezimDomKod: Rezim = analizaFinansowa ? (analizaFinansowa.rezim === "current" ? "A_SBC_2026" : "B_program_2027") : cfg.rezimDomyslny;
+  const rezimDom = analizaFinansowa
+    ? parametryRezimuZAnalizy(analizaFinansowa, cfg.rezimy[rezimDomKod])
+    : cfg.rezimy[cfg.rezimDomyslny];
 
   const konteksty: KontekstScenariusza[] = [
     {
       scenariusz: "konserwatywny",
       rezim: rezimDom,
-      rezimKod: cfg.rezimDomyslny,
+      rezimKod: rezimDomKod,
       mnoznikKosztu: cfg.scenariusze.konserwatywny.mnoznikKosztu,
       mnoznikWartOdtw: cfg.scenariusze.konserwatywny.mnoznikWartOdtw,
       mnoznikStopy: cfg.scenariusze.konserwatywny.mnoznikStopy,
@@ -204,7 +237,7 @@ export function uruchomPoziom3(
     {
       scenariusz: "oczekiwany",
       rezim: rezimDom,
-      rezimKod: cfg.rezimDomyslny,
+      rezimKod: rezimDomKod,
       mnoznikKosztu: cfg.scenariusze.oczekiwany.mnoznikKosztu,
       mnoznikWartOdtw: cfg.scenariusze.oczekiwany.mnoznikWartOdtw,
       mnoznikStopy: cfg.scenariusze.oczekiwany.mnoznikStopy,
@@ -224,25 +257,36 @@ export function uruchomPoziom3(
   const petlaZwrotna = !oczekiwany.domyka;
 
   const flagi: string[] = [];
+  if (analizaFinansowa?.zablokowana)
+    flagi.push(
+      `PROFIL ZABLOKOWANY: ${analizaFinansowa.ostrzezenia[0]} — model finansowy ma charakter poglądowy do czasu zmiany profilu.`
+    );
   if (rezimDom.flagaNiepewnosci)
-    flagi.push("Reżim B (program 2027+) — parametry orientacyjne, szczegóły rozporządzeń niepotwierdzone.");
+    flagi.push(
+      analizaFinansowa
+        ? `Reżim ${analizaFinansowa.rezim === "future" ? "nowy (2027+)" : "obecny"} — część parametrów orientacyjna (tbc), szczegóły rozporządzeń niepotwierdzone.`
+        : "Reżim B (program 2027+) — parametry orientacyjne, szczegóły rozporządzeń niepotwierdzone."
+    );
   if (petlaZwrotna)
     flagi.push("Program nie domyka się finansowo w scenariuszu oczekiwanym → pętla zwrotna do P2 po inny wariant zabudowy.");
   if (oczekiwany.czynszPrzekraczaPulap)
     flagi.push("Czynsz samofinansujący przekracza pułap SIM — domknięcie wymaga grantu/partycypacji.");
   if (d.czynszRynkowyM2 === null)
     flagi.push("Brak lokalnego czynszu rynkowego — odniesienie szacunkowe, obniżona pewność (najsłabsze ogniwo).");
+  // Ostrzeżenia z ankiety (montaż, grunt, reguły szczególne) — bez duplikatów.
+  if (analizaFinansowa) for (const o of analizaFinansowa.ostrzezenia) if (!flagi.includes(o)) flagi.push(o);
 
   const wrazliwosc = liczWrazliwosc(d, wariant, os, konteksty[1], cfg);
 
   return {
     dzialkaId: d.id,
     wariantNazwa: wariant.nazwa,
-    rezimDomyslny: cfg.rezimDomyslny,
+    rezimDomyslny: rezimDomKod,
     osCzasu: os,
     scenariusze,
     petlaZwrotna,
     wrazliwosc,
     flagi,
+    analizaFinansowa,
   };
 }

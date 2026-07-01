@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { uruchomAnalize } from "@/lib/engine";
 import { raportPokrycia } from "@/lib/data/service";
 import type { DaneDzialki } from "@/lib/types";
+import type { ProfilFinansowy } from "@/lib/finanse/typy";
 import type { Konfiguracja } from "@/lib/config";
 
 /**
@@ -9,7 +10,7 @@ import type { Konfiguracja } from "@/lib/config";
  * Nie zapisuje danych — liczy pipeline P1→P2→P3 na przesłanym obiekcie.
  */
 export async function POST(req: Request) {
-  let body: { dane?: Partial<DaneDzialki>; konfiguracja?: Partial<Konfiguracja> };
+  let body: { dane?: Partial<DaneDzialki>; konfiguracja?: Partial<Konfiguracja>; profilFinansowy?: ProfilFinansowy };
   try {
     body = await req.json();
   } catch {
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
   }
 
   const pelne = uzupelnijBraki(dane as DaneDzialki);
-  const wynik = uruchomAnalize(pelne, body?.konfiguracja);
+  const wynik = uruchomAnalize(pelne, body?.konfiguracja, body?.profilFinansowy);
   const pokrycie = raportPokrycia(pelne);
   return NextResponse.json({ ...wynik, pokrycie });
 }

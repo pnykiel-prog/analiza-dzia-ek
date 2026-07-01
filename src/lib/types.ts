@@ -11,6 +11,9 @@
  * nigdy nie zamienia braku na werdykt negatywny.
  */
 
+import type { AnalizaFinansowa } from "./finanse/typy";
+export type { AnalizaFinansowa };
+
 export type Profil = "mlodzi" | "seniorzy";
 export type ProfilRekomendowany = Profil | "oba" | "zaden";
 export type Werdykt = "zielony" | "zolty" | "czerwony";
@@ -284,6 +287,12 @@ export interface WynikPoziom3 {
   petlaZwrotna: boolean; // czy program nie domyka → powrót do P2
   wrazliwosc: WrazliwoscPozycja[];
   flagi: string[];
+  /**
+   * Analiza z ankiety finansowej (brama P3): dobrany montaż, dostępne instrumenty,
+   * traktowanie gruntu, ostrzeżenia, flagi `tbc` i porównanie reżimów. Obecna, gdy
+   * przekazano profil finansowy; `null` dla analizy bez ankiety (kompatybilność wstecz).
+   */
+  analizaFinansowa: AnalizaFinansowa | null;
 }
 
 // ────────────────────────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@
  */
 
 import type { DaneDzialki, WariantZabudowy, WynikAnalizy } from "../types";
+import type { ProfilFinansowy } from "../finanse/typy";
 import type { Konfiguracja } from "../config";
 import { KONFIG_FINANSE, KONFIG_SCORING, KONFIG_ZABUDOWA } from "../config";
 import { uruchomPoziom1 } from "./poziom1";
@@ -19,7 +20,11 @@ function wybierzWariantDoP3(warianty: WariantZabudowy[], profil: string): Warian
   return preferowany ?? warianty[0];
 }
 
-export function uruchomAnalize(dane: DaneDzialki, konfig?: Partial<Konfiguracja>): WynikAnalizy {
+export function uruchomAnalize(
+  dane: DaneDzialki,
+  konfig?: Partial<Konfiguracja>,
+  profilFinansowy?: ProfilFinansowy
+): WynikAnalizy {
   const cfgScoring = konfig?.scoring ?? KONFIG_SCORING;
   const cfgZabudowa = konfig?.zabudowa ?? KONFIG_ZABUDOWA;
   const cfgFinanse = konfig?.finanse ?? KONFIG_FINANSE;
@@ -27,7 +32,7 @@ export function uruchomAnalize(dane: DaneDzialki, konfig?: Partial<Konfiguracja>
   const poziom1 = uruchomPoziom1(dane, cfgScoring);
   const poziom2 = uruchomPoziom2(dane, poziom1, cfgZabudowa);
   const wariant = wybierzWariantDoP3(poziom2.warianty, poziom1.profilRekomendowany);
-  const poziom3 = uruchomPoziom3(dane, wariant, cfgFinanse);
+  const poziom3 = uruchomPoziom3(dane, wariant, cfgFinanse, profilFinansowy);
 
   return { dane, poziom1, poziom2, poziom3 };
 }
