@@ -30,6 +30,8 @@ export interface KonfiguracjaKonektorow {
     };
     /** Opcjonalne nadpisanie ID (pomija auto-dobór, gdy ustawione). */
     zmienneId: Partial<Record<keyof KonfiguracjaKonektorow["gus"]["zapytania"], string>>;
+    /** Krajowa mediana odniesienia udziału 20–39 lat [%] — baza porównania grupy „młodzi". */
+    medianaWiek2039Pct: number;
   };
   kimpzp: { aktywny: boolean; endpoint: string; warstwy: string; infoFormat: string };
   /** Generyczne konektory „obecność obiektu w punkcie" (WMS GetFeatureInfo) → bramki. */
@@ -68,6 +70,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       saldoMigracji: "saldo migracji",
     },
     zmienneId: {},
+    medianaWiek2039Pct: 25,
   },
   kimpzp: {
     aktywny: true,
