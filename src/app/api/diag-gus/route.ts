@@ -161,17 +161,54 @@ export async function GET(req: Request) {
     return wynik;
   };
 
+  // Wartość zmiennej dla wybranej jednostki (do weryfikacji ID „na żywo").
+  const wartoscDla = async (varId: string): Promise<number | null> => {
+    if (!jednostka) return null;
+    const raw = await fetchTekst(url(`data/by-unit/${encodeURIComponent(jednostka.id)}`, { "var-id": varId, year: String(gus.rok) }), { ...siec, naglowki });
+    if (!raw) return null;
+    try {
+      return wartoscZmiennej(JSON.parse(raw), gus.rok);
+    } catch {
+      return null;
+    }
+  };
+
+  // Sonda „rodzeństwa" zmiennej: z ID znanej zmiennej (seed) → jej temat → wszystkie
+  // zmienne tematu WRAZ z wartościami dla jednostki. Autorytatywnie odkrywa komplet
+  // (np. ekonomiczne grupy wieku: ogółem/przed-/produkcyjny/poprodukcyjny).
+  const sondaRodzenstwa = async (seed: string) => {
+    const metaRaw = await fetchTekst(url(`variables/${encodeURIComponent(seed)}`, {}), { ...siec, naglowki });
+    let subjectId: string | null = null;
+    let nazwaSeed = "";
+    if (metaRaw) {
+      try {
+        const m = JSON.parse(metaRaw) as { subjectId?: string; n1?: string; n2?: string; n3?: string };
+        subjectId = m.subjectId ?? null;
+        nazwaSeed = [m.n1, m.n2, m.n3].filter(Boolean).join(" · ");
+      } catch { /* ignore */ }
+    }
+    if (!subjectId) return { seed, nazwaSeed, subjectId: null, zmienne: [] as unknown[] };
+    const zmienne = listaZmiennych(await fetchTekst(url("variables", { "subject-id": subjectId }), { ...siec, naglowki }));
+    const zWart = [];
+    for (const z of zmienne) zWart.push({ ...z, wartosc: await wartoscDla(z.id) });
+    return { seed, nazwaSeed, subjectId, zmienne: zWart };
+  };
+
   const vars = u.searchParams.get("vars"); // subject-id → lista zmiennych tematu
   const szukaj = u.searchParams.get("szukaj");
+  const seed = u.searchParams.get("seed");
   if (vars) {
     diag.vars = { subjectId: vars, zmienne: listaZmiennych(await fetchTekst(url("variables", { "subject-id": vars }), { ...siec, naglowki })) };
+  } else if (seed) {
+    diag.sonda = await sondaRodzenstwa(seed);
   } else if (szukaj) {
     diag.szukaj = await szukajFraz(szukaj);
   } else {
-    // Domyślnie zwracamy OBA: katalog tematów (autorytatywny) i kandydatów po frazie.
-    diag.katalog = await zbudujKatalog();
+    // Sonda rodzeństwa dla znanej zmiennej „ludność w wieku produkcyjnym" (1727911)
+    // → autorytatywnie odkrywa komplet ekonomicznych grup wieku + ludność ogółem, z wartościami.
+    diag.grupyWieku = await sondaRodzenstwa("1727911");
     diag.kandydaci = await Promise.all(
-      ["ludność w wieku poprodukcyjnym", "ludność w wieku produkcyjnym", "bezrobotni"].map(szukajFraz)
+      ["stopa bezrobocia rejestrowanego", "udział bezrobotnych zarejestrowanych", "bezrobotni zarejestrowani"].map(szukajFraz)
     );
   }
 
