@@ -112,7 +112,7 @@ export async function GET(req: Request) {
     if (!surowa) return [];
     try {
       const wyniki = (JSON.parse(surowa) as { results?: Record<string, unknown>[] })?.results ?? [];
-      return wyniki.slice(0, 12).map((r) => ({
+      return wyniki.slice(0, 140).map((r) => ({
         id: String(r.id),
         nazwa: [r.n1, r.n2, r.n3].filter(Boolean).join(" · "),
         jednostka: (r.measureUnitName as string) ?? undefined,
@@ -189,8 +189,11 @@ export async function GET(req: Request) {
     }
     if (!subjectId) return { seed, nazwaSeed, subjectId: null, zmienne: [] as unknown[] };
     const zmienne = listaZmiennych(await fetchTekst(url("variables", { "subject-id": subjectId }), { ...siec, naglowki }));
+    // Wartości tylko dla pierwszych 20 (limit czasu funkcji); reszta = same id + nazwa.
     const zWart = [];
-    for (const z of zmienne) zWart.push({ ...z, wartosc: await wartoscDla(z.id) });
+    for (let i = 0; i < zmienne.length; i++) {
+      zWart.push({ ...zmienne[i], wartosc: i < 20 ? await wartoscDla(zmienne[i].id) : null });
+    }
     return { seed, nazwaSeed, subjectId, zmienne: zWart };
   };
 
