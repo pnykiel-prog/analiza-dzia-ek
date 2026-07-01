@@ -7,11 +7,13 @@
  */
 
 import type {
+  BrakDanych,
   DaneDzialki,
   KluczoweLiczby,
   Profil,
   ProfilRekomendowany,
   StatusBramki,
+  Sygnal,
   Werdykt,
   WynikBramki,
   WynikMetryki,
@@ -422,6 +424,67 @@ function profilRekomendowany(
   return scoreM >= scoreS ? "mlodzi" : "seniorzy";
 }
 
+// ── Flagi/sygnały + realne białe plamy (panele wyniku P1) ───────────────────
+
+/** Flagi i sygnały: ostrzeżenia z bramek + pozytywy z dostępności/rynku. */
+function liczSygnaly(d: DaneDzialki, szczegoly: WynikBramki[], cfg: KonfiguracjaScoring): Sygnal[] {
+  const s: Sygnal[] = [];
+  for (const b of szczegoly) {
+    if (b.status === "fail" || b.status === "warunkowo") s.push({ tekst: b.nazwa, ton: "ostrzezenie" });
+  }
+  const poz = (w: boolean | null, tekst: string) => {
+    if (w === true) s.push({ tekst, ton: "pozytyw" });
+  };
+  poz(d.przystanekZCzestotliwoscia, "Przystanek z sensowną częstotliwością (≤800 m)");
+  poz(d.zlobkiSzkolyWZasiegu, "Szkoła / żłobek w zasięgu");
+  poz(d.pozWZasiegu, "POZ w zasięgu");
+  poz(d.uslugiPodstawowePieszo, "Usługi podstawowe pieszo");
+  poz(d.zabudowaMieszkaniowaWSasiedztwie, "Zabudowa mieszkaniowa w sąsiedztwie");
+  const luka = lukaPctZDanych(d, cfg);
+  if (luka !== null && luka >= 30) s.push({ tekst: `Wysoka luka cenowa (${Math.round(luka)}%) — realny popyt na najem społeczny`, ton: "pozytyw" });
+  return s;
+}
+
+/**
+ * Realne białe plamy — czego aplikacja faktycznie nie pobrała dla tej działki.
+ * Źródła: brak MPZP, bramki „do weryfikacji" (warstwy niepodłączone/bez danych),
+ * brak czynszu rynkowego oraz pozostałe metryki na fallbacku (biała plama).
+ */
+function liczBraki(d: DaneDzialki, wymiary: WynikWymiaru[], szczegoly: WynikBramki[]): BrakDanych[] {
+  const braki: BrakDanych[] = [];
+  const ujete = new Set<string>();
+
+  if (d.statusPlanistyczny === "brak_danych") {
+    braki.push({
+      tytul: "MPZP / Studium uwarunkowań",
+      opis: `Brak cyfrowego planu dla obrębu ${d.gmina || "—"}`,
+      wplyw: "pewność przeznaczenia obniżona (fallback z sąsiedztwa)",
+    });
+    ujete.add("Status planistyczny");
+  }
+  if (d.czynszRynkowyM2 === null) {
+    braki.push({
+      tytul: "Rynek najmu (czynsze długoterminowe)",
+      opis: "Brak ofert długoterminowych w zasięgu drabiny przestrzennej",
+      wplyw: "luka cenowa i popyt zewnętrzny szacunkowe",
+    });
+    ujete.add("Luka najemcy (czynsz rynkowy vs pułap SIM)");
+    ujete.add("Luka cenowa (czynsz vs pułap)");
+  }
+  // Warstwy, których źródła nie są podłączone / bez danych (bramki „do weryfikacji").
+  for (const b of szczegoly)
+    if (b.status === "do_weryfikacji")
+      braki.push({ tytul: b.nazwa, opis: `${b.zrodlo} — źródło niepodłączone lub brak danych`, wplyw: "bramka: do weryfikacji (nie wyklucza)" });
+
+  // Pozostałe białe plamy w metrykach (unikalne, poza już ujętymi).
+  const fallbacki = new Set<string>();
+  for (const w of wymiary) for (const m of w.metryki) if (m.fallback) fallbacki.add(m.nazwa);
+  for (const nazwa of fallbacki)
+    if (!ujete.has(nazwa)) braki.push({ tytul: nazwa, opis: "Biała plama — brak danych wejściowych", wplyw: "obniża pewność analizy" });
+
+  return braki;
+}
+
 export function uruchomPoziom1(d: DaneDzialki, cfg: KonfiguracjaScoring = KONFIG_SCORING): WynikPoziom1 {
   const { szczegoly, flagi: flagiBramek } = liczBramki(d);
   const statusBramek = agregujBramki(szczegoly);
@@ -470,6 +533,9 @@ export function uruchomPoziom1(d: DaneDzialki, cfg: KonfiguracjaScoring = KONFIG
     profil === "seniorzy" ? popyt.seniorzy.flagi : profil === "oba" ? [...popyt.mlodzi.flagi, ...popyt.seniorzy.flagi] : popyt.mlodzi.flagi;
   const flagi = [...new Set([...flagiBramek, ...flagiW5, ...flagiPopytu])];
 
+  const sygnaly = liczSygnaly(d, szczegoly, cfg);
+  const braki = liczBraki(d, wymiary, szczegoly);
+
   return {
     dzialkaId: d.id,
     bramki: { status: statusBramek, flagi: flagiBramek, szczegoly },
@@ -484,5 +550,7 @@ export function uruchomPoziom1(d: DaneDzialki, cfg: KonfiguracjaScoring = KONFIG
     kluczoweLiczby: kluczowe,
     flagi,
     popyt,
+    sygnaly,
+    braki,
   };
 }
