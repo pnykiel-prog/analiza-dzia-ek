@@ -234,6 +234,17 @@ export async function GET(req: Request) {
     diag.weryfikacja = weryfikacja;
     // Sonda rodzeństwa z seed 72305 → komplet zmiennych tematu „ludność wg ekonomicznych grup wieku" z wartościami.
     diag.grupyWieku = await sondaRodzenstwa("72305");
+
+    // Probe ZBIORCZY — dokładnie jak w konektorze (jedno data/by-unit z wieloma var-id).
+    // Potwierdza kształt odpowiedzi multi-var i że limit BDL nie blokuje jednego zapytania.
+    if (jednostka) {
+      const ids = ["72305", "72310", "72311", "72312", "72313", "60530", "1365234"];
+      const qs = new URLSearchParams({ format: "json", year: String(gus.rok) });
+      ids.forEach((id) => qs.append("var-id", id));
+      const zbUrl = `${gus.endpoint}/data/by-unit/${encodeURIComponent(jednostka.id)}?${qs.toString()}`;
+      const raw = await fetchTekst(zbUrl, { ...siec, naglowki });
+      diag.zbiorczy = { url: zbUrl, osiagalny: raw !== null, surowaOdpowiedzSkrot: raw?.slice(0, 900) ?? null };
+    }
   }
 
   // Podsumowanie diagnostyczne — jednoznaczna przyczyna.

@@ -65,37 +65,25 @@ function naglowki(): Record<string, string> {
   return gus.clientId ? { "X-ClientId": gus.clientId } : {};
 }
 
-type KluczZmiennej = keyof typeof gus.zapytania;
-
-/** Cache wykrytych ID zmiennych (BDL var-id się nie zmienia) — w obrębie instancji serwera. */
-const cacheId = new Map<KluczZmiennej, string | null>();
-
-/** Znajduje ID zmiennej: nadpisanie z konfiguracji albo auto-dobór z BDL (z cache). */
-async function idZmiennej(klucz: KluczZmiennej): Promise<string | null> {
-  const override = gus.zmienneId[klucz];
-  if (override) return override;
-  if (cacheId.has(klucz)) return cacheId.get(klucz)!;
-  const fraza = gus.zapytania[klucz];
-  if (!fraza) return null;
-  const odp = await fetchJson(url("variables/search", { name: fraza }), { ...KONFIG_KONEKTORY.siec, naglowki: naglowki() });
-  const id = pierwszaZmienna(odp);
-  cacheId.set(klucz, id);
-  return id;
-}
-
-async function wartosc(unitId: string, klucz: KluczZmiennej): Promise<number | null> {
-  const varId = await idZmiennej(klucz);
-  if (!varId) return null;
-  return wartoscId(unitId, varId);
-}
-
-/** Wartość zmiennej BDL po jawnym ID (data/by-unit/{unitId}?var-id=…). */
-async function wartoscId(unitId: string, varId: string): Promise<number | null> {
-  const odp = await fetchJson(url(`data/by-unit/${encodeURIComponent(unitId)}`, { "var-id": varId, year: String(gus.rok) }), {
-    ...KONFIG_KONEKTORY.siec,
-    naglowki: naglowki(),
-  });
-  return wartoscZmiennej(odp, gus.rok);
+/**
+ * Wartości WIELU zmiennych w JEDNYM zapytaniu (data/by-unit z powtórzonym `var-id`).
+ * Krytyczne dla limitów BDL: bez X-ClientId równoległe pojedyncze zapytania są
+ * odrzucane (429) — jedno zbiorcze omija limit i mieści się w czasie funkcji.
+ */
+async function wartosciWielu(unitId: string, varIds: string[]): Promise<Map<string, number | null>> {
+  const qs = new URLSearchParams({ format: "json", year: String(gus.rok) });
+  for (const id of varIds) qs.append("var-id", id);
+  const odp = await fetchJson<{ results?: { id?: string | number; values?: { year?: string | number; val?: number }[] }[] }>(
+    `${gus.endpoint}/data/by-unit/${encodeURIComponent(unitId)}?${qs.toString()}`,
+    { ...KONFIG_KONEKTORY.siec, naglowki: naglowki() }
+  );
+  const map = new Map<string, number | null>();
+  for (const r of odp?.results ?? []) {
+    const vals = r.values ?? [];
+    const dop = vals.find((v) => Number(v.year) === gus.rok) ?? [...vals].sort((a, b) => Number(b.year) - Number(a.year))[0];
+    map.set(String(r.id), typeof dop?.val === "number" ? dop.val : null);
+  }
+  return map;
 }
 
 /**
@@ -146,15 +134,25 @@ export const konektorGUS: Konektor = {
       meta.push({ pole, zrodlo: this.zrodlo, czas, pewnosc, status: "ok", tryb: "A" });
     };
 
-    // Demografia z pasm wieku (P2137, kolumna „· ogółem") + wskaźniki po ID.
-    const u = jednostka.id;
-    const [ogolem, pasma0_64, pasma20_39, podmioty, saldo] = await Promise.all([
-      wartoscId(u, P2137_OGOLEM_TOTAL),
-      Promise.all(PASMA_0_64.map((id) => wartoscId(u, id))).then(sumaPasm),
-      Promise.all(PASMA_20_39.map((id) => wartoscId(u, id))).then(sumaPasm),
-      wartosc(u, "podmiotyNa10k"),
-      wartosc(u, "saldoMigracji"),
-    ]);
+    // Demografia z pasm wieku (P2137, kolumna „· ogółem") + wskaźniki — JEDNO zapytanie
+    // zbiorcze (limity BDL: równoległe pojedyncze zapytania bywają odrzucane bez X-ClientId).
+    const idPodmioty = gus.zmienneId.podmiotyNa10k ?? "60530";
+    const idSaldo = gus.zmienneId.saldoMigracji ?? "1365234";
+    const potrzebne = [...new Set([P2137_OGOLEM_TOTAL, ...PASMA_0_64, ...PASMA_20_39, idPodmioty, idSaldo])];
+    const m = await wartosciWielu(jednostka.id, potrzebne);
+    if ([...m.values()].every((v) => v === null)) {
+      return brakWyniku(
+        this.klucz,
+        this.zrodlo,
+        czas,
+        `Jednostka „${jednostka.name}" (id ${jednostka.id}) znaleziona, ale zbiorcze data/by-unit nie zwróciło wartości (limit BDL/rok ${gus.rok}?). Diagnostyka: /api/diag-gus?gmina=${encodeURIComponent(teren.gmina)}.`
+      );
+    }
+    const ogolem = m.get(P2137_OGOLEM_TOTAL) ?? null;
+    const pasma0_64 = sumaPasm(PASMA_0_64.map((id) => m.get(id) ?? null));
+    const pasma20_39 = sumaPasm(PASMA_20_39.map((id) => m.get(id) ?? null));
+    const podmioty = m.get(idPodmioty) ?? null;
+    const saldo = m.get(idSaldo) ?? null;
 
     if (ogolem && ogolem > 0) {
       // 65+ = ogółem − (0–64); udział 20–39 z sumy pasm. „Brak danych ≠ nie" — gdy pasma niepełne, pomijamy.
