@@ -116,8 +116,12 @@ function zakresWieku(band: string): [number, number] | null {
   return null; // „ogółem" itp.
 }
 
+/** Cache listy pasm (definicja zmiennych P2137 jest stała) — 1 zapytanie na instancję, nie na analizę. */
+let cachePasma: PasmoWieku[] | null = null;
+
 /** Lista pasm wieku (kolumna „· ogółem") tematu P2137 — samodobór z katalogu (bez zgadywania ID). */
 async function pasmaWiekuOgolem(): Promise<PasmoWieku[]> {
+  if (cachePasma && cachePasma.length > 0) return cachePasma;
   const odp = await fetchJson<{ results?: { id?: number | string; n1?: string; n2?: string; n3?: string }[] }>(
     url("variables", { "subject-id": TEMAT_GRUPY_WIEKU, "page-size": "100" }),
     { ...KONFIG_KONEKTORY.siec, naglowki: naglowki() }
@@ -129,6 +133,7 @@ async function pasmaWiekuOgolem(): Promise<PasmoWieku[]> {
     const zakres = zakresWieku(czesci[0] ?? "");
     if (zakres) out.push({ id: String(r.id), lo: zakres[0], hi: zakres[1] });
   }
+  if (out.length > 0) cachePasma = out;
   return out;
 }
 
