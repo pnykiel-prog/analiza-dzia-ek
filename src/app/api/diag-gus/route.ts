@@ -204,12 +204,33 @@ export async function GET(req: Request) {
   } else if (szukaj) {
     diag.szukaj = await szukajFraz(szukaj);
   } else {
-    // Sonda rodzeństwa dla znanej zmiennej „ludność w wieku produkcyjnym" (1727911)
-    // → autorytatywnie odkrywa komplet ekonomicznych grup wieku + ludność ogółem, z wartościami.
-    diag.grupyWieku = await sondaRodzenstwa("1727911");
-    diag.kandydaci = await Promise.all(
-      ["stopa bezrobocia rejestrowanego", "udział bezrobotnych zarejestrowanych", "bezrobotni zarejestrowani"].map(szukajFraz)
-    );
+    // Weryfikacja „na żywo" hipotetycznych ID (kanoniczne zmienne BDL) — pobiera wartość
+    // dla jednostki, by potwierdzić poprawność bez zgadywania. Nazwy z metadanych zmiennej.
+    const nazwaZmiennej = async (id: string): Promise<string> => {
+      const raw = await fetchTekst(url(`variables/${encodeURIComponent(id)}`, {}), { ...siec, naglowki });
+      if (!raw) return "";
+      try {
+        const m = JSON.parse(raw) as { n1?: string; n2?: string; n3?: string };
+        return [m.n1, m.n2, m.n3].filter(Boolean).join(" · ");
+      } catch {
+        return "";
+      }
+    };
+    const KANDYDACI_ID: Record<string, string> = {
+      ludnoscOgolem_72305: "72305",
+      przedprodukcyjny_72300: "72300",
+      produkcyjny_72301: "72301",
+      poprodukcyjny_72302: "72302",
+      stopaBezrobocia_czerwiec_461685: "461685",
+      stopaBezrobocia_grudzien_461691: "461691",
+    };
+    const weryfikacja: Record<string, { id: string; nazwa: string; wartosc: number | null }> = {};
+    for (const [klucz, id] of Object.entries(KANDYDACI_ID)) {
+      weryfikacja[klucz] = { id, nazwa: await nazwaZmiennej(id), wartosc: await wartoscDla(id) };
+    }
+    diag.weryfikacja = weryfikacja;
+    // Sonda rodzeństwa z seed 72305 → komplet zmiennych tematu „ludność wg ekonomicznych grup wieku" z wartościami.
+    diag.grupyWieku = await sondaRodzenstwa("72305");
   }
 
   // Podsumowanie diagnostyczne — jednoznaczna przyczyna.
