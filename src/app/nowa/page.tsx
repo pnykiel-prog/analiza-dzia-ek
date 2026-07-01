@@ -12,7 +12,8 @@ import { Poziom1View } from "@/components/Poziom1View";
 import { Poziom2View } from "@/components/Poziom2View";
 import { Poziom3View } from "@/components/Poziom3View";
 import { AnkietaFinansowa } from "@/components/AnkietaFinansowa";
-import { Stepper, BannerBramki } from "@/components/grunt";
+import { Stepper, BannerBramki, Chip } from "@/components/grunt";
+import { SYMBOLE_MPZP, statusZeSymbolu } from "@/lib/mpzp";
 import { PodgladTerenu, type TrybMapy, type WarstwyMapy } from "@/components/GruntMap";
 import { RaportView } from "@/components/RaportView";
 import { liczba } from "@/lib/format";
@@ -63,6 +64,9 @@ export default function NowaAnalizaPage() {
   const [licze, setLicze] = useState(false);
   const [recznaPow, setRecznaPow] = useState("");
   const [trybWejscia, setTrybWejscia] = useState<"kaskada" | "id">("id");
+  // Deklaracja MPZP przez wypełniającego (ekran wejścia).
+  const [mpzpIstnieje, setMpzpIstnieje] = useState<"" | "tak" | "nie">("");
+  const [mpzpSymbol, setMpzpSymbol] = useState("");
 
   // Override P2 (A±/R) — wartości jako stringi + zbiór skorygowanych pól.
   const [p2, setP2] = useState<Record<string, string>>({});
@@ -89,6 +93,17 @@ export default function NowaAnalizaPage() {
     setPozycje((ps) => (ps.length > 1 ? ps.filter((_, idx) => idx !== i) : ps));
   }
 
+  // Nakłada deklarację MPZP wypełniającego na dane działki (przed analizą P1).
+  function zastosujMpzp(d: DaneDzialki | null): DaneDzialki | null {
+    if (!d) return d;
+    if (mpzpIstnieje === "tak" && mpzpSymbol) {
+      const { status, sprzeczne } = statusZeSymbolu(mpzpSymbol);
+      return { ...d, statusPlanistyczny: status, przeznaczenieSprzeczneZMieszkaniowa: sprzeczne, mpzpZadeklarowany: true };
+    }
+    if (mpzpIstnieje === "nie") return { ...d, przeznaczenieSprzeczneZMieszkaniowa: false, mpzpZadeklarowany: true };
+    return d;
+  }
+
   async function analizujP1(e: React.FormEvent) {
     e.preventDefault();
     setBlad(null);
@@ -110,14 +125,15 @@ export default function NowaAnalizaPage() {
         setBlad(d.blad ?? "Błąd pobierania danych.");
         return;
       }
-      setDane(d.dane);
+      const dm = zastosujMpzp(d.dane);
+      setDane(dm);
       setMeta(d.meta);
       setMediana(d.medianaRegionalna);
       setRecznaPow("");
       // Jeśli pobrano geometrię (działka w ULDK) — liczymy i przechodzimy do wyniku P1.
       // W przeciwnym razie zostajemy na ekranie wejścia (ręczne podanie powierzchni).
-      if (d.dane && d.dane.powierzchniaM2 > 0) {
-        await przelicz(d.dane);
+      if (dm && dm.powierzchniaM2 > 0) {
+        await przelicz(dm);
         setEkran("poziom1");
         setMaxKrok((m) => Math.max(m, 3));
       } else {
@@ -140,7 +156,7 @@ export default function NowaAnalizaPage() {
     }
     setBlad(null);
     setLicze(true);
-    const noweDane = { ...dane, powierzchniaM2: pow };
+    const noweDane = zastosujMpzp({ ...dane, powierzchniaM2: pow })!;
     setDane(noweDane);
     await przelicz(noweDane);
     setEkran("poziom1");
@@ -385,7 +401,49 @@ export default function NowaAnalizaPage() {
               pre-wypełniają kolejne. Tylko numer jest wymagany dla każdej kolejnej pozycji.
             </p>
           </Karta>
-          <button type="submit" disabled={licze} className="btn-primary" style={{ height: "var(--grunt-h-cta)" }}>
+
+          {/* MPZP — deklaracja wypełniającego (pod wprowadzonymi działkami) */}
+          <Karta
+            tytul="Plan miejscowy (MPZP)"
+            podtytul="Czy dla wprowadzonych działek obowiązuje MPZP? Deklaracja zastępuje automatyczne pobranie na tym etapie i wystarcza do Poziomu 1."
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[12px] text-grunt-text-muted2 mr-1">Czy istnieje MPZP?</span>
+              <Chip selected={mpzpIstnieje === "tak"} onClick={() => setMpzpIstnieje("tak")}>Tak</Chip>
+              <Chip selected={mpzpIstnieje === "nie"} onClick={() => setMpzpIstnieje("nie")}>Nie</Chip>
+            </div>
+
+            {mpzpIstnieje === "tak" && (
+              <label className="text-sm block mt-3 max-w-md">
+                <span className="text-[11px] font-medium text-grunt-text-muted2">Symbol przeznaczenia z MPZP</span>
+                <select value={mpzpSymbol} onChange={(e) => setMpzpSymbol(e.target.value)} className="inp bg-white mt-1">
+                  <option value="">— wybierz symbol —</option>
+                  {SYMBOLE_MPZP.map((sm) => (
+                    <option key={sm.symbol} value={sm.symbol}>{sm.symbol} — {sm.opis}</option>
+                  ))}
+                </select>
+                {mpzpSymbol && (
+                  <span className={`text-[11px] mt-1 block ${statusZeSymbolu(mpzpSymbol).sprzeczne ? "text-grunt-red" : "text-grunt-green"}`}>
+                    {statusZeSymbolu(mpzpSymbol).sprzeczne
+                      ? "Przeznaczenie sprzeczne z funkcją mieszkaniową — twarde wykluczenie w bramkach."
+                      : "MPZP mieszkaniowy — zgodny z zabudową społeczną."}
+                  </span>
+                )}
+              </label>
+            )}
+            {mpzpIstnieje === "nie" && (
+              <p className="text-[11px] text-grunt-text-faint2 mt-2">
+                Brak MPZP — Poziom 1 użyje sąsiedztwa jako odniesienia; alert o braku planu nie będzie pokazywany.
+              </p>
+            )}
+            {mpzpIstnieje === "" && (
+              <p className="text-[11px] text-grunt-text-faint2 mt-2">
+                Bez odpowiedzi — jeśli plan jest w danych automatycznych, użyjemy go; w przeciwnym razie pojawi się biała plama MPZP.
+              </p>
+            )}
+          </Karta>
+
+          <button type="submit" disabled={licze || (mpzpIstnieje === "tak" && !mpzpSymbol)} className="btn-primary" style={{ height: "var(--grunt-h-cta)" }}>
             {licze ? "Pobieram dane i liczę…" : "Pobierz dane i analizuj (Poziom 1)"}
           </button>
         </form>

@@ -440,6 +440,8 @@ function liczSygnaly(d: DaneDzialki, szczegoly: WynikBramki[], cfg: Konfiguracja
   poz(d.pozWZasiegu, "POZ w zasięgu");
   poz(d.uslugiPodstawowePieszo, "Usługi podstawowe pieszo");
   poz(d.zabudowaMieszkaniowaWSasiedztwie, "Zabudowa mieszkaniowa w sąsiedztwie");
+  if (d.statusPlanistyczny === "brak_danych" && d.mpzpZadeklarowany !== true)
+    s.push({ tekst: "Brak MPZP — biała plama planistyczna", ton: "ostrzezenie" });
   const luka = lukaPctZDanych(d, cfg);
   if (luka !== null && luka >= 30) s.push({ tekst: `Wysoka luka cenowa (${Math.round(luka)}%) — realny popyt na najem społeczny`, ton: "pozytyw" });
   return s;
@@ -454,7 +456,7 @@ function liczBraki(d: DaneDzialki, wymiary: WynikWymiaru[], szczegoly: WynikBram
   const braki: BrakDanych[] = [];
   const ujete = new Set<string>();
 
-  if (d.statusPlanistyczny === "brak_danych") {
+  if (d.statusPlanistyczny === "brak_danych" && d.mpzpZadeklarowany !== true) {
     braki.push({
       tytul: "MPZP / Studium uwarunkowań",
       opis: `Brak cyfrowego planu dla obrębu ${d.gmina || "—"}`,
@@ -462,6 +464,8 @@ function liczBraki(d: DaneDzialki, wymiary: WynikWymiaru[], szczegoly: WynikBram
     });
     ujete.add("Status planistyczny");
   }
+  // Deklaracja MPZP „zamyka" pytanie planistyczne — nie raportujemy metryki statusu jako braku.
+  if (d.mpzpZadeklarowany === true) ujete.add("Status planistyczny");
   if (d.czynszRynkowyM2 === null) {
     braki.push({
       tytul: "Rynek najmu (czynsze długoterminowe)",
