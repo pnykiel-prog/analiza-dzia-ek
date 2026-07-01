@@ -188,7 +188,8 @@ export async function GET(req: Request) {
       } catch { /* ignore */ }
     }
     if (!subjectId) return { seed, nazwaSeed, subjectId: null, zmienne: [] as unknown[] };
-    const zmienne = listaZmiennych(await fetchTekst(url("variables", { "subject-id": subjectId }), { ...siec, naglowki }));
+    // page-size=100: BDL domyślnie stronicuje po 10 — bez tego widzimy tylko część pasm wieku.
+    const zmienne = listaZmiennych(await fetchTekst(url("variables", { "subject-id": subjectId, "page-size": "100" }), { ...siec, naglowki }));
     // Wartości tylko dla pierwszych 20 (limit czasu funkcji); reszta = same id + nazwa.
     const zWart = [];
     for (let i = 0; i < zmienne.length; i++) {

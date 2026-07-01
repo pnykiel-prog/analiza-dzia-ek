@@ -71,36 +71,77 @@ function naglowki(): Record<string, string> {
  * odrzucane (429) — jedno zbiorcze omija limit i mieści się w czasie funkcji.
  */
 async function wartosciWielu(unitId: string, varIds: string[]): Promise<Map<string, number | null>> {
-  const qs = new URLSearchParams({ format: "json", year: String(gus.rok) });
-  for (const id of varIds) qs.append("var-id", id);
-  const odp = await fetchJson<{ results?: { id?: string | number; values?: { year?: string | number; val?: number }[] }[] }>(
-    `${gus.endpoint}/data/by-unit/${encodeURIComponent(unitId)}?${qs.toString()}`,
-    { ...KONFIG_KONEKTORY.siec, naglowki: naglowki() }
-  );
   const map = new Map<string, number | null>();
-  for (const r of odp?.results ?? []) {
-    const vals = r.values ?? [];
-    const dop = vals.find((v) => Number(v.year) === gus.rok) ?? [...vals].sort((a, b) => Number(b.year) - Number(a.year))[0];
-    map.set(String(r.id), typeof dop?.val === "number" ? dop.val : null);
+  // BDL ogranicza liczbę var-id na zapytanie — dzielimy na paczki (sekwencyjnie, bez serii równoległych).
+  const ROZMIAR_PACZKI = 12;
+  for (let i = 0; i < varIds.length; i += ROZMIAR_PACZKI) {
+    const paczka = varIds.slice(i, i + ROZMIAR_PACZKI);
+    const qs = new URLSearchParams({ format: "json", year: String(gus.rok) });
+    for (const id of paczka) qs.append("var-id", id);
+    const odp = await fetchJson<{ results?: { id?: string | number; values?: { year?: string | number; val?: number; attrId?: number }[] }[] }>(
+      `${gus.endpoint}/data/by-unit/${encodeURIComponent(unitId)}?${qs.toString()}`,
+      { ...KONFIG_KONEKTORY.siec, naglowki: naglowki() }
+    );
+    for (const r of odp?.results ?? []) {
+      const vals = r.values ?? [];
+      const dop = vals.find((v) => Number(v.year) === gus.rok) ?? [...vals].sort((a, b) => Number(b.year) - Number(a.year))[0];
+      // BDL: attrId===0 oznacza brak danych (val bywa 0) — traktujemy jako null.
+      const brakDanych = dop?.attrId === 0;
+      map.set(String(r.id), !brakDanych && typeof dop?.val === "number" ? dop.val : null);
+    }
   }
   return map;
 }
 
 /**
- * Zmienne BDL „Ludność wg grup wieku i płci" (temat P2137), kolumna „· ogółem":
- *  72305 = ogółem (razem); 72306 = 0-4; każda kolejna 5-letnia grupa = +1
- *  (72307=5-9, 72308=10-14, …). Potwierdzone diagnostyką /api/diag-gus.
+ * Temat BDL „Ludność wg grup wieku i płci" (P2137). ID zmiennych pasm NIE są
+ * ciągłe — dlatego zamiast zgadywać, odczytujemy listę zmiennych tematu i
+ * parsujemy zakres wieku z nazwy (kolumna „· ogółem"). Total = 72305.
  */
+const TEMAT_GRUPY_WIEKU = "P2137";
 const P2137_OGOLEM_TOTAL = "72305";
-const P2137_OGOLEM_0_4 = 72306;
-const idPasma = (k: number): string => String(P2137_OGOLEM_0_4 + k); // k=0 → 0-4, k=4 → 20-24, k=12 → 60-64
-const PASMA_0_64 = Array.from({ length: 13 }, (_, k) => idPasma(k)); // 0-4 … 60-64
-const PASMA_20_39 = [4, 5, 6, 7].map(idPasma); // 20-24, 25-29, 30-34, 35-39
 
-/** Suma wartości pasm (null, gdy któregokolwiek brak — nie zaniżamy udziału). */
-function sumaPasm(wartosci: (number | null)[]): number | null {
-  if (wartosci.some((v) => v === null)) return null;
-  return (wartosci as number[]).reduce((s, v) => s + v, 0);
+interface PasmoWieku {
+  id: string;
+  lo: number;
+  hi: number; // Infinity dla „N i więcej"
+}
+
+/** Parsuje zakres wieku z etykiety BDL: „20-24" → [20,24]; „85 i więcej" → [85,∞]. */
+function zakresWieku(band: string): [number, number] | null {
+  const przedzial = band.match(/^(\d+)\s*[-–]\s*(\d+)$/);
+  if (przedzial) return [Number(przedzial[1]), Number(przedzial[2])];
+  const otwarty = band.match(/^(\d+)\s*(?:i\s*(?:wi|więcej|wiecej)|\+)/i);
+  if (otwarty) return [Number(otwarty[1]), Infinity];
+  return null; // „ogółem" itp.
+}
+
+/** Lista pasm wieku (kolumna „· ogółem") tematu P2137 — samodobór z katalogu (bez zgadywania ID). */
+async function pasmaWiekuOgolem(): Promise<PasmoWieku[]> {
+  const odp = await fetchJson<{ results?: { id?: number | string; n1?: string; n2?: string; n3?: string }[] }>(
+    url("variables", { "subject-id": TEMAT_GRUPY_WIEKU, "page-size": "100" }),
+    { ...KONFIG_KONEKTORY.siec, naglowki: naglowki() }
+  );
+  const out: PasmoWieku[] = [];
+  for (const r of odp?.results ?? []) {
+    const czesci = [r.n1, r.n2, r.n3].filter(Boolean) as string[];
+    if (czesci[czesci.length - 1] !== "ogółem") continue; // tylko kolumna obu płci
+    const zakres = zakresWieku(czesci[0] ?? "");
+    if (zakres) out.push({ id: String(r.id), lo: zakres[0], hi: zakres[1] });
+  }
+  return out;
+}
+
+/** Suma wartości wybranych pasm (null, gdy któregokolwiek brak — nie zaniżamy udziału). */
+function sumaPasm(pasma: PasmoWieku[], m: Map<string, number | null>): number | null {
+  if (pasma.length === 0) return null;
+  let suma = 0;
+  for (const p of pasma) {
+    const v = m.get(p.id);
+    if (v === null || v === undefined) return null;
+    suma += v;
+  }
+  return suma;
 }
 
 export const konektorGUS: Konektor = {
@@ -134,11 +175,12 @@ export const konektorGUS: Konektor = {
       meta.push({ pole, zrodlo: this.zrodlo, czas, pewnosc, status: "ok", tryb: "A" });
     };
 
-    // Demografia z pasm wieku (P2137, kolumna „· ogółem") + wskaźniki — JEDNO zapytanie
-    // zbiorcze (limity BDL: równoległe pojedyncze zapytania bywają odrzucane bez X-ClientId).
+    // Demografia z pasm wieku (P2137) — samodobór pasm z katalogu (ID nieciągłe),
+    // potem JEDNO zbiorcze data/by-unit (limity BDL: serie równoległe bywają odrzucane).
     const idPodmioty = gus.zmienneId.podmiotyNa10k ?? "60530";
     const idSaldo = gus.zmienneId.saldoMigracji ?? "1365234";
-    const potrzebne = [...new Set([P2137_OGOLEM_TOTAL, ...PASMA_0_64, ...PASMA_20_39, idPodmioty, idSaldo])];
+    const pasma = await pasmaWiekuOgolem();
+    const potrzebne = [...new Set([P2137_OGOLEM_TOTAL, ...pasma.map((p) => p.id), idPodmioty, idSaldo])];
     const m = await wartosciWielu(jednostka.id, potrzebne);
     if ([...m.values()].every((v) => v === null)) {
       return brakWyniku(
@@ -149,13 +191,13 @@ export const konektorGUS: Konektor = {
       );
     }
     const ogolem = m.get(P2137_OGOLEM_TOTAL) ?? null;
-    const pasma0_64 = sumaPasm(PASMA_0_64.map((id) => m.get(id) ?? null));
-    const pasma20_39 = sumaPasm(PASMA_20_39.map((id) => m.get(id) ?? null));
+    // 65+ = ogółem − (0–64); 20–39 = pasma 20-24…35-39. Sumy null, gdy pasmo bez danych.
+    const pasma0_64 = sumaPasm(pasma.filter((p) => p.hi <= 64), m);
+    const pasma20_39 = sumaPasm(pasma.filter((p) => p.lo >= 20 && p.hi <= 39), m);
     const podmioty = m.get(idPodmioty) ?? null;
     const saldo = m.get(idSaldo) ?? null;
 
     if (ogolem && ogolem > 0) {
-      // 65+ = ogółem − (0–64); udział 20–39 z sumy pasm. „Brak danych ≠ nie" — gdy pasma niepełne, pomijamy.
       if (pasma0_64 !== null) dodaj("udzial65PlusPct", ((ogolem - pasma0_64) / ogolem) * 100, 80);
       if (pasma20_39 !== null) {
         dodaj("udzial2039Pct", (pasma20_39 / ogolem) * 100, 80);
