@@ -124,8 +124,46 @@ export async function GET(req: Request) {
   const szukajFraz = async (fraza: string) =>
     ({ fraza, wyniki: listaZmiennych(await fetchTekst(url("variables/search", { name: fraza }), { ...siec, naglowki })) });
 
+  // Eksplorator DRZEWA TEMATÓW (autorytatywny): temat → zmienne (id + nazwa).
+  // BDL variables/search słabo dopasowuje frazy; nawigacja po tematach jest pewna.
+  const listaTematow = (surowa: string | null): { id: string; name: string }[] => {
+    if (!surowa) return [];
+    try {
+      const wyniki = (JSON.parse(surowa) as { results?: { id?: string | number; name?: string }[] })?.results ?? [];
+      return wyniki.slice(0, 8).map((s) => ({ id: String(s.id), name: String(s.name ?? "") }));
+    } catch {
+      return [];
+    }
+  };
+
+  const katalog = u.searchParams.get("katalog");
+  const vars = u.searchParams.get("vars"); // subject-id → lista zmiennych tematu
   const szukaj = u.searchParams.get("szukaj");
-  if (szukaj) {
+  if (vars) {
+    diag.vars = { subjectId: vars, zmienne: listaZmiennych(await fetchTekst(url("variables", { "subject-id": vars }), { ...siec, naglowki })) };
+  } else if (katalog) {
+    const zmienneTematu = async (id: string) =>
+      listaZmiennych(await fetchTekst(url("variables", { "subject-id": id }), { ...siec, naglowki }));
+    const dzieci = async (id: string) =>
+      listaTematow(await fetchTekst(url("subjects", { "parent-id": id }), { ...siec, naglowki }));
+    const wynik: { subjectId: string; temat: string; zmienne: { id: string; nazwa: string }[] }[] = [];
+    for (const fraza of ["ludność", "bezrob"]) {
+      const tematy = listaTematow(await fetchTekst(url("subjects/search", { name: fraza }), { ...siec, naglowki }));
+      for (const t of tematy) {
+        const zmienne = await zmienneTematu(t.id);
+        if (zmienne.length > 0) {
+          wynik.push({ subjectId: t.id, temat: t.name, zmienne });
+        } else {
+          // Temat nadrzędny bez zmiennych → wejdź jeden poziom w dół (zmienne są w liściach).
+          for (const c of (await dzieci(t.id)).slice(0, 6)) {
+            const zc = await zmienneTematu(c.id);
+            if (zc.length > 0) wynik.push({ subjectId: c.id, temat: `${t.name} › ${c.name}`, zmienne: zc });
+          }
+        }
+      }
+    }
+    diag.katalog = wynik;
+  } else if (szukaj) {
     diag.szukaj = await szukajFraz(szukaj);
   } else {
     // Zestaw fraz eksploracyjnych dla brakujących pojęć (ludność, wiek, bezrobocie).
