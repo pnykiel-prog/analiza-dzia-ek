@@ -2,12 +2,25 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { powierzchniaZWkt, metrykiZWkt, bbox, bboxStykaja, pl1992ToWgs84 } from "../../geo";
+import { powierzchniaZWkt, metrykiZWkt, bbox, bboxStykaja, pl1992ToWgs84, konturSvg } from "../../geo";
 import { parsujOdpowiedzUldk } from "../../data/uldk";
 
 test("geo: powierzchnia prostokąta 100×50 = 5000 m²", () => {
   const wkt = "POLYGON((0 0,100 0,100 50,0 50,0 0))";
   assert.equal(powierzchniaZWkt(wkt), 5000);
+});
+
+test("geo: kontur SVG — skaluje/centruje i odbija oś Y", () => {
+  // Kwadrat 100×100 w pudełku 100×100 wyśrodkowanym na (250,215).
+  const pts = konturSvg("POLYGON((0 0,100 0,100 100,0 100,0 0))", { cx: 250, cy: 215, w: 100, h: 100 });
+  assert.ok(pts);
+  const wsp = pts!.split(" ").map((p) => p.split(",").map(Number));
+  const xs = wsp.map((c) => c[0]);
+  const ys = wsp.map((c) => c[1]);
+  // Wyśrodkowane: X w [200,300], Y w [165,265].
+  assert.ok(Math.min(...xs) >= 199.9 && Math.max(...xs) <= 300.1);
+  assert.ok(Math.min(...ys) >= 164.9 && Math.max(...ys) <= 265.1);
+  assert.equal(konturSvg("POINT(1 2)"), null); // brak wielokąta → null
 });
 
 test("geo: front i proporcja z bbox", () => {

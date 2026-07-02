@@ -222,8 +222,11 @@ export function ocenPopyt(
     { nazwa: "Mnożnik usług/dostępności", wartosc: `×${mUsl.m.toFixed(2)}`, udzial: Math.round((mUsl.m - cfg.mnoznikUslug.min) / cfg.mnoznikUslug.wklad * 100), fallback: mUsl.fallback },
   ];
 
-  const fallbacki = skladniki.filter((s) => s.fallback).length + (sila.fallback ? 1 : 0);
-  const pewnosc = clamp(Math.round((1 - fallbacki / (skladniki.length + 1)) * 100));
+  // Pewność liczymy z ISTOTNYCH składników: na P1 (bezUslug) mnożnik usług nie jest
+  // używany, więc jego brak nie może obniżać pewności Poziomu 1.
+  const istotne = bezUslug ? skladniki.filter((s) => s.nazwa !== "Mnożnik usług/dostępności") : skladniki;
+  const fallbacki = istotne.filter((s) => s.fallback).length + (sila.fallback ? 1 : 0);
+  const pewnosc = clamp(Math.round((1 - fallbacki / (istotne.length + 1)) * 100));
 
   return {
     profil,

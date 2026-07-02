@@ -11,7 +11,7 @@
   };
 
   class GruntMap extends HTMLElement {
-    static get observedAttributes() { return ['mode', 'layers', 'view']; }
+    static get observedAttributes() { return ['mode', 'layers', 'view', 'shape']; }
     connectedCallback() { this.render(); }
     attributeChangedCallback() { if (this.isConnected) this.render(); }
 
@@ -23,6 +23,7 @@
     render() {
       const mode = this.getAttribute('mode') || 'ok';
       const view = this.getAttribute('view') || 'start';
+      const shape = (this.getAttribute('shape') || '').trim(); // realny kontur działki (punkty SVG)
       const L = this.layers;
       const W = 600, H = 420;
       let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" style="display:block;font-family:'IBM Plex Mono',monospace">`;
@@ -116,8 +117,25 @@
         svg += `<text x="282" y="335" fill="${C.red}" font-size="9.5" text-anchor="middle" font-weight="600">przerwa ≈140 m</text>`;
         svg += `<text x="222" y="160" fill="${C.ink}" font-size="9">142/7</text>`;
         svg += `<text x="322" y="330" fill="${C.ink}" font-size="9">151/5</text>`;
+      } else if (shape) {
+        // REALNY kontur działki z geometrii ULDK (punkty SVG przekazane w atrybucie `shape`).
+        svg += this.poly(shape, C.parcel, C.parcelFill, true);
+        // wierzchołki
+        shape.split(' ').forEach(p => {
+          const [x, y] = p.split(',');
+          if (x && y) svg += `<circle cx="${x}" cy="${y}" r="2.4" fill="#fff" stroke="${C.parcel}" stroke-width="1.3"/>`;
+        });
+        // etykieta nad górnym wierzchołkiem
+        const ys = shape.split(' ').map(p => parseFloat(p.split(',')[1])).filter(v => !isNaN(v));
+        const topY = ys.length ? Math.min(...ys) : 160;
+        svg += `<text x="250" y="${(topY - 8).toFixed(0)}" fill="${C.ink}" font-size="9.5" font-weight="600" text-anchor="middle">Teren inwestycji</text>`;
+        if (view === 'level2') {
+          svg += this.pin(305, 150, C.young, 'P');
+          svg += this.pin(150, 290, C.young, 'S');
+          svg += this.pin(420, 250, C.senior, '+');
+        }
       } else {
-        // merged parcel (ok)
+        // merged parcel (ok) — schemat, gdy brak realnej geometrii
         const pts = '188,168 252,160 268,196 262,238 205,250 182,212';
         svg += this.poly(pts, C.parcel, C.parcelFill, true);
         // internal division line (the two original parcels)

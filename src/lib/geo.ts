@@ -105,6 +105,42 @@ export function metrykiZWkt(wkt: string): MetryGeometrii {
 }
 
 /**
+ * Kontur działki do rysowania na schematycznej mapie: pierwszy (największy) pierścień
+ * WKT przeskalowany i wyśrodkowany w zadanym pudełku (układ SVG — oś Y w dół).
+ * Zwraca ciąg „x,y x,y …" dla <polygon points>. Null, gdy brak geometrii.
+ */
+export function konturSvg(
+  wkt: string,
+  box: { cx: number; cy: number; w: number; h: number } = { cx: 250, cy: 215, w: 150, h: 150 }
+): string | null {
+  const wielokaty = parsujWielokaty(wkt);
+  // wybierz pierścień o największym polu (główna działka, nie ewentualne fragmenty)
+  let ring: Punkt[] | null = null;
+  let najw = -1;
+  for (const w of wielokaty) {
+    const r = w[0];
+    const p = poleP(r);
+    if (p > najw) { najw = p; ring = r; }
+  }
+  if (!ring || ring.length < 3) return null;
+  const xs = ring.map((p) => p[0]);
+  const ys = ring.map((p) => p[1]);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const gw = maxX - minX || 1, gh = maxY - minY || 1;
+  const skala = Math.min(box.w / gw, box.h / gh);
+  const offX = box.cx - (gw * skala) / 2;
+  const offY = box.cy - (gh * skala) / 2;
+  return ring
+    .map((p) => {
+      const x = offX + (p[0] - minX) * skala;
+      const y = offY + (maxY - p[1]) * skala; // odbicie osi Y (geo ↑ vs SVG ↓)
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+}
+
+/**
  * Reprojekcja EPSG:2180 (PUWG1992 / CS92) → WGS84 [lon, lat].
  * Odwrotna transwersalna Merkatora (GRS80). Wejście: (easting, northing) — taka
  * jest kolejność współrzędnych w WKT z ULDK. Pozwala policzyć centroid WGS84 do
