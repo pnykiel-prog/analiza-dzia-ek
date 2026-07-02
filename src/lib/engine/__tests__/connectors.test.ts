@@ -37,6 +37,22 @@ test("gus: wybór jednostki po nazwie (dokładne dopasowanie)", () => {
   assert.equal(wybierzJednostke({ results: [] }, "X"), null);
 });
 
+test("gus: pomija jednostkę archiwalną „…do 2001\" (Warszawa) i bierze aktualną", () => {
+  // BDL zwraca dla „Warszawa" najpierw jednostkę historyczną — musimy ją pominąć.
+  const json = {
+    results: [
+      { id: "071412831001", name: "M.st.Warszawa do 2001" },
+      { id: "011412865011", name: "Warszawa" },
+    ],
+  };
+  assert.equal(wybierzJednostke(json, "Warszawa")!.id, "011412865011");
+  // Nazwa rozszerzona (np. „Powiat m.st. Warszawa") też łapana przez zawieranie.
+  const json2 = { results: [{ id: "9", name: "M.st.Warszawa do 2001" }, { id: "10", name: "Powiat m.st. Warszawa" }] };
+  assert.equal(wybierzJednostke(json2, "Warszawa")!.id, "10");
+  // Gdy tylko archiwalna — zwracamy ją (lepsze niż null; zachowanie awaryjne).
+  assert.equal(wybierzJednostke({ results: [{ id: "9", name: "M.st.Warszawa do 2001" }] }, "Warszawa")!.id, "9");
+});
+
 test("gus: wartość zmiennej (rok lub najnowsza)", () => {
   const json = { results: [{ values: [{ year: 2021, val: 10 }, { year: 2023, val: 12 }] }] };
   assert.equal(wartoscZmiennej(json, 2021), 10);

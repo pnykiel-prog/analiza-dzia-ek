@@ -24,12 +24,26 @@ interface JednostkaBDL {
   parentId?: string;
 }
 
-/** Wybiera jednostkę BDL pasującą nazwą (dokładnie), w razie braku pierwszą. */
+/** Jednostka historyczna/nieaktualna w BDL (np. „M.st.Warszawa do 2001") — bez bieżących danych. */
+function jednostkaHistoryczna(name: string): boolean {
+  return /\bdo\s+(19|20)\d{2}\b/i.test(name); // „do 2001", „do 1998" itp.
+}
+
+/** Wybiera aktualną jednostkę BDL pasującą nazwą; pomija jednostki archiwalne („…do 2001"). */
 export function wybierzJednostke(json: unknown, nazwa: string): JednostkaBDL | null {
   const wyniki = (json as { results?: JednostkaBDL[] })?.results;
   if (!Array.isArray(wyniki) || wyniki.length === 0) return null;
   const dopasuj = (s: string) => s.toLowerCase().trim();
-  return wyniki.find((u) => dopasuj(u.name) === dopasuj(nazwa)) ?? wyniki[0];
+  // Pomijamy jednostki archiwalne (mają id, ale data/by-unit nic nie zwraca).
+  // Przy braku aktualnych zostawiamy pełną pulę (lepsze niż null).
+  const aktualne = wyniki.filter((u) => !jednostkaHistoryczna(u.name));
+  const pula = aktualne.length ? aktualne : wyniki;
+  // Preferencja: dokładna nazwa → nazwa zawierająca szukaną (np. „Powiat m.st. Warszawa") → pierwsza.
+  return (
+    pula.find((u) => dopasuj(u.name) === dopasuj(nazwa)) ??
+    pula.find((u) => dopasuj(u.name).includes(dopasuj(nazwa))) ??
+    pula[0]
+  );
 }
 
 /** Pierwsze ID zmiennej z odpowiedzi variables/search. */
