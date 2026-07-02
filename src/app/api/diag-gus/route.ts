@@ -270,5 +270,8 @@ export async function GET(req: Request) {
         ? "JEDNOSTKA OK, ale brak wartości — najpewniej frazy nie trafiają w ID zmiennych (ustaw zmienneId w konfiguracji)."
         : "OK — GUS zwraca dane; jeśli aplikacja ich nie pokazuje, problem jest dalej (mapowanie/pewność).";
 
-  return NextResponse.json(diag, { status: 200 });
+  // Maskujemy klucz API we wszystkich echo-URL/odpowiedziach (diagnostyka bywa wklejana).
+  let txt = JSON.stringify(diag);
+  if (gus.clientId) txt = txt.split(gus.clientId).join("***");
+  return new NextResponse(txt, { status: 200, headers: { "content-type": "application/json; charset=utf-8" } });
 }
