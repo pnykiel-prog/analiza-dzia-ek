@@ -213,11 +213,14 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
   if (dane) {
     const rev = odwrotnyTeryt(dane.id);
     if (rev) {
+      // Nazwy administracyjne z prefiksu TERYT identyfikatora są KANONICZNE (ten sam
+      // słownik, którego używa BDL/GUS) — mają pierwszeństwo nad nazwą z ULDK, której
+      // format bywa niezgodny (np. etykieta rodzaju) i psuje dopasowanie jednostki w GUS.
       dane = {
         ...dane,
-        wojewodztwo: dane.wojewodztwo || rev.wojewodztwo,
-        powiat: dane.powiat || rev.powiat,
-        gmina: dane.gmina || rev.gmina,
+        wojewodztwo: rev.wojewodztwo || dane.wojewodztwo,
+        powiat: rev.powiat || dane.powiat,
+        gmina: rev.gmina || dane.gmina,
       };
     }
   }
