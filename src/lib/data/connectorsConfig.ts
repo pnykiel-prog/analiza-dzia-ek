@@ -36,6 +36,12 @@ export interface KonfiguracjaKonektorow {
     rokBazowyTrend: number;
     /** ID zmiennych „stopa bezrobocia rejestrowanego" (miesięczne, poziom powiatu) — próba po kolei. */
     stopaBezrobociaIds: string[];
+    /** ID zmiennej „przeciętny dochód/wynagrodzenie" [zł/mc] — popyt P1 (podział dochodowy). Pusty → fallback. */
+    dochodId?: string;
+    /** ID zmiennej „zameldowania (napływ)" — atrakcyjność migracyjna A1. Pusty → proxy z salda. */
+    zameldowaniaId?: string;
+    /** ID zmiennej „wymeldowania młodych (odpływ)" — atrakcyjność migracyjna A3. Pusty → fallback. */
+    wymeldowaniaId?: string;
   };
   kimpzp: { aktywny: boolean; endpoint: string; warstwy: string; infoFormat: string };
   /** Generyczne konektory „obecność obiektu w punkcie" (WMS GetFeatureInfo) → bramki. */

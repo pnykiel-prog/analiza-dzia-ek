@@ -18,20 +18,21 @@
 import type {
   DaneDzialki,
   DopasowanieProfil,
+  OcenaPopytuP1,
   PodstawaPlanistyczna,
   PojemnoscP1,
-  PrognozaPotencjalu,
   Profil,
+  PrognozaPotencjalu,
   ProfilRekomendowany,
-  Werdykt,
+  WerdyktP1,
   WynikPoziom1,
   WynikPopytu,
 } from "../types";
 import type { KonfiguracjaPoziom1, KonfiguracjaScoring } from "../config";
-import { KONFIG_POPYT, KONFIG_POZIOM1, KONFIG_SCORING } from "../config";
-import { ocenPopyt } from "./popyt";
+import { KONFIG_POZIOM1, KONFIG_SCORING } from "../config";
+import { ocenPopytP1 } from "./popytP1";
 import { prognozaPotencjalu, sasiedztwoDeterministyczne } from "./potencjal";
-import { clamp, liniowo } from "./utils";
+import { clamp } from "./utils";
 import { statusZeSymbolu } from "../mpzp";
 
 // ── Podstawa planistyczna ────────────────────────────────────────────────────
@@ -90,53 +91,38 @@ function pojemnoscZPrognozy(p: PrognozaPotencjalu): PojemnoscP1 {
   };
 }
 
-// ── Dopasowanie pojemność ↔ popyt → werdykt ──────────────────────────────────
-
-function pasmoWerdyktu(score: number, cfg: KonfiguracjaPoziom1): Werdykt {
-  if (score >= cfg.pasma.zielony) return "zielony";
-  if (score >= cfg.pasma.zolty) return "zolty";
-  return "czerwony";
-}
-
-function dopasuj(
-  profil: Profil,
-  popyt: WynikPopytu,
-  pojemnoscMieszkan: number | null,
-  funkcjaOk: boolean | null,
-  cfg: KonfiguracjaPoziom1
-): DopasowanieProfil {
-  const popytPkt = popyt.realizowalny;
-  if (funkcjaOk === false)
-    return { profil, popyt: popytPkt, pojemnoscMieszkan, score: 0, werdykt: "czerwony", komentarz: "Funkcja mieszkaniowa niedozwolona wg podstawy planistycznej." };
-
-  if (pojemnoscMieszkan === null)
-    return {
-      profil,
-      popyt: popytPkt,
-      pojemnoscMieszkan,
-      score: popytPkt,
-      werdykt: pasmoWerdyktu(popytPkt, cfg),
-      komentarz: "Brak podstawy planistycznej — pojemność nieoznaczona; ocena z samego popytu.",
-    };
-
-  const modPoj = pojemnoscMieszkan >= cfg.progMieszkanViable ? 1 : liniowo(pojemnoscMieszkan, 0, cfg.progMieszkanViable, 0.5, 1);
-  const score = clamp(Math.round(popytPkt * modPoj));
-  const duzyPopyt = popytPkt >= cfg.pasma.zielony;
-  const malaPojemnosc = pojemnoscMieszkan < cfg.progMieszkanViable;
-  const komentarz = duzyPopyt
-    ? malaPojemnosc
-      ? `Duży popyt, ograniczona pojemność (${pojemnoscMieszkan} mieszk.) — realny, lecz niewielki wkład.`
-      : `Popyt i pojemność (${pojemnoscMieszkan} mieszk.) zgodne — mocne dopasowanie.`
-    : popytPkt < cfg.pasma.zolty
-      ? "Słaby popyt — inwestycja mało uzasadniona niezależnie od pojemności."
-      : `Umiarkowany popyt przy pojemności ${pojemnoscMieszkan} mieszk.`;
-  return { profil, popyt: popytPkt, pojemnoscMieszkan, score, werdykt: pasmoWerdyktu(score, cfg), komentarz };
-}
+// ── Rekomendacja profilu (dla Poziomu 2/3) z werdyktów społecznych ────────────
 
 function profilRekomendowany(scoreM: number, scoreS: number, cfg: KonfiguracjaPoziom1): ProfilRekomendowany {
   if (scoreM < cfg.pasma.zolty && scoreS < cfg.pasma.zolty) return "zaden";
   if (scoreM >= cfg.pasma.zielony && scoreS >= cfg.pasma.zielony && Math.abs(scoreM - scoreS) <= 10) return "oba";
   return scoreM >= scoreS ? "mlodzi" : "seniorzy";
+}
+
+/** Zgodność wsteczna: buduje WynikPopytu (W2) z werdyktu społecznego + atrakcyjności. */
+function kompatPopyt(profil: Profil, w: WerdyktP1, ocena: OcenaPopytuP1): WynikPopytu {
+  const kw = ocena.kwalifikacje[profil];
+  return {
+    profil,
+    wewnetrzny: w.score,
+    zewnetrzny: ocena.atrakcyjnoscMigracyjna.wartosc,
+    potencjalny: w.score,
+    realizowalny: w.score,
+    mnoznikLuka: 1,
+    mnoznikUslugi: 1,
+    udzialKwalifikujacyPct: kw.qS == null ? null : Math.round(kw.qS * 100),
+    napiecie: 0,
+    interpretacja: w.komentarz,
+    flagi: w.flagi,
+    pewnosc: w.pewnosc,
+    skladniki: [
+      { nazwa: "Grupa docelowa", wartosc: kw.nGrupa == null ? "brak danych" : `${kw.nGrupa} os.`, udzial: 0, fallback: kw.nGrupa == null },
+    ],
+  };
+}
+
+function kompatDopas(w: WerdyktP1, pojemnoscMieszkan: number | null): DopasowanieProfil {
+  return { profil: w.profil, popyt: w.score, pojemnoscMieszkan, score: w.score, werdykt: w.werdykt, komentarz: w.komentarz };
 }
 
 // ── Wejście silnika P1 ───────────────────────────────────────────────────────
@@ -154,32 +140,36 @@ export function uruchomPoziom1(
   const prognoza = liczPrognoze(d, mpzp, cfg);
   const pojemnosc = pojemnoscZPrognozy(prognoza);
 
-  // Popyt: demografia + rynek, BEZ mnożnika usług (usługi = Poziom 2).
-  const popytM = ocenPopyt(d, "mlodzi", KONFIG_SCORING, KONFIG_POPYT, true);
-  const popytS = ocenPopyt(d, "seniorzy", KONFIG_SCORING, KONFIG_POPYT, true);
+  // Popyt: pełna ocena P1 — siatka 4 werdyktów (społeczne vs komunalne × profil).
+  const ocenaPopytu = ocenPopytP1(d, { mlodzi: prognoza.mieszkania.mlodzi, seniorzy: prognoza.mieszkania.seniorzy });
 
-  const dopMlodzi = dopasuj("mlodzi", popytM, pojemnosc.szacLiczbaMieszkanMlodzi, funkcjaOk, cfg);
-  const dopSeniorzy = dopasuj("seniorzy", popytS, pojemnosc.szacLiczbaMieszkanSeniorzy, funkcjaOk, cfg);
+  // Blokada przydatności: sprzeczne przeznaczenie zeruje werdykty społeczne (projekt niedozwolony).
+  if (funkcjaOk === false) {
+    for (const w of Object.values(ocenaPopytu.werdykty)) {
+      if (w.natura === "spoleczny") { w.score = 0; w.werdykt = "czerwony"; w.flagi = [...w.flagi, "Funkcja mieszkaniowa niedozwolona wg przeznaczenia."]; }
+    }
+  }
 
-  const scoreMlodzi = dopMlodzi.score;
-  const scoreSeniorzy = dopSeniorzy.score;
+  const spoleczneM = ocenaPopytu.werdykty.spolecznyMlodzi;
+  const spoleczneS = ocenaPopytu.werdykty.spolecznySeniorzy;
+  const scoreMlodzi = spoleczneM.score;
+  const scoreSeniorzy = spoleczneS.score;
+
+  // Rekomendacja profilu dla P2/P3 (natura projektowa = werdykty społeczne).
   const profil = funkcjaOk === false ? "zaden" : profilRekomendowany(scoreMlodzi, scoreSeniorzy, cfg);
-  const werdykt = funkcjaOk === false ? "czerwony" : profil === "seniorzy" ? dopSeniorzy.werdykt : dopMlodzi.werdykt;
+  const werdykt = funkcjaOk === false ? "czerwony" : profil === "seniorzy" ? spoleczneS.werdykt : spoleczneM.werdykt;
 
   const tryb: "pelny" | "ograniczony" = pojemnosc.pumM2 === null || d.powierzchniaM2 <= 0 ? "ograniczony" : "pelny";
 
   const flagi: string[] = [];
-  if (funkcjaOk === false)
-    flagi.push("Funkcja mieszkaniowa niedozwolona wg wskazanego przeznaczenia — działka nieprzydatna.");
-  // Zawsze zaznaczamy orientacyjny charakter prognozy (nie zastępuje ustaleń planu/decyzji).
+  if (funkcjaOk === false) flagi.push("Funkcja mieszkaniowa niedozwolona wg wskazanego przeznaczenia — działka nieprzydatna.");
   flagi.push("Pojemność to orientacyjna prognoza z kształtu działki i zabudowy sąsiedztwa — nie zastępuje ustaleń MPZP/WZ (potwierdzenie na Poziomie 2).");
   for (const f of prognoza.flagi) if (!flagi.includes(f)) flagi.push(f);
-  const flagiPopytu = profil === "seniorzy" ? popytS.flagi : profil === "oba" ? [...popytM.flagi, ...popytS.flagi] : popytM.flagi;
-  for (const f of flagiPopytu) if (!flagi.includes(f)) flagi.push(f);
+  const rek = ocenaPopytu.werdykty[ocenaPopytu.rekomendowanyKierunek];
+  for (const f of rek.flagi) if (!flagi.includes(f)) flagi.push(f);
 
-  // Pewność P1 = średnia z pewności popytu i pewności prognozy potencjału.
-  const pewnoscPopyt = Math.round((popytM.pewnosc + popytS.pewnosc) / 2);
-  let pewnosc = Math.round((pewnoscPopyt + prognoza.pewnosc) / 2);
+  // Pewność P1 = średnia z pewności rekomendowanego werdyktu popytu i prognozy potencjału.
+  let pewnosc = Math.round((ocenaPopytu.pewnoscOgolna + prognoza.pewnosc) / 2);
   if (tryb === "ograniczony") pewnosc = Math.round(pewnosc * 0.85);
 
   return {
@@ -188,14 +178,18 @@ export function uruchomPoziom1(
     podstawa,
     funkcjaMieszkaniowaDozwolona: funkcjaOk !== false,
     prognoza,
+    ocenaPopytu,
     pojemnosc,
-    popyt: { mlodzi: popytM, seniorzy: popytS },
-    dopasowanie: { mlodzi: dopMlodzi, seniorzy: dopSeniorzy },
+    popyt: { mlodzi: kompatPopyt("mlodzi", spoleczneM, ocenaPopytu), seniorzy: kompatPopyt("seniorzy", spoleczneS, ocenaPopytu) },
+    dopasowanie: {
+      mlodzi: kompatDopas(spoleczneM, pojemnosc.szacLiczbaMieszkanMlodzi),
+      seniorzy: kompatDopas(spoleczneS, pojemnosc.szacLiczbaMieszkanSeniorzy),
+    },
     scoreMlodzi,
     scoreSeniorzy,
     profilRekomendowany: profil,
-    werdyktMlodzi: dopMlodzi.werdykt,
-    werdyktSeniorzy: dopSeniorzy.werdykt,
+    werdyktMlodzi: spoleczneM.werdykt,
+    werdyktSeniorzy: spoleczneS.werdykt,
     werdykt,
     pewnosc: clamp(pewnosc),
     tryb,

@@ -101,6 +101,13 @@ export interface DaneDzialki {
   mediana2039Woj: Maybe<number>;
   saldoMigracjiMlodzi: Maybe<number>; // dodatnie/zero/ujemne
   udzial65PlusPct: Maybe<number>;
+  // F2. Liczby bezwzględne i dochód (popyt P1 — trójdzielny podział, benchmarki per mieszkaniec)
+  liczbaMieszkancowGminy?: Maybe<number>; // ludność ogółem gminy
+  liczba2039?: Maybe<number>; // liczebność 20–39 (nie %)
+  liczba65Plus?: Maybe<number>; // liczebność 65+ (nie %)
+  dochodPrzecietnyGmina?: Maybe<number>; // proxy dochodu gosp. (wynagrodzenie/dochód gminy), miesięcznie
+  naplywZameldowanNa1000?: Maybe<number>; // napływ zameldowań (śr. 3–5 lat) na 1000 mieszk. — A1
+  odplywMlodychNa1000?: Maybe<number>; // odpływ (wymeldowania) młodych na 1000 mieszk. — A3
   trend65Plus: Maybe<"rosnacy" | "stabilny" | "malejacy">;
   populacjaStabilna: Maybe<boolean>; // czy gmina nie wymiera
   trendLudnosc: Maybe<"rosnaca" | "stabilna" | "malejaca">;
@@ -185,6 +192,53 @@ export interface WynikPopytu {
   skladniki: SkladnikPopytu[];
 }
 
+// ── Ocena popytu P1 (wersja pełna): 4 werdykty, 2 natury ─────────────────────
+
+export type NaturaWerdyktu = "spoleczny" | "komunalny";
+export type KluczWerdyktu = "spolecznyMlodzi" | "spolecznySeniorzy" | "komunalnyMlodzi" | "komunalnySeniorzy";
+
+/** Trójdzielny podział dochodowy grupy docelowej (K/S/R) → liczby bezwzględne. */
+export interface KwalifikacjeProfil {
+  nGrupa: number | null; // liczebność 20–39 / 65+ (GUS BDL)
+  qK: number | null; // udział segmentu komunalnego (dochód < próg dolny)
+  qS: number | null; // udział segmentu społecznego (próg dolny ≤ dochód < górny)
+  nKomunalny: number | null; // nGrupa × qK
+  nSpoleczny: number | null; // nGrupa × qS
+  estymacja: boolean; // czy udziały q estymowane (rozkład regionalny) → niższa pewność
+}
+
+/** Wskaźnik atrakcyjności migracyjnej (zastępuje popyt zewnętrzny). */
+export interface AtrakcyjnoscMigracyjna {
+  a1: number; // 0–100, ZMIERZONE (napływ vs benchmark) — kotwica i bramka
+  a2: number; // 0–100, ESTYMOWANE (potencjał odblokowany tańszą ofertą)
+  a3: number; // 0–100, ESTYMOWANE (zatrzymany odpływ)
+  wartosc: number; // 0–100 (złożona, z sufitem skali)
+  pewnosc: number; // niższa, im większy udział A2/A3
+  fallback: boolean; // A1 z proxy (saldo) zamiast zmierzonego napływu
+}
+
+/** Pojedynczy werdykt (jedno z czterech pól siatki). */
+export interface WerdyktP1 {
+  klucz: KluczWerdyktu;
+  natura: NaturaWerdyktu;
+  profil: Profil;
+  score: number; // 0–100
+  werdykt: Werdykt; // zielony / zolty / czerwony
+  liczbaKwalifikujacych: number | null; // segment S (społeczne) lub K (komunalne)
+  pewnosc: number; // 0–100
+  flagi: string[];
+  komentarz: string;
+}
+
+/** Pełna ocena popytu P1 — siatka 4 werdyktów + kwalifikacje + atrakcyjność. */
+export interface OcenaPopytuP1 {
+  kwalifikacje: { mlodzi: KwalifikacjeProfil; seniorzy: KwalifikacjeProfil };
+  atrakcyjnoscMigracyjna: AtrakcyjnoscMigracyjna;
+  werdykty: Record<KluczWerdyktu, WerdyktP1>;
+  rekomendowanyKierunek: KluczWerdyktu;
+  pewnoscOgolna: number;
+}
+
 /** Flaga/sygnał do panelu „Flagi i sygnały" (kolor wg tonu). */
 export interface Sygnal {
   tekst: string;
@@ -261,6 +315,8 @@ export interface WynikPoziom1 {
   funkcjaMieszkaniowaDozwolona: boolean;
   /** Prognoza potencjału zabudowy (z kształtu + sąsiedztwa) — źródło pojemności na P1. */
   prognoza: PrognozaPotencjalu;
+  /** Ocena popytu P1 (pełna): siatka 4 werdyktów, kwalifikacje, atrakcyjność migracyjna. */
+  ocenaPopytu: OcenaPopytuP1;
   pojemnosc: PojemnoscP1;
   /** Popyt per profil (na P1 bez mnożnika usług). */
   popyt: { mlodzi: WynikPopytu; seniorzy: WynikPopytu };

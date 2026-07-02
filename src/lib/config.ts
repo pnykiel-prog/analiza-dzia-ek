@@ -144,6 +144,59 @@ export const KONFIG_POPYT: KonfiguracjaPopyt = {
   dojazdPoza: 0.1,
 };
 
+// ── POZIOM 1: ocena popytu (wersja pełna) — 4 werdykty, 2 natury ──────────────
+
+export interface KonfiguracjaPopytP1 {
+  /** Progi dochodowe [zł/mc] = wartość odtworzeniowa /m² × mnożnik. */
+  progDochoduKomunalnyMn: number; // próg dolny: dochód < próg → komunalny
+  progDochoduSpolecznyMn: number; // próg górny: dochód < próg → społeczny (≥ → rynek)
+  /** Parametr kształtu rozkładu dochodów (log-normal, σ log) — regionalny. */
+  sigmaDochodu: number;
+  /** Domyślny dochód gminy [zł/mc] gdy brak danych (fallback). */
+  dochodFallback: number;
+  /** Domyślna wartość odtworzeniowa [zł/m²] gdy brak danych (do progów dochodowych). */
+  wartoscOdtwFallback: number;
+  /** Ilu kwalifikujących się (segment S) na 1 mieszkanie = pełna wystarczalność. */
+  margines: number;
+  /** Benchmark regionalny udziału społecznego (mediana q_S). */
+  qBenchS: number;
+  /** Benchmark regionalny gęstości komunalnej na 1000 mieszk. (mediana). */
+  benchKomNa1000: number;
+  /** Wagi społeczne per profil: wewnętrzny (liczba) vs atrakcyjność migracyjna. */
+  wagiSpoleczne: Record<Profil, { wew: number; zew: number }>;
+  /** Modyfikator luki cenowej: 0.75 + 0.5×(luka/100) (tylko społeczne). */
+  mLuka: { baza: number; nachylenie: number };
+  /** Zakresy modyfikatorów napięcia i trendu (centrowane w 1,0). */
+  mNapiecie: { min: number; max: number }; // społeczne
+  mNapiecieKom: { min: number; max: number }; // komunalne — mocniej w górę
+  mTrendMlodzi: { min: number; max: number };
+  mTrendSeniorzy: { min: number; max: number }; // ostrzej w dół
+  /** Atrakcyjność migracyjna: wagi składowych + sufit skali. */
+  atrakcyjnosc: { waga2: number; waga3: number; sufit: number; naplywBenchNa1000: number; odplywBenchNa1000: number };
+  /** Pasma werdyktu (score → kolor). */
+  pasma: { zielony: number; zolty: number };
+}
+
+export const KONFIG_POPYT_P1: KonfiguracjaPopytP1 = {
+  // Wartość odtworzeniowa ~5000 zł/m² → próg komunalny ~2500, społeczny ~7000 zł/mc.
+  progDochoduKomunalnyMn: 0.5,
+  progDochoduSpolecznyMn: 1.4,
+  sigmaDochodu: 0.6,
+  dochodFallback: 6500,
+  wartoscOdtwFallback: 5000,
+  margines: 5,
+  qBenchS: 0.22,
+  benchKomNa1000: 8,
+  wagiSpoleczne: { mlodzi: { wew: 0.55, zew: 0.45 }, seniorzy: { wew: 0.85, zew: 0.15 } },
+  mLuka: { baza: 0.75, nachylenie: 0.5 },
+  mNapiecie: { min: 0.8, max: 1.2 },
+  mNapiecieKom: { min: 0.8, max: 1.4 },
+  mTrendMlodzi: { min: 0.85, max: 1.15 },
+  mTrendSeniorzy: { min: 0.6, max: 1.1 },
+  atrakcyjnosc: { waga2: 0.6, waga3: 0.4, sufit: 100, naplywBenchNa1000: 20, odplywBenchNa1000: 15 },
+  pasma: { zielony: 65, zolty: 40 },
+};
+
 // ── POZIOM 2: parametry zabudowy ────────────────────────────────────────────
 
 export interface KonfiguracjaZabudowy {
