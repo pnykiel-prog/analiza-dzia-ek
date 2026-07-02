@@ -35,15 +35,28 @@ export function wybierzJednostke(json: unknown, nazwa: string): JednostkaBDL | n
   if (!Array.isArray(wyniki) || wyniki.length === 0) return null;
   const dopasuj = (s: string) => s.toLowerCase().trim();
   // Pomijamy jednostki archiwalne (mają id, ale data/by-unit nic nie zwraca).
-  // Przy braku aktualnych zostawiamy pełną pulę (lepsze niż null).
+  // Gdy w tej odpowiedzi są SAME archiwalne → zwracamy null, aby konektor spróbował
+  // innego wyszukiwania (np. bez filtra poziomu) i znalazł aktualną jednostkę.
   const aktualne = wyniki.filter((u) => !jednostkaHistoryczna(u.name));
-  const pula = aktualne.length ? aktualne : wyniki;
+  if (aktualne.length === 0) return null;
   // Preferencja: dokładna nazwa → nazwa zawierająca szukaną (np. „Powiat m.st. Warszawa") → pierwsza.
   return (
-    pula.find((u) => dopasuj(u.name) === dopasuj(nazwa)) ??
-    pula.find((u) => dopasuj(u.name).includes(dopasuj(nazwa))) ??
-    pula[0]
+    aktualne.find((u) => dopasuj(u.name) === dopasuj(nazwa)) ??
+    aktualne.find((u) => dopasuj(u.name).includes(dopasuj(nazwa))) ??
+    aktualne[0]
   );
+}
+
+/** Diagnostyka: surowe wyniki units/search (z filtrem poziomu i bez) — do namierzania jednostki. */
+export async function diagJednostki(name: string): Promise<unknown> {
+  const upros = (j: unknown) =>
+    ((j as { results?: JednostkaBDL[] })?.results ?? []).map((u) => ({ id: u.id, name: u.name, level: u.level }));
+  const zLevel = await fetchJson(url("units/search", { name, level: String(gus.poziomGmina) }), {
+    ...KONFIG_KONEKTORY.siec,
+    naglowki: naglowki(),
+  });
+  const bezLevel = await fetchJson(url("units/search", { name }), { ...KONFIG_KONEKTORY.siec, naglowki: naglowki() });
+  return { name, poziomGmina: gus.poziomGmina, zLevel: upros(zLevel), bezLevel: upros(bezLevel) };
 }
 
 /** Pierwsze ID zmiennej z odpowiedzi variables/search. */

@@ -49,8 +49,9 @@ test("gus: pomija jednostkę archiwalną „…do 2001\" (Warszawa) i bierze akt
   // Nazwa rozszerzona (np. „Powiat m.st. Warszawa") też łapana przez zawieranie.
   const json2 = { results: [{ id: "9", name: "M.st.Warszawa do 2001" }, { id: "10", name: "Powiat m.st. Warszawa" }] };
   assert.equal(wybierzJednostke(json2, "Warszawa")!.id, "10");
-  // Gdy tylko archiwalna — zwracamy ją (lepsze niż null; zachowanie awaryjne).
-  assert.equal(wybierzJednostke({ results: [{ id: "9", name: "M.st.Warszawa do 2001" }] }, "Warszawa")!.id, "9");
+  // Gdy w odpowiedzi są SAME archiwalne — zwracamy null, aby konektor spróbował innego
+  // wyszukiwania (bez filtra poziomu) i znalazł aktualną jednostkę.
+  assert.equal(wybierzJednostke({ results: [{ id: "9", name: "M.st.Warszawa do 2001" }] }, "Warszawa"), null);
 });
 
 test("gus: wartość zmiennej (rok lub najnowsza)", () => {
