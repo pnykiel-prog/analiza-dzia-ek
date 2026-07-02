@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { powierzchniaZWkt, metrykiZWkt, bbox, bboxStykaja, pl1992ToWgs84, konturSvg } from "../../geo";
+import { powierzchniaZWkt, metrykiZWkt, bbox, bboxStykaja, pl1992ToWgs84, konturSvg, konturGeo } from "../../geo";
 import { parsujOdpowiedzUldk } from "../../data/uldk";
 
 test("geo: powierzchnia prostokąta 100×50 = 5000 m²", () => {
@@ -21,6 +21,18 @@ test("geo: kontur SVG — skaluje/centruje i odbija oś Y", () => {
   assert.ok(Math.min(...xs) >= 199.9 && Math.max(...xs) <= 300.1);
   assert.ok(Math.min(...ys) >= 164.9 && Math.max(...ys) <= 265.1);
   assert.equal(konturSvg("POINT(1 2)"), null); // brak wielokąta → null
+});
+
+test("geo: kontur WGS84 — reprojekcja pierścienia do [lon,lat] w granicach Polski", () => {
+  // Kwadrat 100 m w EPSG:2180 w okolicy Rzeszowa.
+  const g = konturGeo("POLYGON((640000 244000,640100 244000,640100 244100,640000 244100,640000 244000))");
+  assert.ok(g);
+  assert.equal(g!.length, 5); // 4 wierzchołki + domknięcie
+  for (const [lon, lat] of g!) {
+    assert.ok(lon > 14 && lon < 25, `lon poza Polską: ${lon}`);
+    assert.ok(lat > 49 && lat < 55, `lat poza Polską: ${lat}`);
+  }
+  assert.equal(konturGeo("POINT(1 2)"), null);
 });
 
 test("geo: front i proporcja z bbox", () => {

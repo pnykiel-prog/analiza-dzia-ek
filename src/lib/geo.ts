@@ -141,6 +141,24 @@ export function konturSvg(
 }
 
 /**
+ * Największy (główny) pierścień działki jako punkty WGS84 [lon, lat] — do
+ * narysowania realnego wielokąta na mapie kaflowej (OSM). Współrzędne WKT są
+ * w EPSG:2180, więc każdy wierzchołek reprojektujemy przez `pl1992ToWgs84`.
+ * Zwraca `null`, gdy geometria nie zawiera wielokąta.
+ */
+export function konturGeo(wkt: string): [number, number][] | null {
+  const wielokaty = parsujWielokaty(wkt);
+  let ring: Punkt[] | null = null;
+  let najw = -1;
+  for (const w of wielokaty) {
+    const p = poleP(w[0]);
+    if (p > najw) { najw = p; ring = w[0]; }
+  }
+  if (!ring || ring.length < 3) return null;
+  return ring.map((p) => pl1992ToWgs84(p[0], p[1]));
+}
+
+/**
  * Reprojekcja EPSG:2180 (PUWG1992 / CS92) → WGS84 [lon, lat].
  * Odwrotna transwersalna Merkatora (GRS80). Wejście: (easting, northing) — taka
  * jest kolejność współrzędnych w WKT z ULDK. Pozwala policzyć centroid WGS84 do

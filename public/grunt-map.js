@@ -1,7 +1,33 @@
-// <grunt-map> — schematic GIS-style parcel map. Plain custom element.
-// attrs: mode = ok|notfound|nonadjacent ; layers = JSON {parcel,env,iso_m,iso_s,plan} ; view = start|level2
+// <grunt-map> — parcel map. Plain custom element.
+// attrs: mode = ok|notfound|nonadjacent ; layers = JSON {parcel,env,iso_m,iso_s,plan} ;
+//        view = start|level2 ; shape = punkty SVG (schemat) ; geo = JSON [[lon,lat]…] (realna mapa OSM)
+// Gdy podano `geo`, rysujemy realny wielokąt działki na kaflowej mapie OpenStreetMap
+// (Leaflet ładowany leniwie z CDN) — działka leży w swoim faktycznym położeniu.
 (function () {
   const NS = 'http://www.w3.org/2000/svg';
+
+  // Leniwe ładowanie Leaflet (CSS + JS) z CDN — jedna współdzielona obietnica.
+  let leafletP = null;
+  function ladujLeaflet() {
+    if (window.L) return Promise.resolve(window.L);
+    if (leafletP) return leafletP;
+    leafletP = new Promise((resolve, reject) => {
+      if (!document.querySelector('link[data-leaflet]')) {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        link.setAttribute('data-leaflet', '');
+        document.head.appendChild(link);
+      }
+      const s = document.createElement('script');
+      s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      s.async = true;
+      s.onload = () => resolve(window.L);
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+    return leafletP;
+  }
   const C = {
     bg: '#EFF2F6', water: '#DCE7EE', block: '#E4E9EF', blockStroke: '#D5DCE5',
     green: '#E4E9EF', road: '#FFFFFF', roadEdge: '#D5DCE5', roadMajor: '#FBFCFD',
@@ -11,8 +37,9 @@
   };
 
   class GruntMap extends HTMLElement {
-    static get observedAttributes() { return ['mode', 'layers', 'view', 'shape']; }
+    static get observedAttributes() { return ['mode', 'layers', 'view', 'shape', 'geo']; }
     connectedCallback() { this.render(); }
+    disconnectedCallback() { this.zniszczMape(); }
     attributeChangedCallback() { if (this.isConnected) this.render(); }
 
     get layers() {
@@ -20,10 +47,28 @@
       catch (e) { return {}; }
     }
 
+    /** Usuwa instancję mapy Leaflet (jeśli istnieje) przy zmianie geometrii/odłączeniu. */
+    zniszczMape() {
+      if (this.mapa) { try { this.mapa.remove(); } catch (e) {} this.mapa = null; }
+      this.geoKey = null;
+    }
+
     render() {
       const mode = this.getAttribute('mode') || 'ok';
       const view = this.getAttribute('view') || 'start';
       const shape = (this.getAttribute('shape') || '').trim(); // realny kontur działki (punkty SVG)
+
+      // Realna mapa: gdy mamy geometrię WGS84 i status pozwala pokazać działkę.
+      if (mode !== 'notfound') {
+        let geoPts = null;
+        try {
+          const arr = JSON.parse(this.getAttribute('geo') || 'null');
+          if (Array.isArray(arr) && arr.length >= 3) geoPts = arr;
+        } catch (e) { geoPts = null; }
+        if (geoPts) { this.renderMapa(geoPts); return; }
+      }
+      this.zniszczMape(); // powrót do schematu — porządkujemy ewentualną mapę
+
       const L = this.layers;
       const W = 600, H = 420;
       let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" style="display:block;font-family:'IBM Plex Mono',monospace">`;
@@ -162,6 +207,58 @@
 
       svg += `</svg>`;
       this.innerHTML = svg;
+    }
+
+    /**
+     * Rysuje realny wielokąt działki na kaflowej mapie OpenStreetMap (Leaflet),
+     * dopasowując widok do granic działki. `pts` = [[lon,lat]…] (WGS84).
+     */
+    renderMapa(pts) {
+      const key = JSON.stringify(pts);
+      if (this.mapa && this.geoKey === key) return; // ta sama geometria — nie odtwarzamy
+      this.zniszczMape();
+      this.geoKey = key;
+      this.innerHTML =
+        '<div class="gm-leaflet" style="width:100%;height:100%;min-height:220px;background:#EFF2F6"></div>';
+      const host = this.querySelector('.gm-leaflet');
+      ladujLeaflet()
+        .then((L) => {
+          if (this.geoKey !== key || !host || !host.isConnected) return; // zdezaktualizowane
+          const latlngs = pts.map((p) => [p[1], p[0]]); // Leaflet: [lat, lon]
+          const map = L.map(host, {
+            scrollWheelZoom: false, // nie przejmujemy scrolla strony
+            zoomControl: true,
+            attributionControl: true,
+          });
+          this.mapa = map;
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap',
+          }).addTo(map);
+          const poly = L.polygon(latlngs, {
+            color: '#16263F',
+            weight: 2.4,
+            fillColor: '#16263F',
+            fillOpacity: 0.14,
+            lineJoin: 'round',
+          }).addTo(map);
+          poly.bindTooltip('Teren inwestycji', {
+            permanent: true,
+            direction: 'top',
+            className: 'gm-tip',
+            opacity: 1,
+          });
+          try { map.fitBounds(poly.getBounds(), { padding: [26, 26], maxZoom: 18 }); }
+          catch (e) {}
+          // kontener bywa mierzony przed layoutem — wymuszamy przeliczenie rozmiaru
+          setTimeout(() => { try { map.invalidateSize(); } catch (e) {} }, 60);
+        })
+        .catch(() => {
+          if (host && host.isConnected) {
+            host.innerHTML =
+              '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#6B7A92;font:12px/1.4 \'IBM Plex Sans\',sans-serif;padding:16px;text-align:center">Nie udało się wczytać mapy podkładowej.</div>';
+          }
+        });
     }
 
     poly(pts, stroke, fill, glow) {
