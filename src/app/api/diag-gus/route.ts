@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { KONFIG_KONEKTORY } from "@/lib/data/connectorsConfig";
-import { konektorGUS } from "@/lib/data/connectors/gus";
+import { konektorGUS, diagJednostki } from "@/lib/data/connectors/gus";
 import type { Teren } from "@/lib/data/connectors/types";
 import { rozwiazDzialki } from "@/lib/data/resolver";
 
@@ -27,6 +27,11 @@ export async function GET(req: Request) {
 
   // TRYB APLIKACJI: podaj identyfikator działki (?id=…) — uruchamiamy DOKŁADNIE ten sam
   // resolver co /nowa i pokazujemy, jaką gminę rozpoznał i czy demografia GUS trafiła do danych.
+  // TRYB SUROWYCH JEDNOSTEK: ?units=Warszawa — pokazuje, co BDL zwraca dla units/search
+  // (z filtrem poziomu i bez), z id/nazwą/poziomem — do namierzenia właściwej jednostki.
+  const units = u.searchParams.get("units");
+  if (units) return odpowiedz(await diagJednostki(units));
+
   const id = u.searchParams.get("id");
   if (id) {
     const r = await rozwiazDzialki([{ wojewodztwo: "", powiat: "", gmina: "", obreb: "", numer: "", idBezposredni: id }]);
