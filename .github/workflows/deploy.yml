@@ -1,0 +1,52 @@
+name: Deploy na Vercel (produkcja)
+
+# Buduje i deployuje aplikację na Vercel przy każdym pushu do `main`
+# (niezależnie od integracji Vercel↔GitHub). Można też uruchomić ręcznie.
+#
+# Wymagane sekrety repozytorium (Settings → Secrets and variables → Actions):
+#   VERCEL_TOKEN       — token z https://vercel.com/account/tokens
+#   VERCEL_ORG_ID      — z pliku .vercel/project.json (po `vercel link`) lub Settings projektu
+#   VERCEL_PROJECT_ID  — jw.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: vercel-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Zainstaluj Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Pobierz ustawienia i zmienne środowiskowe (produkcja)
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Zbuduj (next build przez Vercel)
+        run: vercel build --prod --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy na produkcję
+        run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
