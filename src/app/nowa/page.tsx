@@ -25,6 +25,7 @@ interface MetaRozw {
   poleAutomatyczne: string[];
   rynek: { czynszN: number; cenaNowychN: number };
   raportZrodel?: { klucz: string; zrodlo: string; status: string; debug?: string }[];
+  ksztaltSvg?: string | null;
 }
 
 const pustaPozycja = (): PozycjaDzialki => ({ wojewodztwo: "", powiat: "", gmina: "", obreb: "", numer: "" });
@@ -574,6 +575,7 @@ export default function NowaAnalizaPage() {
           view="level2"
           height={340}
           layers={warstwyP2(dane, wynik?.poziom1.profilRekomendowany)}
+          shape={meta?.ksztaltSvg ?? ""}
         />
       )}
 
@@ -587,6 +589,7 @@ export default function NowaAnalizaPage() {
                 view="level2"
                 height={340}
                 layers={warstwyP2(dane, wynik?.poziom1.profilRekomendowany)}
+                shape={meta?.ksztaltSvg ?? ""}
               />
             </div>
             <KompletnoscOceny p2={p2} />
@@ -1001,7 +1004,7 @@ function PotwierdzenieDanych({ dane, meta }: { dane: DaneDzialki; meta: MetaRozw
       )}
     </Karta>
     <div className="lg:sticky" style={{ top: "var(--grunt-sticky-top)" }}>
-      <PodgladTerenu mode={trybMapy} view="start" layers={{ parcel: true }} />
+      <PodgladTerenu mode={trybMapy} view="start" layers={{ parcel: true }} shape={meta.ksztaltSvg ?? ""} />
     </div>
     </div>
   );

@@ -12,7 +12,7 @@ import { DZIALKI_PRZYKLADOWE } from "./sample";
 import { skomponujId, odwrotnyTeryt, type PozycjaDzialki } from "../teryt";
 import { statusRynkowy } from "../fieldModes";
 import { pobierzDzialkePoId } from "./uldk";
-import { centroid, centroid4326ZWkt, czyPrzylegaja } from "../geo";
+import { centroid, centroid4326ZWkt, czyPrzylegaja, konturSvg } from "../geo";
 import { uruchomKonektory } from "./connectors";
 import type { MetaPola, Teren } from "./connectors/types";
 import { medianaRynkowa, wartoscOdtworzeniowaDla } from "../config-rynek";
@@ -46,6 +46,8 @@ export interface MetaRozwiazania {
   raportZrodel: { klucz: string; zrodlo: string; status: string; debug?: string }[];
   /** Metadane pól wypełnionych przez konektory. */
   metaPol: MetaPola[];
+  /** Kontur działki (punkty SVG) z geometrii ULDK — do narysowania realnego kształtu; null bez geometrii. */
+  ksztaltSvg: string | null;
 }
 
 export interface RozwiazanieDzialek {
@@ -265,6 +267,8 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
     cenaNowychN: nDla("cenaNowychM2", 32, 6),
   };
 
+  const ksztaltSvg = wktZnalezione[0] ? konturSvg(wktZnalezione[0]) : null;
+
   return {
     dane,
     meta: {
@@ -275,6 +279,7 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
       rynek,
       raportZrodel,
       metaPol,
+      ksztaltSvg,
     },
   };
 }
