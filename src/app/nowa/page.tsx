@@ -50,12 +50,10 @@ async function pobierzOpcjeTeryt(params: Record<string, string>): Promise<{ tery
 }
 
 type Ekran = "wejscie" | "poziom1" | "poziom2" | "poziom3" | "raport";
-type Rola = "klient" | "administrator";
 const EKRANY: Ekran[] = ["wejscie", "poziom1", "poziom2", "poziom3", "raport"];
 
 export default function NowaAnalizaPage() {
   const [ekran, setEkran] = useState<Ekran>("wejscie");
-  const [rola, setRola] = useState<Rola>("klient");
   const [maxKrok, setMaxKrok] = useState(1);
   const [pozycje, setPozycje] = useState<PozycjaDzialki[]>([pustaPozycja()]);
   const [dane, setDane] = useState<DaneDzialki | null>(null);
@@ -306,7 +304,6 @@ export default function NowaAnalizaPage() {
   }
 
   const korektyP2 = Object.keys(p2).filter((k) => p2orig[k] !== undefined && p2[k] !== p2orig[k]);
-  const rolaAdmin = rola === "administrator";
   const stepAktywny = EKRANY.indexOf(ekran) + 1;
 
   function cofnij() {
@@ -331,16 +328,12 @@ export default function NowaAnalizaPage() {
         )}
       </div>
 
-      {/* Pasek: rola (klient/administrator) + powrót do poprzedniego ekranu */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="inline-flex rounded-input border border-grunt-border-input overflow-hidden text-[13px]">
-          <button onClick={() => setRola("klient")} className={`px-3.5 py-1.5 ${rola === "klient" ? "bg-grunt-ink text-white" : "bg-grunt-surface text-grunt-text-3"}`}>Klient</button>
-          <button onClick={() => setRola("administrator")} className={`px-3.5 py-1.5 ${rola === "administrator" ? "bg-grunt-ink text-white" : "bg-grunt-surface text-grunt-text-3"}`}>Administrator</button>
-        </div>
-        {ekran !== "wejscie" && (
+      {/* Pasek nawigacji: powrót do poprzedniego ekranu */}
+      {ekran !== "wejscie" && (
+        <div className="flex items-center justify-end gap-3">
           <button onClick={cofnij} className="btn-secondary">← Wstecz</button>
-        )}
-      </div>
+        </div>
+      )}
 
       {blad && <p className="text-sm text-grunt-red bg-grunt-red-bg border border-grunt-red/25 rounded-md px-3 py-2">{blad}</p>}
 
@@ -470,8 +463,8 @@ export default function NowaAnalizaPage() {
         </form>
       )}
 
-      {/* POZIOM 1 (administrator) — potwierdzenie wczytania: teren, mapa, źródła */}
-      {ekran === "poziom1" && rolaAdmin && dane && meta && (
+      {/* POZIOM 1 — potwierdzenie wczytania: teren, mapa, źródła (jeden ekran) */}
+      {ekran === "poziom1" && dane && meta && (
         <PotwierdzenieDanych dane={dane} meta={meta} />
       )}
 
@@ -501,20 +494,8 @@ export default function NowaAnalizaPage() {
         </Karta>
       )}
 
-      {/* POZIOM 2 (klient) — tylko podgląd terenu; wynik poniżej */}
-      {ekran === "poziom2" && !rolaAdmin && dane && (
-        <PodgladTerenu
-          mode={meta?.przylegajace === false ? "nonadjacent" : "ok"}
-          view="level2"
-          height={340}
-          layers={warstwyP2(dane, wynik?.poziom1.profilRekomendowany)}
-          shape={meta?.ksztaltSvg ?? ""}
-          geo={meta?.ksztaltGeo ?? ""}
-        />
-      )}
-
-      {/* POZIOM 2 (administrator) — ocena działki: dane, korekty, przelicz */}
-      {ekran === "poziom2" && rolaAdmin && dane && (
+      {/* POZIOM 2 — ocena działki: mapa, dane, korekty, przelicz (jeden ekran) */}
+      {ekran === "poziom2" && dane && (
         <div className="space-y-4">
           <div className="grid lg:grid-cols-[minmax(0,430px)_1fr] gap-4 items-start">
             <div className="lg:sticky" style={{ top: "var(--grunt-sticky-top)" }}>
@@ -601,8 +582,8 @@ export default function NowaAnalizaPage() {
         </div>
       )}
 
-      {/* POZIOM 3 (administrator) — edytowalne parametry reżimu/montażu */}
-      {ekran === "poziom3" && rolaAdmin && dane && profilFin && (
+      {/* POZIOM 3 — edytowalne parametry reżimu/montażu (jeden ekran) */}
+      {ekran === "poziom3" && dane && profilFin && (
         <div className="space-y-4">
           <Karta tytul="Poziom 3 — parametry reżimu i montażu (A±)" podtytul="Bazowo z konfiguracji reżimu B (program 2027+); modyfikowalne dla scenariuszy">
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -640,7 +621,7 @@ export default function NowaAnalizaPage() {
         <div className="space-y-4">
           {ekran === "poziom1" && (
             <>
-              <Poziom1View p1={wynik.poziom1} pelny={rolaAdmin} />
+              <Poziom1View p1={wynik.poziom1} pelny />
               <BannerBramki
                 tytul="Poziom 1 zaliczony — przejdź do oceny działki"
                 opis="Poziom 2 odsłania model zabudowy i warianty."
