@@ -55,6 +55,17 @@ export interface KonfiguracjaPoziom1 {
   metrazSredniM2: Record<Profil, number>;
   /** Symbole MPZP z dozwoloną zabudową mieszkaniową (wielorodzinna istotna). */
   symboleMieszkaniowe: string[];
+  /** Parametry prognozy potencjału zabudowy (kształt + sąsiedztwo + spadek). */
+  potencjal: KonfiguracjaPotencjal;
+}
+
+/** Kalibracja prognozy potencjału zabudowy (port `potential.py`). */
+export interface KonfiguracjaPotencjal {
+  minSzerokoscWielorodzinnaM: number; // poniżej tej szerokości wielorodzinna trudna
+  gornyLimitPokrycia: number; // górne ograniczenie szacowanego pokrycia (0..1)
+  kondygnacjeFallback: number; // gdy brak wysokości w sąsiedztwie
+  zwartoscNeutralna: number; // przyjmowana zwartość, gdy brak geometrii
+  efektywnoscNeutralna: number; // efektywność kształtu, gdy brak geometrii
 }
 
 export const KONFIG_POZIOM1: KonfiguracjaPoziom1 = {
@@ -63,6 +74,13 @@ export const KONFIG_POZIOM1: KonfiguracjaPoziom1 = {
   wspolczynnikEfektywnosci: 0.8,
   metrazSredniM2: { mlodzi: 41, seniorzy: 45 },
   symboleMieszkaniowe: ["MW", "MWn", "MU", "MW/U", "MN/U", "MN"],
+  potencjal: {
+    minSzerokoscWielorodzinnaM: 18,
+    gornyLimitPokrycia: 0.45,
+    kondygnacjeFallback: 2,
+    zwartoscNeutralna: 0.7,
+    efektywnoscNeutralna: 0.85,
+  },
 };
 
 // ── MODEL OCENY POPYTU (pod-model wymiaru W2) ───────────────────────────────

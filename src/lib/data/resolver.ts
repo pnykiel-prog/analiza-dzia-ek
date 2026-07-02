@@ -12,7 +12,7 @@ import { DZIALKI_PRZYKLADOWE } from "./sample";
 import { skomponujId, odwrotnyTeryt, type PozycjaDzialki } from "../teryt";
 import { statusRynkowy } from "../fieldModes";
 import { pobierzDzialkePoId } from "./uldk";
-import { centroid, centroid4326ZWkt, czyPrzylegaja, konturSvg, konturGeo } from "../geo";
+import { centroid, centroid4326ZWkt, czyPrzylegaja, konturSvg, konturGeo, zwartoscKsztaltu, minSzerokoscKsztaltu } from "../geo";
 import { uruchomKonektory } from "./connectors";
 import type { MetaPola, Teren } from "./connectors/types";
 import { medianaRynkowa, wartoscOdtworzeniowaDla } from "../config-rynek";
@@ -227,6 +227,15 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
         gmina: rev.gmina || dane.gmina,
       };
     }
+  }
+
+  // Metryki kształtu z geometrii ULDK (do prognozy potencjału zabudowy na P1).
+  if (dane && wktZnalezione[0]) {
+    dane = {
+      ...dane,
+      zwartoscKsztaltu: zwartoscKsztaltu(wktZnalezione[0]),
+      minSzerokoscM: minSzerokoscKsztaltu(wktZnalezione[0]),
+    };
   }
 
   // Uruchom konektory danych (GUS, KIMPZP, …) na scalonym terenie i dopełnij białe plamy.

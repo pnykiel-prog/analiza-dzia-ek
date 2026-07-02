@@ -53,6 +53,12 @@ export interface DaneDzialki {
   powierzchniaM2: number;
   frontM: Maybe<number>; // szerokość frontu działki
   proporcjaBokow: Maybe<number>; // dłuższy/krótszy bok (kształt)
+  /** Zwartość kształtu (Polsby-Popper 0..1) z geometrii ULDK — prognoza potencjału. */
+  zwartoscKsztaltu?: Maybe<number>;
+  /** Krótszy bok minimalnego prostokąta otaczającego [m] — szerokość zabudowalna. */
+  minSzerokoscM?: Maybe<number>;
+  /** Deklaracja obecności MPZP (adnotacja „do potwierdzenia w planie" w prognozie). */
+  mpzpObecnosc?: "jest" | "brak" | "nieznane";
   budynkiIstniejace: Maybe<boolean>;
 
   // A/B. Użytki i klasa gruntu (EGiB)
@@ -194,14 +200,39 @@ export interface BrakDanych {
 
 // ── Poziom 1 (rewizja): działka → podstawa planistyczna → pojemność × popyt ──
 
-export type PodstawaTyp = "MPZP" | "WZ" | "PnB" | "BRAK";
+export type PodstawaTyp = "PROGNOZA" | "MPZP" | "WZ" | "PnB" | "BRAK";
 
-/** Ręcznie wprowadzona podstawa planistyczna (S3) — determinizm, bez auto-parsowania. */
+/** Podstawa oceny pojemności na P1. Domyślnie „PROGNOZA" (z kształtu + lokalizacji). */
 export interface PodstawaPlanistyczna {
   typ: PodstawaTyp;
-  symbol?: string; // symbol MPZP (np. MW, MN)
+  symbol?: string; // symbol MPZP (np. MW, MN) — opcjonalna adnotacja
   funkcja?: string; // opis funkcji dla WZ/PnB
-  zrodlo: "ręczne";
+  zrodlo: "ręczne" | "prognoza";
+}
+
+/** Sygnał z sąsiedztwa do prognozy potencjału (docelowo BDOT + NMT; teraz deterministyczny). */
+export interface SasiedztwoDane {
+  pokrycieUdzial: number; // pokrycie zabudową w buforze (0..~0.6)
+  typoweKondygnacje: number; // mediana liczby kondygnacji w otoczeniu
+  liczbaProbki: number; // liczba budynków w próbie (do pewności)
+  wysokosciDostepne: boolean; // czy kondygnacje realne, czy fallback
+  spadekPct: number; // średni spadek terenu [%]
+  zrodlo: "deterministyczne" | "bdot_nmt"; // pochodzenie sygnału
+}
+
+/** Prognoza orientacyjnego potencjału zabudowy (zastępuje ręczne wskaźniki na P1). */
+export interface PrognozaPotencjalu {
+  etykieta: string; // „orientacyjny potencjał zabudowy"
+  powierzchniaDzialkiM2: number;
+  szacowanePokrycie: number; // udział zabudowy 0..1
+  szacowaneKondygnacje: number;
+  powierzchniaZabudowyM2: number;
+  pumM2: number;
+  mieszkania: { mlodzi: number; seniorzy: number };
+  pewnosc: number; // 0–100
+  flagi: string[];
+  flagaMpzp: "jest" | "brak" | "nieznane";
+  sasiedztwo: SasiedztwoDane;
 }
 
 /** Pojemność zabudowy wyliczona z powierzchni działki i ręcznych wskaźników. */
@@ -228,6 +259,8 @@ export interface WynikPoziom1 {
   powierzchniaM2: number;
   podstawa: PodstawaPlanistyczna;
   funkcjaMieszkaniowaDozwolona: boolean;
+  /** Prognoza potencjału zabudowy (z kształtu + sąsiedztwa) — źródło pojemności na P1. */
+  prognoza: PrognozaPotencjalu;
   pojemnosc: PojemnoscP1;
   /** Popyt per profil (na P1 bez mnożnika usług). */
   popyt: { mlodzi: WynikPopytu; seniorzy: WynikPopytu };

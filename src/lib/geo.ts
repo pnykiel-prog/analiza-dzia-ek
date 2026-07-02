@@ -140,13 +140,8 @@ export function konturSvg(
     .join(" ");
 }
 
-/**
- * Największy (główny) pierścień działki jako punkty WGS84 [lon, lat] — do
- * narysowania realnego wielokąta na mapie kaflowej (OSM). Współrzędne WKT są
- * w EPSG:2180, więc każdy wierzchołek reprojektujemy przez `pl1992ToWgs84`.
- * Zwraca `null`, gdy geometria nie zawiera wielokąta.
- */
-export function konturGeo(wkt: string): [number, number][] | null {
+/** Największy (o największym polu) pierścień zewnętrzny z WKT — główna działka. */
+export function najwiekszyPierscien(wkt: string): Punkt[] | null {
   const wielokaty = parsujWielokaty(wkt);
   let ring: Punkt[] | null = null;
   let najw = -1;
@@ -154,7 +149,93 @@ export function konturGeo(wkt: string): [number, number][] | null {
     const p = poleP(w[0]);
     if (p > najw) { najw = p; ring = w[0]; }
   }
-  if (!ring || ring.length < 3) return null;
+  return ring && ring.length >= 3 ? ring : null;
+}
+
+/**
+ * Zwartość kształtu (wskaźnik Polsby-Popper): 4·π·A / P². 1 = koło (idealnie
+ * zwarte), niżej = wydłużone/nieregularne. Podstawa oceny efektywności zabudowy
+ * w prognozie potencjału. `null`, gdy brak wielokąta.
+ */
+export function zwartoscKsztaltu(wkt: string): number | null {
+  const ring = najwiekszyPierscien(wkt);
+  if (!ring) return null;
+  const A = poleP(ring);
+  let P = 0;
+  for (let i = 0; i < ring.length - 1; i++) {
+    P += Math.hypot(ring[i + 1][0] - ring[i][0], ring[i + 1][1] - ring[i][1]);
+  }
+  const first = ring[0], last = ring[ring.length - 1];
+  if (first[0] !== last[0] || first[1] !== last[1]) {
+    P += Math.hypot(first[0] - last[0], first[1] - last[1]); // domknij obwód
+  }
+  if (P <= 0) return null;
+  return Math.max(0, Math.min(1, (4 * Math.PI * A) / (P * P)));
+}
+
+/** Otoczka wypukła (Andrew monotone chain), przeciwnie do ruchu wskazówek zegara. */
+function otoczkaWypukla(pts: Punkt[]): Punkt[] {
+  const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (p.length < 3) return p;
+  const cross = (o: Punkt, a: Punkt, b: Punkt) =>
+    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const dol: Punkt[] = [];
+  for (const pt of p) {
+    while (dol.length >= 2 && cross(dol[dol.length - 2], dol[dol.length - 1], pt) <= 0) dol.pop();
+    dol.push(pt);
+  }
+  const gora: Punkt[] = [];
+  for (let i = p.length - 1; i >= 0; i--) {
+    const pt = p[i];
+    while (gora.length >= 2 && cross(gora[gora.length - 2], gora[gora.length - 1], pt) <= 0) gora.pop();
+    gora.push(pt);
+  }
+  dol.pop(); gora.pop();
+  return dol.concat(gora);
+}
+
+/**
+ * Szerokość działki = krótszy bok minimalnego (co do pola) prostokąta
+ * otaczającego. Dla wydłużonych/obróconych działek dużo wierniejsza niż krótszy
+ * bok obwiedni osiowej. Metoda: obrót względem każdej krawędzi otoczki wypukłej
+ * (min-area rectangle spoczywa na krawędzi otoczki). `null`, gdy brak wielokąta.
+ */
+export function minSzerokoscKsztaltu(wkt: string): number | null {
+  const ring = najwiekszyPierscien(wkt);
+  if (!ring) return null;
+  const hull = otoczkaWypukla(ring);
+  if (hull.length < 3) return null;
+  let najlepszePole = Infinity;
+  let krotszyBok = Infinity;
+  for (let i = 0; i < hull.length; i++) {
+    const a = hull[i], b = hull[(i + 1) % hull.length];
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len; // kierunek krawędzi
+    const px = -uy, py = ux; // prostopadły
+    let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+    for (const [x, y] of hull) {
+      const u = x * ux + y * uy;
+      const v = x * px + y * py;
+      if (u < minU) minU = u; if (u > maxU) maxU = u;
+      if (v < minV) minV = v; if (v > maxV) maxV = v;
+    }
+    const w = maxU - minU, h = maxV - minV;
+    const pole = w * h;
+    if (pole < najlepszePole) { najlepszePole = pole; krotszyBok = Math.min(w, h); }
+  }
+  return Number.isFinite(krotszyBok) ? Math.round(krotszyBok * 10) / 10 : null;
+}
+
+/**
+ * Największy (główny) pierścień działki jako punkty WGS84 [lon, lat] — do
+ * narysowania realnego wielokąta na mapie kaflowej (OSM). Współrzędne WKT są
+ * w EPSG:2180, więc każdy wierzchołek reprojektujemy przez `pl1992ToWgs84`.
+ * Zwraca `null`, gdy geometria nie zawiera wielokąta.
+ */
+export function konturGeo(wkt: string): [number, number][] | null {
+  const ring = najwiekszyPierscien(wkt);
+  if (!ring) return null;
   return ring.map((p) => pl1992ToWgs84(p[0], p[1]));
 }
 

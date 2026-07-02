@@ -23,29 +23,32 @@ test("P1: działka wzorcowa → tryb pełny, funkcja dozwolona, rekomendacja mł
   assert.ok(w.scoreMlodzi >= w.scoreSeniorzy);
   assert.ok(["mlodzi", "oba"].includes(w.profilRekomendowany));
   assert.ok(w.pewnosc >= 80, `pewność powinna być wysoka, jest ${w.pewnosc}`);
-  // Pojemność wyliczona z ręcznych wskaźników podstawy planistycznej.
+  // Pojemność wyliczona z prognozy potencjału (kształt + sąsiedztwo).
   assert.ok(w.pojemnosc.pumM2 !== null && w.pojemnosc.pumM2! > 0);
   assert.ok(w.pojemnosc.szacLiczbaMieszkanMlodzi! >= 15);
 });
 
-test("P1: działka senioralna → podstawa MPZP, tryb pełny, oba profile ocenione", () => {
-  // Po rewizji P1 nie stosuje mnożnika usług (POZ/usługi = Poziom 2), więc
-  // przewaga seniorów wynikająca z usług ujawnia się dopiero na P2.
+test("P1: działka senioralna → prognoza potencjału, tryb pełny, oba profile ocenione", () => {
+  // Po rewizji P1 pojemność liczy PROGNOZA (kształt + sąsiedztwo), nie ręczne wskaźniki;
+  // domyślna podstawa to „PROGNOZA". Mnożnik usług (POZ) ujawnia się dopiero na P2.
   const w = uruchomPoziom1(senioralna);
-  assert.equal(w.podstawa.typ, "MPZP");
+  assert.equal(w.podstawa.typ, "PROGNOZA");
   assert.equal(w.tryb, "pelny");
   assert.equal(w.funkcjaMieszkaniowaDozwolona, true);
   assert.notEqual(w.werdyktSeniorzy, undefined);
   assert.notEqual(w.werdyktMlodzi, undefined);
+  assert.ok(w.prognoza.pumM2 > 0);
   assert.ok(w.pojemnosc.szacLiczbaMieszkanSeniorzy! > 0);
 });
 
-test("P1: białe plamy → tryb ograniczony, funkcja nieprzesądzona, obniżona pewność", () => {
+test("P1: białe plamy → prognoza z powierzchni daje pojemność, funkcja nieprzesądzona, obniżona pewność", () => {
   const w = uruchomPoziom1(bialePlamy);
-  assert.equal(w.tryb, "ograniczony"); // brak wskaźników planistycznych
-  assert.equal(w.funkcjaMieszkaniowaDozwolona, true); // BRAK podstawy → nie blokujemy
-  assert.equal(w.pojemnosc.pumM2, null);
-  assert.notEqual(w.werdykt, "zielony");
+  // Prognoza działa z samej powierzchni i kształtu — pojemność jest oznaczona (tryb pełny),
+  // ale braki demografii/geometrii obniżają pewność.
+  assert.equal(w.tryb, "pelny");
+  assert.equal(w.funkcjaMieszkaniowaDozwolona, true); // brak deklaracji → nie blokujemy
+  assert.ok(w.pojemnosc.pumM2 !== null && w.pojemnosc.pumM2! > 0);
+  assert.equal(w.prognoza.flagaMpzp, "nieznane");
   assert.ok(w.pewnosc < 90, `pewność powinna być obniżona przez braki, jest ${w.pewnosc}`);
 });
 
