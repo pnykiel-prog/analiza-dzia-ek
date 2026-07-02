@@ -32,6 +32,16 @@ test("teryt: nazwa gminy bez etykiety rodzaju (miasto/obszar wiejski)", () => {
   assert.ok(!/\(/.test(r!.gmina), `nazwa nie powinna zawierać etykiety: ${r!.gmina}`);
 });
 
+test("teryt: dzielnice m.st. Warszawy (146501–146519) → gmina Warszawa", () => {
+  const wola = odwrotnyTeryt("146517_8.0705.69"); // Wola
+  assert.ok(wola);
+  assert.equal(wola!.wojewodztwo, "mazowieckie");
+  assert.equal(wola!.powiat, "Warszawa");
+  assert.equal(wola!.gmina, "Warszawa");
+  // Inna dzielnica (Śródmieście) — również mapowana na Warszawę.
+  assert.equal(odwrotnyTeryt("146509_8")!.gmina, "Warszawa");
+});
+
 test("teryt: nieznany kod → null (nie rzuca)", () => {
   assert.equal(odwrotnyTeryt("999999_9.0001.1"), null);
 });
