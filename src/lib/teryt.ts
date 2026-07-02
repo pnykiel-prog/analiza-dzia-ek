@@ -57,7 +57,10 @@ function budujOdwrotny(): void {
 export function odwrotnyTeryt(kodLubId: string): { wojewodztwo: string; powiat: string; gmina: string } | null {
   if (!REV_TERYT) budujOdwrotny();
   const kodGminy = kodLubId.trim().split(".")[0]; // odetnij obręb/numer, jeśli podano pełny id
-  return REV_TERYT!.get(kodGminy) ?? REV_TERYT!.get(kodGminy.split("_")[0]) ?? null;
+  const bezSufiksu = kodGminy.split("_")[0]; // usuń „_R" (rodzaj gminy)
+  // Forma bez podkreślnika, np. „1863011" (WWPPGG + rodzaj) → pierwsze 6 cyfr = kod gminy (WWPPGG).
+  const szescCyfr = kodGminy.replace(/\D/g, "").slice(0, 6);
+  return REV_TERYT!.get(kodGminy) ?? REV_TERYT!.get(bezSufiksu) ?? REV_TERYT!.get(szescCyfr) ?? null;
 }
 
 /** Dane jednej pozycji identyfikacyjnej z formularza. */

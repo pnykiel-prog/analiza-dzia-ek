@@ -20,6 +20,12 @@ test("teryt: sam kod gminy (z sufiksem ULDK i bez) rozpoznawany", () => {
   assert.equal(bezSufiksu!.gmina, "Rzeszów");
 });
 
+test("teryt: forma 7-cyfrowa bez podkreślnika (1863011.…) też rozpoznawana", () => {
+  const r = odwrotnyTeryt("1863011.0001.100/1"); // WWPPGG + rodzaj, bez „_"
+  assert.ok(r);
+  assert.equal(r!.gmina, "Rzeszów");
+});
+
 test("teryt: nazwa gminy bez etykiety rodzaju (miasto/obszar wiejski)", () => {
   const r = odwrotnyTeryt("186301_1");
   assert.ok(r);
