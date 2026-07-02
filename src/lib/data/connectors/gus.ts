@@ -21,14 +21,15 @@ interface JednostkaBDL {
   id: string;
   name: string;
   level?: number;
+  parentId?: string;
 }
 
 /** Wybiera jednostkę BDL pasującą nazwą (dokładnie), w razie braku pierwszą. */
 export function wybierzJednostke(json: unknown, nazwa: string): JednostkaBDL | null {
   const wyniki = (json as { results?: JednostkaBDL[] })?.results;
   if (!Array.isArray(wyniki) || wyniki.length === 0) return null;
-  const norm = (s: string) => s.toLowerCase().trim();
-  return wyniki.find((u) => norm(u.name) === norm(nazwa)) ?? wyniki[0];
+  const dopasuj = (s: string) => s.toLowerCase().trim();
+  return wyniki.find((u) => dopasuj(u.name) === dopasuj(nazwa)) ?? wyniki[0];
 }
 
 /** Pierwsze ID zmiennej z odpowiedzi variables/search. */
@@ -72,13 +73,13 @@ function naglowki(): Record<string, string> {
  * Krytyczne dla limitów BDL: bez X-ClientId równoległe pojedyncze zapytania są
  * odrzucane (429) — jedno zbiorcze omija limit i mieści się w czasie funkcji.
  */
-async function wartosciWielu(unitId: string, varIds: string[]): Promise<Map<string, number | null>> {
+async function wartosciWielu(unitId: string, varIds: string[], rok: number = gus.rok): Promise<Map<string, number | null>> {
   const map = new Map<string, number | null>();
   // BDL ogranicza liczbę var-id na zapytanie — dzielimy na paczki (sekwencyjnie, bez serii równoległych).
   const ROZMIAR_PACZKI = 12;
   for (let i = 0; i < varIds.length; i += ROZMIAR_PACZKI) {
     const paczka = varIds.slice(i, i + ROZMIAR_PACZKI);
-    const qs = new URLSearchParams({ format: "json", year: String(gus.rok) });
+    const qs = new URLSearchParams({ format: "json", year: String(rok) });
     if (gus.clientId) qs.set("client-id", gus.clientId);
     for (const id of paczka) qs.append("var-id", id);
     const odp = await fetchJson<{ results?: { id?: string | number; values?: { year?: string | number; val?: number; attrId?: number }[] }[] }>(
@@ -87,7 +88,7 @@ async function wartosciWielu(unitId: string, varIds: string[]): Promise<Map<stri
     );
     for (const r of odp?.results ?? []) {
       const vals = r.values ?? [];
-      const dop = vals.find((v) => Number(v.year) === gus.rok) ?? [...vals].sort((a, b) => Number(b.year) - Number(a.year))[0];
+      const dop = vals.find((v) => Number(v.year) === rok) ?? [...vals].sort((a, b) => Number(b.year) - Number(a.year))[0];
       // BDL: attrId===0 oznacza brak danych (val bywa 0) — traktujemy jako null.
       const brakDanych = dop?.attrId === 0;
       map.set(String(r.id), !brakDanych && typeof dop?.val === "number" ? dop.val : null);
@@ -152,6 +153,49 @@ function sumaPasm(pasma: PasmoWieku[], m: Map<string, number | null>): number | 
   return suma;
 }
 
+// ── Regionalna baza odniesienia (mediana wojewódzka 20–39) ───────────────────
+
+const norm = (s: string) => s.toLowerCase().trim();
+
+/** Cache: nazwa województwa → id jednostki BDL (poziom 2). Bardzo mała zmienność. */
+const cacheWojId = new Map<string, string>();
+
+/** Znajduje id jednostki województwa po nazwie (Units?level=2). Null, gdy brak. */
+async function jednostkaWojewodztwa(wojNazwa: string): Promise<string | null> {
+  if (!wojNazwa) return null;
+  const klucz = norm(wojNazwa);
+  if (cacheWojId.has(klucz)) return cacheWojId.get(klucz)!;
+  const odp = await fetchJson<{ results?: { id?: string; name?: string }[] }>(
+    url("units", { level: "2", "page-size": "50" }),
+    { ...KONFIG_KONEKTORY.siec, naglowki: naglowki() }
+  );
+  const trafiona = (odp?.results ?? []).find((u) => norm(String(u.name ?? "")) === klucz);
+  if (trafiona?.id) {
+    cacheWojId.set(klucz, trafiona.id);
+    return trafiona.id;
+  }
+  return null;
+}
+
+/** Cache: nazwa województwa → udział 20–39 [%] (regionalna baza odniesienia). */
+const cacheMediana = new Map<string, number>();
+
+/** Udział 20–39 dla województwa (dane BDL). Fallback do stałej krajowej, gdy brak. */
+async function medianaWoj2039(wojNazwa: string, p2039: PasmoWieku[]): Promise<number | null> {
+  if (!wojNazwa || p2039.length === 0) return null;
+  const klucz = norm(wojNazwa);
+  if (cacheMediana.has(klucz)) return cacheMediana.get(klucz)!;
+  const wojId = await jednostkaWojewodztwa(wojNazwa);
+  if (!wojId) return null;
+  const m = await wartosciWielu(wojId, [P2137_OGOLEM_TOTAL, ...p2039.map((p) => p.id)]);
+  const ogolem = m.get(P2137_OGOLEM_TOTAL);
+  const suma = sumaPasm(p2039, m);
+  if (!ogolem || ogolem <= 0 || suma === null) return null;
+  const udzial = Math.round((suma / ogolem) * 1000) / 10;
+  cacheMediana.set(klucz, udzial);
+  return udzial;
+}
+
 export const konektorGUS: Konektor = {
   klucz: "GUS_BDL",
   zrodlo: "GUS Bank Danych Lokalnych",
@@ -209,16 +253,50 @@ export const konektorGUS: Konektor = {
     const podmioty = m.get(idPodmioty) ?? null;
     const saldo = m.get(idSaldo) ?? null;
 
+    const udzial65 = ogolem && ogolem > 0 && pop65 !== null ? (pop65 / ogolem) * 100 : null;
     if (ogolem && ogolem > 0) {
-      if (pop65 !== null) dodaj("udzial65PlusPct", (pop65 / ogolem) * 100, 80);
+      if (udzial65 !== null) dodaj("udzial65PlusPct", udzial65, 80);
       if (pop2039 !== null) {
         dodaj("udzial2039Pct", (pop2039 / ogolem) * 100, 80);
-        dodaj("mediana2039Woj", gus.medianaWiek2039Pct, 55); // baza odniesienia dla „młodych"
+        // Baza odniesienia „młodych": realna mediana wojewódzka (BDL) albo krajowy fallback.
+        const medWoj = await medianaWoj2039(teren.wojewodztwo, p2039);
+        dodaj("mediana2039Woj", medWoj ?? gus.medianaWiek2039Pct, medWoj !== null ? 75 : 55);
       }
     }
     // BDL 60530 to podmioty „na 10 tys." — model/UI używa „na 1000", więc /10.
     dodaj("liczbaPodmiotowGosp", podmioty === null ? null : podmioty / 10);
     dodaj("saldoMigracjiMlodzi", saldo, 70); // proxy: saldo ogółem (nie tylko 25–39)
+
+    // Trend (rok bazowy → bieżący) dla 65+ i ludności ogółem — profil senioralny + „pułapka seniorów".
+    if (ogolem && ogolem > 0) {
+      const mBaza = await wartosciWielu(jednostka.id, [P2137_OGOLEM_TOTAL, ...p65.map((p) => p.id)], gus.rokBazowyTrend);
+      const ogolemBaza = mBaza.get(P2137_OGOLEM_TOTAL);
+      const pop65Baza = p65.length === 2 ? sumaPasm(p65, mBaza) : null;
+      if (ogolemBaza && ogolemBaza > 0) {
+        // Trend ludności → trendLudnosc + populacjaStabilna.
+        const zmianaPop = (ogolem - ogolemBaza) / ogolemBaza;
+        const trendL = zmianaPop > 0.01 ? "rosnaca" : zmianaPop < -0.01 ? "malejaca" : "stabilna";
+        dane.trendLudnosc = trendL;
+        dane.populacjaStabilna = trendL !== "malejaca";
+        meta.push({ pole: "trendLudnosc", zrodlo: this.zrodlo, czas, pewnosc: 75, status: "ok", tryb: "A" });
+        meta.push({ pole: "populacjaStabilna", zrodlo: this.zrodlo, czas, pewnosc: 70, status: "ok", tryb: "A" });
+        // Trend udziału 65+ (punkty proc.) → trend65Plus.
+        if (udzial65 !== null && pop65Baza !== null) {
+          const udzial65Baza = (pop65Baza / ogolemBaza) * 100;
+          const delta = udzial65 - udzial65Baza;
+          dane.trend65Plus = delta > 0.5 ? "rosnacy" : delta < -0.5 ? "malejacy" : "stabilny";
+          meta.push({ pole: "trend65Plus", zrodlo: this.zrodlo, czas, pewnosc: 75, status: "ok", tryb: "A" });
+        }
+      }
+    }
+
+    // Stopa bezrobocia rejestrowanego — poziom powiatu (jednostka nadrzędna gminy).
+    const powiatId = jednostka.parentId;
+    if (powiatId) {
+      const mBezr = await wartosciWielu(powiatId, gus.stopaBezrobociaIds);
+      const stopa = gus.stopaBezrobociaIds.map((id) => mBezr.get(id)).find((v) => v !== null && v !== undefined) ?? null;
+      dodaj("bezrobociePct", stopa ?? null, 85);
+    }
 
     if (Object.keys(dane).length === 0) {
       return brakWyniku(

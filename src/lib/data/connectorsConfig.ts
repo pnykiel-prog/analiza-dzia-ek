@@ -30,8 +30,12 @@ export interface KonfiguracjaKonektorow {
     };
     /** Opcjonalne nadpisanie ID (pomija auto-dobór, gdy ustawione). */
     zmienneId: Partial<Record<keyof KonfiguracjaKonektorow["gus"]["zapytania"], string>>;
-    /** Krajowa mediana odniesienia udziału 20–39 lat [%] — baza porównania grupy „młodzi". */
+    /** Krajowa mediana odniesienia udziału 20–39 lat [%] — fallback, gdy brak danych wojewódzkich. */
     medianaWiek2039Pct: number;
+    /** Rok bazowy do liczenia trendów (65+, ludność) — porównanie z rokiem bieżącym. */
+    rokBazowyTrend: number;
+    /** ID zmiennych „stopa bezrobocia rejestrowanego" (miesięczne, poziom powiatu) — próba po kolei. */
+    stopaBezrobociaIds: string[];
   };
   kimpzp: { aktywny: boolean; endpoint: string; warstwy: string; infoFormat: string };
   /** Generyczne konektory „obecność obiektu w punkcie" (WMS GetFeatureInfo) → bramki. */
@@ -76,6 +80,9 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
     // Pozostałe (ludność ogółem/wiek/bezrobocie) do przypięcia po eksploracji katalogu.
     zmienneId: { podmiotyNa10k: "60530", saldoMigracji: "1365234" },
     medianaWiek2039Pct: 25,
+    rokBazowyTrend: 2015,
+    // „grudzień" i „czerwiec" stopy bezrobocia rejestrowanego (poziom powiatu).
+    stopaBezrobociaIds: ["461691", "461685"],
   },
   kimpzp: {
     aktywny: true,
