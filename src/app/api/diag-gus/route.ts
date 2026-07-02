@@ -38,8 +38,10 @@ export async function GET(req: Request) {
 
   // NAJWAŻNIEJSZE: uruchom REALNY konektor GUS dla gminy i pokaż jego wynik (to samo,
   // co dostaje aplikacja). Jeśli `dane` zawiera udzial2039Pct/udzial65PlusPct — działa.
+  // Województwo z parametru — pozwala zweryfikować realną medianę wojewódzką (bez niego fallback 25).
+  const woj = u.searchParams.get("woj") ?? "";
   const terenDiag: Teren = {
-    id: "diag", teryt: "", wojewodztwo: "", powiat: "", gmina,
+    id: "diag", teryt: "", wojewodztwo: woj, powiat: "", gmina,
     centroid2180: null, centroid4326: null, wktList: [], powierzchniaM2: 0,
   };
   diag.konektorWynik = await konektorGUS.pobierz(terenDiag);
