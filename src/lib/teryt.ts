@@ -60,7 +60,13 @@ export function odwrotnyTeryt(kodLubId: string): { wojewodztwo: string; powiat: 
   const bezSufiksu = kodGminy.split("_")[0]; // usuń „_R" (rodzaj gminy)
   // Forma bez podkreślnika, np. „1863011" (WWPPGG + rodzaj) → pierwsze 6 cyfr = kod gminy (WWPPGG).
   const szescCyfr = kodGminy.replace(/\D/g, "").slice(0, 6);
-  return REV_TERYT!.get(kodGminy) ?? REV_TERYT!.get(bezSufiksu) ?? REV_TERYT!.get(szescCyfr) ?? null;
+  const trafienie = REV_TERYT!.get(kodGminy) ?? REV_TERYT!.get(bezSufiksu) ?? REV_TERYT!.get(szescCyfr);
+  if (trafienie) return trafienie;
+  // m.st. Warszawa: działki są identyfikowane kodami dzielnic (146501–146519, np.
+  // „146517_8" = Wola), których słownik nie zawiera. Wszystkie dzielnice (prefiks
+  // 1465) mapujemy na gminę „Warszawa" — na tym poziomie GUS BDL raportuje demografię.
+  if (szescCyfr.startsWith("1465")) return REV_TERYT!.get("146501") ?? null;
+  return null;
 }
 
 /** Dane jednej pozycji identyfikacyjnej z formularza. */
