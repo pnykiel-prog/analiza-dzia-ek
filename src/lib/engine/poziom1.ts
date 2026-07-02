@@ -1,25 +1,26 @@
 /**
  * Poziom 1 — REWIZJA (deterministyczny, wąski zakres).
- * Zgodny z „wytyczne_claude_code_poziom1_rewizja.md".
  *
  * P1 ocenia wyłącznie trzy rzeczy:
- *  1. Lokalizacja i rozmiar działki (auto z ULDK → powierzchnia).
- *  2. Co można zbudować — z RĘCZNIE wprowadzonej podstawy planistycznej (MPZP/WZ/PnB).
+ *  1. Lokalizacja i rozmiar działki (auto z ULDK → powierzchnia, kształt).
+ *  2. Co można zbudować — PROGNOZA orientacyjnego potencjału zabudowy z kształtu
+ *     działki + zabudowy sąsiedztwa + spadku terenu (zamiast ręcznych wskaźników
+ *     MPZP/WZ/PnB). MPZP jest opcjonalną adnotacją „do potwierdzenia w planie".
  *  3. Popyt — demografia + rynek (bez mnożnika usług; usługi = Poziom 2).
  *
- * Wynik = dopasowanie POJEMNOŚCI zabudowy do POPYTU, osobno dla profilu młodych
- * i senioralnego. Środowisko/uzbrojenie/dostępność/geotechnika → Poziom 2.
+ * Wynik = dopasowanie POJEMNOŚCI (z prognozy) do POPYTU, osobno dla profilu
+ * młodych i senioralnego. Środowisko/uzbrojenie/dostępność/geotechnika → Poziom 2.
  *
- * Determinizm: brak auto-pobierania źródeł spoza zakresu, brak przeliczeń w pętli;
- * podstawa planistyczna pochodzi od użytkownika (eliminuje pętle z parsowania planów).
+ * Determinizm: brak auto-pobierania źródeł w pętli; sygnał z sąsiedztwa jest
+ * deterministyczny (seed z identyfikatora działki).
  */
 
 import type {
   DaneDzialki,
   DopasowanieProfil,
   PodstawaPlanistyczna,
-  PodstawaTyp,
   PojemnoscP1,
+  PrognozaPotencjalu,
   Profil,
   ProfilRekomendowany,
   Werdykt,
@@ -29,46 +30,63 @@ import type {
 import type { KonfiguracjaPoziom1, KonfiguracjaScoring } from "../config";
 import { KONFIG_POPYT, KONFIG_POZIOM1, KONFIG_SCORING } from "../config";
 import { ocenPopyt } from "./popyt";
+import { prognozaPotencjalu, sasiedztwoDeterministyczne } from "./potencjal";
 import { clamp, liniowo } from "./utils";
 import { statusZeSymbolu } from "../mpzp";
 
-// ── Podstawa planistyczna (z danych) ─────────────────────────────────────────
+// ── Podstawa planistyczna ────────────────────────────────────────────────────
 
 function ustalPodstawe(d: DaneDzialki): PodstawaPlanistyczna {
   if (d.podstawa) return d.podstawa;
-  // Wsteczna kompatybilność: wyprowadź z pól planistycznych.
-  const typ: PodstawaTyp =
-    d.statusPlanistyczny === "brak_danych" ? "BRAK" : d.statusPlanistyczny === "ouz" || d.statusPlanistyczny === "plan_ogolny_sprzyjajacy" ? "WZ" : "MPZP";
-  return { typ, zrodlo: "ręczne" };
+  // Domyślnie: prognoza potencjału (bez ręcznych wskaźników).
+  return { typ: "PROGNOZA", zrodlo: "prognoza" };
 }
 
-/** Czy podstawa dopuszcza zabudowę mieszkaniową (wielorodzinną istotną dla SIM). */
-function funkcjaDozwolona(d: DaneDzialki, podstawa: PodstawaPlanistyczna, cfg: KonfiguracjaPoziom1): boolean | null {
+/** Deklarowana/wykryta obecność MPZP — do adnotacji „do potwierdzenia w planie". */
+function obecnoscMpzp(d: DaneDzialki, podstawa: PodstawaPlanistyczna): "jest" | "brak" | "nieznane" {
+  if (podstawa.typ === "MPZP") return "jest";
+  if (d.mpzpObecnosc) return d.mpzpObecnosc;
+  if (podstawa.typ === "BRAK") return "brak";
+  if (d.statusPlanistyczny === "brak_danych") return "nieznane";
+  return "nieznane";
+}
+
+/**
+ * Czy funkcja mieszkaniowa jest dopuszczalna. Prognoza nie blokuje zabudowy —
+ * blokujemy tylko, gdy wprost wskazano sprzeczne przeznaczenie (symbol MPZP
+ * niemieszkaniowy lub jawnie sprzeczny status planistyczny).
+ */
+function funkcjaDozwolona(d: DaneDzialki, podstawa: PodstawaPlanistyczna): boolean | null {
   if (podstawa.symbol) return !statusZeSymbolu(podstawa.symbol).sprzeczne;
-  if (podstawa.typ === "BRAK") return null; // nieoznaczona — nie blokujemy
   if (d.statusPlanistyczny === "sprzeczny") return false;
-  if (d.statusPlanistyczny === "brak_danych") return null;
-  return true; // mpzp_mieszkaniowy / plan_ogolny / ouz
+  return null; // prognoza / brak deklaracji — nie blokujemy
 }
 
-// ── Pojemność zabudowy (z powierzchni + ręcznych wskaźników) ──────────────────
+// ── Pojemność zabudowy z prognozy potencjału ──────────────────────────────────
 
-function liczPojemnosc(d: DaneDzialki, cfg: KonfiguracjaPoziom1): PojemnoscP1 {
-  const w = d.wskaznikiPlanistyczne;
-  if (!w || d.powierzchniaM2 <= 0) {
-    return { maxPowZabudowyM2: null, powCalkowitaM2: null, pumM2: null, szacLiczbaMieszkanMlodzi: null, szacLiczbaMieszkanSeniorzy: null };
-  }
-  // PBC ogranicza powierzchnię zabudowy: zabudowa ≤ (100 − PBC)% działki.
-  const maxZabPct = Math.min(w.maxPowZabudowyPct, 100 - w.minPbcPct);
-  const maxPowZabudowyM2 = (d.powierzchniaM2 * maxZabPct) / 100;
-  const powCalkowitaM2 = w.intensywnosc > 0 ? d.powierzchniaM2 * w.intensywnosc : maxPowZabudowyM2 * w.maxKondygnacje;
-  const pumM2 = powCalkowitaM2 * cfg.wspolczynnikEfektywnosci;
+function liczPrognoze(d: DaneDzialki, mpzp: "jest" | "brak" | "nieznane", cfg: KonfiguracjaPoziom1): PrognozaPotencjalu {
+  const sasiedztwo = sasiedztwoDeterministyczne(d.id || `${d.teryt}-${d.powierzchniaM2}`, d.sredniSpadekPct);
+  return prognozaPotencjalu({
+    powierzchniaM2: d.powierzchniaM2,
+    zwartosc: d.zwartoscKsztaltu ?? null,
+    minSzerokoscM: d.minSzerokoscM ?? d.frontM ?? null,
+    sasiedztwo,
+    mpzp,
+    metrazSredniM2: cfg.metrazSredniM2,
+    wspolczynnikEfektywnosci: cfg.wspolczynnikEfektywnosci,
+    cfg: cfg.potencjal,
+  });
+}
+
+/** Mapuje prognozę na strukturę PojemnoscP1 (zgodność z resztą aplikacji). */
+function pojemnoscZPrognozy(p: PrognozaPotencjalu): PojemnoscP1 {
+  const powCalkowitaM2 = Math.round(p.powierzchniaZabudowyM2 * p.szacowaneKondygnacje);
   return {
-    maxPowZabudowyM2: Math.round(maxPowZabudowyM2),
-    powCalkowitaM2: Math.round(powCalkowitaM2),
-    pumM2: Math.round(pumM2),
-    szacLiczbaMieszkanMlodzi: Math.floor(pumM2 / cfg.metrazSredniM2.mlodzi),
-    szacLiczbaMieszkanSeniorzy: Math.floor(pumM2 / cfg.metrazSredniM2.seniorzy),
+    maxPowZabudowyM2: p.powierzchniaZabudowyM2,
+    powCalkowitaM2,
+    pumM2: p.pumM2,
+    szacLiczbaMieszkanMlodzi: p.mieszkania.mlodzi,
+    szacLiczbaMieszkanSeniorzy: p.mieszkania.seniorzy,
   };
 }
 
@@ -129,8 +147,12 @@ export function uruchomPoziom1(
   cfg: KonfiguracjaPoziom1 = KONFIG_POZIOM1
 ): WynikPoziom1 {
   const podstawa = ustalPodstawe(d);
-  const funkcjaOk = funkcjaDozwolona(d, podstawa, cfg);
-  const pojemnosc = liczPojemnosc(d, cfg);
+  const funkcjaOk = funkcjaDozwolona(d, podstawa);
+  const mpzp = obecnoscMpzp(d, podstawa);
+
+  // Pojemność: PROGNOZA orientacyjnego potencjału (kształt + sąsiedztwo + spadek).
+  const prognoza = liczPrognoze(d, mpzp, cfg);
+  const pojemnosc = pojemnoscZPrognozy(prognoza);
 
   // Popyt: demografia + rynek, BEZ mnożnika usług (usługi = Poziom 2).
   const popytM = ocenPopyt(d, "mlodzi", KONFIG_SCORING, KONFIG_POPYT, true);
@@ -144,17 +166,20 @@ export function uruchomPoziom1(
   const profil = funkcjaOk === false ? "zaden" : profilRekomendowany(scoreMlodzi, scoreSeniorzy, cfg);
   const werdykt = funkcjaOk === false ? "czerwony" : profil === "seniorzy" ? dopSeniorzy.werdykt : dopMlodzi.werdykt;
 
-  const tryb: "pelny" | "ograniczony" = pojemnosc.pumM2 === null ? "ograniczony" : "pelny";
+  const tryb: "pelny" | "ograniczony" = pojemnosc.pumM2 === null || d.powierzchniaM2 <= 0 ? "ograniczony" : "pelny";
 
   const flagi: string[] = [];
   if (funkcjaOk === false)
-    flagi.push("Funkcja mieszkaniowa niedozwolona wg podstawy planistycznej — działka nieprzydatna.");
-  if (tryb === "ograniczony")
-    flagi.push("Brak podstawy planistycznej — pojemność nieoznaczona (tryb ograniczony). Uzupełnij MPZP/WZ/PnB.");
+    flagi.push("Funkcja mieszkaniowa niedozwolona wg wskazanego przeznaczenia — działka nieprzydatna.");
+  // Zawsze zaznaczamy orientacyjny charakter prognozy (nie zastępuje ustaleń planu/decyzji).
+  flagi.push("Pojemność to orientacyjna prognoza z kształtu działki i zabudowy sąsiedztwa — nie zastępuje ustaleń MPZP/WZ (potwierdzenie na Poziomie 2).");
+  for (const f of prognoza.flagi) if (!flagi.includes(f)) flagi.push(f);
   const flagiPopytu = profil === "seniorzy" ? popytS.flagi : profil === "oba" ? [...popytM.flagi, ...popytS.flagi] : popytM.flagi;
   for (const f of flagiPopytu) if (!flagi.includes(f)) flagi.push(f);
 
-  let pewnosc = Math.round((popytM.pewnosc + popytS.pewnosc) / 2);
+  // Pewność P1 = średnia z pewności popytu i pewności prognozy potencjału.
+  const pewnoscPopyt = Math.round((popytM.pewnosc + popytS.pewnosc) / 2);
+  let pewnosc = Math.round((pewnoscPopyt + prognoza.pewnosc) / 2);
   if (tryb === "ograniczony") pewnosc = Math.round(pewnosc * 0.85);
 
   return {
@@ -162,6 +187,7 @@ export function uruchomPoziom1(
     powierzchniaM2: d.powierzchniaM2,
     podstawa,
     funkcjaMieszkaniowaDozwolona: funkcjaOk !== false,
+    prognoza,
     pojemnosc,
     popyt: { mlodzi: popytM, seniorzy: popytS },
     dopasowanie: { mlodzi: dopMlodzi, seniorzy: dopSeniorzy },

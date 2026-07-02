@@ -66,12 +66,10 @@ export default function NowaAnalizaPage() {
   const [licze, setLicze] = useState(false);
   const [recznaPow, setRecznaPow] = useState("");
   const [trybWejscia, setTrybWejscia] = useState<"kaskada" | "id">("id");
-  // Podstawa planistyczna deklarowana ręcznie (ekran wejścia, S3 rewizji P1).
-  const [podstawaTyp, setPodstawaTyp] = useState<"" | "MPZP" | "WZ" | "PnB" | "BRAK">("");
+  // Obecność MPZP — opcjonalna adnotacja do prognozy potencjału (P1, S3).
+  // Pojemność liczy PROGNOZA (kształt + sąsiedztwo); wskaźniki nie są wprowadzane ręcznie.
+  const [podstawaTyp, setPodstawaTyp] = useState<"" | "MPZP" | "BRAK">("");
   const [mpzpSymbol, setMpzpSymbol] = useState("");
-  const [podstawaFunkcja, setPodstawaFunkcja] = useState("");
-  // Ręczne wskaźniki podstawy planistycznej (pojemność P1); puste → fallback do danych auto.
-  const [wsk, setWsk] = useState<Record<string, string>>({ intensywnosc: "", maxKondygnacje: "", maxPowZabudowyPct: "", minPbcPct: "" });
 
   // Override P2 (A±/R) — wartości jako stringi + zbiór skorygowanych pól.
   const [p2, setP2] = useState<Record<string, string>>({});
@@ -98,61 +96,27 @@ export default function NowaAnalizaPage() {
     setPozycje((ps) => (ps.length > 1 ? ps.filter((_, idx) => idx !== i) : ps));
   }
 
-  // Buduje ręczne wskaźniki podstawy planistycznej (pojemność P1); null → fallback do danych auto.
-  // Wystarczy podać intensywność ALBO max pow. zabudowy + kondygnacje — pojemność liczy się z tego,
-  // co jest dostępne (intensywność 0 → pojemność = max pow. zabudowy × kondygnacje).
-  function wskazniki(d: DaneDzialki): DaneDzialki["wskaznikiPlanistyczne"] {
-    const maIntens = wsk.intensywnosc.trim() !== "";
-    const maZab = wsk.maxPowZabudowyPct.trim() !== "";
-    if (!maIntens && !maZab) return d.wskaznikiPlanistyczne; // brak danych → fallback do auto
-    const kond = n(wsk.maxKondygnacje) ?? d.wskaznikiPlanistyczne?.maxKondygnacje ?? 4;
-    const intens = maIntens ? (n(wsk.intensywnosc) ?? 0) : 0;
-    // maxPow potrzebny zawsze (obwiednia P2 + limit PBC); przy braku daj sensowny domyślny.
-    const maxPow = maZab ? (n(wsk.maxPowZabudowyPct) ?? 40) : (d.wskaznikiPlanistyczne?.maxPowZabudowyPct ?? 40);
-    return {
-      intensywnosc: intens,
-      maxWysokoscM: d.wskaznikiPlanistyczne?.maxWysokoscM ?? Math.round(kond * 3.2),
-      maxKondygnacje: kond,
-      maxPowZabudowyPct: maxPow,
-      minPbcPct: n(wsk.minPbcPct) ?? d.wskaznikiPlanistyczne?.minPbcPct ?? 0,
-      normatywParkingowy: d.wskaznikiPlanistyczne?.normatywParkingowy ?? 0.8,
-      udzialUslugPct: d.wskaznikiPlanistyczne?.udzialUslugPct ?? 15,
-    };
-  }
-
-  // Nakłada ręcznie zadeklarowaną podstawę planistyczną (typ + symbol/funkcja + wskaźniki) na dane (przed analizą P1).
+  // Nakłada opcjonalną adnotację o obecności MPZP na dane (przed analizą P1).
+  // Pojemność zawsze liczy PROGNOZA potencjału (kształt + sąsiedztwo) — bez ręcznych wskaźników.
   function zastosujPodstawe(d: DaneDzialki | null): DaneDzialki | null {
     if (!d) return d;
-    if (podstawaTyp === "") return d; // bez deklaracji — użyj danych automatycznych
-    if (podstawaTyp === "BRAK") {
-      return {
-        ...d,
-        statusPlanistyczny: "brak_danych",
-        podstawa: { typ: "BRAK", zrodlo: "ręczne" },
-        wskaznikiPlanistyczne: null,
-        mpzpZadeklarowany: false,
-      };
-    }
     if (podstawaTyp === "MPZP") {
-      const { status, sprzeczne } = statusZeSymbolu(mpzpSymbol);
+      // Symbol jest opcjonalny — służy wyłącznie do wykrycia przeznaczenia sprzecznego z mieszkaniowym.
+      const ocena = mpzpSymbol ? statusZeSymbolu(mpzpSymbol) : null;
       return {
         ...d,
-        statusPlanistyczny: status,
-        przeznaczenieSprzeczneZMieszkaniowa: sprzeczne,
+        statusPlanistyczny: ocena ? ocena.status : d.statusPlanistyczny,
+        przeznaczenieSprzeczneZMieszkaniowa: ocena ? ocena.sprzeczne : d.przeznaczenieSprzeczneZMieszkaniowa,
         mpzpZadeklarowany: true,
-        podstawa: { typ: "MPZP", symbol: mpzpSymbol, zrodlo: "ręczne" },
-        wskaznikiPlanistyczne: wskazniki(d),
+        mpzpObecnosc: "jest",
+        podstawa: { typ: "MPZP", symbol: mpzpSymbol || undefined, zrodlo: "ręczne" },
       };
     }
-    // WZ / PnB — decyzja indywidualna, funkcja mieszkaniowa dopuszczona.
-    return {
-      ...d,
-      statusPlanistyczny: "plan_ogolny_sprzyjajacy",
-      przeznaczenieSprzeczneZMieszkaniowa: false,
-      mpzpZadeklarowany: true,
-      podstawa: { typ: podstawaTyp, funkcja: podstawaFunkcja.trim() || "mieszkaniowa wielorodzinna", zrodlo: "ręczne" },
-      wskaznikiPlanistyczne: wskazniki(d),
-    };
+    if (podstawaTyp === "BRAK") {
+      return { ...d, mpzpZadeklarowany: false, mpzpObecnosc: "brak", podstawa: { typ: "PROGNOZA", zrodlo: "prognoza" } };
+    }
+    // „Nie wiem" — prognoza z adnotacją „obecność MPZP nieznana".
+    return { ...d, mpzpObecnosc: "nieznane", podstawa: { typ: "PROGNOZA", zrodlo: "prognoza" } };
   }
 
   async function analizujP1(e: React.FormEvent) {
@@ -453,24 +417,29 @@ export default function NowaAnalizaPage() {
             </p>
           </Karta>
 
-          {/* Podstawa planistyczna — deklaracja wypełniającego (S3 rewizji P1) */}
+          {/* Co można zbudować — PROGNOZA potencjału (zastępuje ręczne wskaźniki MPZP/WZ/PnB) */}
           <Karta
-            tytul="Podstawa planistyczna"
-            podtytul="Na jakiej podstawie można zabudować działkę? Wybór determinuje pojemność zabudowy na Poziomie 1. Deklaracja zastępuje automatyczne pobranie na tym etapie."
+            tytul="Co można zbudować — prognoza potencjału"
+            podtytul="Poziom 1 automatycznie szacuje orientacyjny potencjał zabudowy z kształtu i lokalizacji działki oraz zabudowy sąsiedztwa — bez ręcznego wprowadzania wskaźników MPZP/WZ/PnB. Poniższe pytanie jest opcjonalne i służy tylko adnotacji."
           >
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[12px] text-grunt-text-muted2 mr-1">Rodzaj podstawy:</span>
-              <Chip selected={podstawaTyp === "MPZP"} onClick={() => setPodstawaTyp("MPZP")}>MPZP (plan miejscowy)</Chip>
-              <Chip selected={podstawaTyp === "WZ"} onClick={() => setPodstawaTyp("WZ")}>Decyzja WZ</Chip>
-              <Chip selected={podstawaTyp === "PnB"} onClick={() => setPodstawaTyp("PnB")}>Pozwolenie na budowę</Chip>
-              <Chip selected={podstawaTyp === "BRAK"} onClick={() => setPodstawaTyp("BRAK")}>Brak podstawy</Chip>
+            <div className="rounded-md bg-grunt-green-bg/60 border border-grunt-green/20 px-3 py-2 text-[12px] text-grunt-text-muted2">
+              <span className="font-semibold text-grunt-text">Prognoza automatyczna:</span> pojemność (pow. zabudowy, PUM,
+              liczba mieszkań) liczona z powierzchni i kształtu działki, typowej zabudowy w otoczeniu oraz spadku terenu.
+              Wynik jest <em>orientacyjny</em> i wymaga potwierdzenia w planie/decyzji na Poziomie 2.
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <span className="text-[12px] text-grunt-text-muted2 mr-1">Czy dla działki obowiązuje MPZP?</span>
+              <Chip selected={podstawaTyp === ""} onClick={() => setPodstawaTyp("")}>Nie wiem</Chip>
+              <Chip selected={podstawaTyp === "MPZP"} onClick={() => setPodstawaTyp("MPZP")}>MPZP obowiązuje</Chip>
+              <Chip selected={podstawaTyp === "BRAK"} onClick={() => setPodstawaTyp("BRAK")}>Brak MPZP</Chip>
             </div>
 
             {podstawaTyp === "MPZP" && (
               <label className="text-sm block mt-3 max-w-md">
-                <span className="text-[11px] font-medium text-grunt-text-muted2">Symbol przeznaczenia z MPZP</span>
+                <span className="text-[11px] font-medium text-grunt-text-muted2">Symbol przeznaczenia z MPZP (opcjonalnie)</span>
                 <select value={mpzpSymbol} onChange={(e) => setMpzpSymbol(e.target.value)} className="inp bg-white mt-1">
-                  <option value="">— wybierz symbol —</option>
+                  <option value="">— nie podaję / nie wiem —</option>
                   {SYMBOLE_MPZP.map((sm) => (
                     <option key={sm.symbol} value={sm.symbol}>{sm.symbol} — {sm.opis}</option>
                   ))}
@@ -482,57 +451,20 @@ export default function NowaAnalizaPage() {
                       : "MPZP mieszkaniowy — zgodny z zabudową społeczną."}
                   </span>
                 )}
-              </label>
-            )}
-
-            {(podstawaTyp === "WZ" || podstawaTyp === "PnB") && (
-              <label className="text-sm block mt-3 max-w-md">
-                <span className="text-[11px] font-medium text-grunt-text-muted2">
-                  Funkcja z {podstawaTyp === "WZ" ? "decyzji o warunkach zabudowy" : "pozwolenia na budowę"} (opcjonalnie)
-                </span>
-                <input
-                  value={podstawaFunkcja}
-                  onChange={(e) => setPodstawaFunkcja(e.target.value)}
-                  className="inp mt-1"
-                  placeholder="np. zabudowa mieszkaniowa wielorodzinna"
-                />
                 <span className="text-[11px] text-grunt-text-faint2 mt-1 block">
-                  Decyzja indywidualna dopuszcza funkcję mieszkaniową; wprowadź wskaźniki, by wyliczyć pojemność.
+                  Symbol służy tylko wykryciu przeznaczenia sprzecznego z mieszkaniowym. Pojemność i tak liczy prognoza.
                 </span>
               </label>
             )}
 
-            {/* Wskaźniki zabudowy — dla MPZP/WZ/PnB. Puste → fallback do danych automatycznych. */}
-            {(podstawaTyp === "MPZP" || podstawaTyp === "WZ" || podstawaTyp === "PnB") && (
-              <div className="mt-4">
-                <div className="text-[11px] uppercase tracking-wide text-grunt-text-faint mb-2">
-                  Wskaźniki zabudowy (pojemność P1) — z wypisu / decyzji
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <WskPole label="Max pow. zabudowy" sufiks="%" k="maxPowZabudowyPct" wsk={wsk} setWsk={setWsk} />
-                  <WskPole label="Min pow. biol. czynna" sufiks="%" k="minPbcPct" wsk={wsk} setWsk={setWsk} />
-                  <WskPole label="Intensywność zabudowy" k="intensywnosc" wsk={wsk} setWsk={setWsk} krok="0.1" />
-                  <WskPole label="Max kondygnacje" k="maxKondygnacje" wsk={wsk} setWsk={setWsk} />
-                </div>
-                <p className="text-[11px] text-grunt-text-faint2 mt-2">
-                  Pozostaw puste, aby użyć wskaźników pobranych automatycznie. Brak wskaźników → tryb ograniczony (pojemność nieoznaczona).
-                </p>
-              </div>
-            )}
-
-            {podstawaTyp === "BRAK" && (
+            {podstawaTyp === "MPZP" && (
               <p className="text-[11px] text-grunt-amber-text2 mt-3 bg-grunt-amber-bg border border-grunt-amber/25 rounded-md px-3 py-2">
-                Brak podstawy planistycznej — Poziom 1 przejdzie w tryb ograniczony: werdykt liczony z samego popytu, pojemność zabudowy nieoznaczona.
-              </p>
-            )}
-            {podstawaTyp === "" && (
-              <p className="text-[11px] text-grunt-text-faint2 mt-2">
-                Bez deklaracji — użyjemy podstawy i wskaźników z danych automatycznych (jeśli dostępne).
+                Obowiązuje MPZP — prognoza pozostaje orientacyjna i wymaga potwierdzenia wskaźnikami z planu (Poziom 2).
               </p>
             )}
           </Karta>
 
-          <button type="submit" disabled={licze || (podstawaTyp === "MPZP" && !mpzpSymbol)} className="btn-primary" style={{ height: "var(--grunt-h-cta)" }}>
+          <button type="submit" disabled={licze} className="btn-primary" style={{ height: "var(--grunt-h-cta)" }}>
             {licze ? "Pobieram dane i liczę…" : "Pobierz dane i analizuj (Poziom 1)"}
           </button>
         </form>
@@ -1075,15 +1007,6 @@ function PoleRynkowe({ label, k, p2, setP2, orig, N, sufiks }: P2Props & { N: nu
       {naglowekPola(`${label}${sufiks ? ` (${sufiks})` : ""}`, tryb, skor)}
       <input type="number" value={p2[k] ?? ""} onChange={(e) => setP2((s) => ({ ...s, [k]: e.target.value }))} className="inp mt-0.5" />
       <span className={`text-[11px] ${kolorStatus}`}>N={N} · {status} · {etykietaZrodla}</span>
-    </label>
-  );
-}
-
-function WskPole({ label, k, wsk, setWsk, sufiks, krok }: { label: string; k: string; wsk: Record<string, string>; setWsk: (f: (s: Record<string, string>) => Record<string, string>) => void; sufiks?: string; krok?: string }) {
-  return (
-    <label className="text-sm block">
-      <span className="text-[11px] text-grunt-text-muted2">{label}{sufiks ? ` (${sufiks})` : ""}</span>
-      <input type="number" step={krok ?? "any"} value={wsk[k] ?? ""} onChange={(e) => setWsk((s) => ({ ...s, [k]: e.target.value }))} className="inp mt-0.5" />
     </label>
   );
 }

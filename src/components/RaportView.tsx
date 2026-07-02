@@ -45,9 +45,9 @@ export function RaportView({ wynik, data }: { wynik: WynikAnalizy; data?: string
       <SekcjaRap numer="02" tytul="Pojemność zabudowy i popyt (Poziom 1)">
         <div className="grid grid-cols-2 gap-4 text-[12px]">
           <div>
-            <div className="text-[10px] uppercase tracking-wide text-grunt-text-faint mb-1">Podstawa planistyczna</div>
+            <div className="text-[10px] uppercase tracking-wide text-grunt-text-faint mb-1">Pojemność (prognoza potencjału)</div>
             <div className="text-grunt-text font-medium">
-              {p1.podstawa.typ}{p1.podstawa.symbol ? ` · ${p1.podstawa.symbol}` : ""} · {p1.tryb === "ograniczony" ? "tryb ograniczony" : "tryb pełny"}
+              {p1.podstawa.typ === "PROGNOZA" ? "Prognoza potencjału" : p1.podstawa.typ}{p1.podstawa.symbol ? ` · ${p1.podstawa.symbol}` : ""} · pewność {p1.prognoza.pewnosc}%
             </div>
             <div className="mt-2 text-grunt-text-muted2">Pojemność (szac. mieszkań): <span className="mono text-grunt-text">M {liczba(p1.pojemnosc.szacLiczbaMieszkanMlodzi)} / S {liczba(p1.pojemnosc.szacLiczbaMieszkanSeniorzy)}</span></div>
           </div>

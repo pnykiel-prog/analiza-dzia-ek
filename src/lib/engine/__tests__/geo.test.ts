@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { powierzchniaZWkt, metrykiZWkt, bbox, bboxStykaja, pl1992ToWgs84, konturSvg, konturGeo } from "../../geo";
+import { powierzchniaZWkt, metrykiZWkt, bbox, bboxStykaja, pl1992ToWgs84, konturSvg, konturGeo, zwartoscKsztaltu, minSzerokoscKsztaltu } from "../../geo";
 import { parsujOdpowiedzUldk } from "../../data/uldk";
 
 test("geo: powierzchnia prostokąta 100×50 = 5000 m²", () => {
@@ -33,6 +33,29 @@ test("geo: kontur WGS84 — reprojekcja pierścienia do [lon,lat] w granicach Po
     assert.ok(lat > 49 && lat < 55, `lat poza Polską: ${lat}`);
   }
   assert.equal(konturGeo("POINT(1 2)"), null);
+});
+
+test("geo: zwartość kształtu (Polsby-Popper) — kwadrat ≈ π/4, wąski pas dużo niżej", () => {
+  const kwadrat = zwartoscKsztaltu("POLYGON((0 0,100 0,100 100,0 100,0 0))");
+  assert.ok(kwadrat !== null && Math.abs(kwadrat! - Math.PI / 4) < 0.02, `kwadrat: ${kwadrat}`);
+  const pas = zwartoscKsztaltu("POLYGON((0 0,200 0,200 10,0 10,0 0))");
+  assert.ok(pas !== null && pas! < kwadrat!, `pas ${pas} powinien być mniej zwarty niż kwadrat ${kwadrat}`);
+  assert.equal(zwartoscKsztaltu("POINT(1 2)"), null);
+});
+
+test("geo: min. szerokość — obrócony prostokąt 100×20 daje krótszy bok ≈ 20 m", () => {
+  // Prostokąt 100×20 obrócony o 45° — obwiednia osiowa myli, min-rect nie.
+  const c = Math.SQRT1_2; // cos45=sin45
+  const pts = [
+    [0, 0],
+    [100 * c, 100 * c],
+    [100 * c - 20 * c, 100 * c + 20 * c],
+    [-20 * c, 20 * c],
+  ];
+  const wkt = `POLYGON((${pts.map((p) => `${p[0]} ${p[1]}`).join(",")},${pts[0][0]} ${pts[0][1]}))`;
+  const w = minSzerokoscKsztaltu(wkt);
+  assert.ok(w !== null && Math.abs(w! - 20) < 1.5, `min szerokość: ${w}`);
+  assert.equal(minSzerokoscKsztaltu("POINT(1 2)"), null);
 });
 
 test("geo: front i proporcja z bbox", () => {

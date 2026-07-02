@@ -4,10 +4,17 @@ import { WskaznikPewnosci } from "./grunt";
 import { etykietaProfilu, liczba, statusSlowny } from "@/lib/format";
 
 const ETYK_PODSTAWA: Record<string, string> = {
+  PROGNOZA: "Prognoza potencjału",
   MPZP: "MPZP (plan miejscowy)",
   WZ: "Decyzja o warunkach zabudowy (WZ)",
   PnB: "Pozwolenie na budowę (PnB)",
   BRAK: "Brak podstawy planistycznej",
+};
+
+const ETYK_MPZP: Record<string, string> = {
+  jest: "MPZP obowiązuje — do potwierdzenia w planie",
+  brak: "brak MPZP",
+  nieznane: "obecność MPZP nieznana",
 };
 
 /**
@@ -16,6 +23,7 @@ const ETYK_PODSTAWA: Record<string, string> = {
  */
 export function Poziom1View({ p1, pelny = true }: { p1: WynikPoziom1; pelny?: boolean }) {
   const poj = p1.pojemnosc;
+  const prog = p1.prognoza;
   // Sygnał braku danych demograficznych: „Grupa docelowa" na fallbacku dla obu profili
   // (tzn. GUS nie dostarczył udziałów wiekowych) — wtedy werdykt jest orientacyjny.
   const grupaFallback = (p: WynikPopytu) => p.skladniki.find((s) => s.nazwa === "Grupa docelowa")?.fallback ?? false;
@@ -48,8 +56,8 @@ export function Poziom1View({ p1, pelny = true }: { p1: WynikPoziom1; pelny?: bo
         <div className="flex items-start gap-3 rounded-md border border-grunt-amber/25 bg-grunt-amber-bg px-3.5 py-2.5">
           <span className="mono grid place-items-center shrink-0 w-6 h-6 rounded-full bg-grunt-amber text-white text-[13px] font-bold">!</span>
           <div>
-            <div className="text-[13px] font-semibold text-grunt-amber-text">Tryb ograniczony — brak podstawy planistycznej</div>
-            <div className="text-[12px] text-grunt-text-muted">Pojemność zabudowy nieoznaczona; werdykt liczony z samego popytu. Uzupełnij MPZP/WZ/PnB, aby ocenić pojemność.</div>
+            <div className="text-[13px] font-semibold text-grunt-amber-text">Tryb ograniczony — brak powierzchni działki</div>
+            <div className="text-[12px] text-grunt-text-muted">Nie udało się ustalić powierzchni (brak geometrii ULDK), więc prognoza potencjału jest niepełna; werdykt oparty głównie na popycie.</div>
           </div>
         </div>
       )}
@@ -62,22 +70,39 @@ export function Poziom1View({ p1, pelny = true }: { p1: WynikPoziom1; pelny?: bo
         Profil rekomendowany: <strong className="text-grunt-text">{etykietaProfilu[p1.profilRekomendowany]}</strong>
       </div>
 
-      {/* Pojemność zabudowy (z podstawy planistycznej) */}
+      {/* Pojemność zabudowy — PROGNOZA orientacyjnego potencjału */}
       <Karta
-        tytul="Pojemność zabudowy"
-        podtytul="Z powierzchni działki (ULDK) i ręcznych wskaźników podstawy planistycznej"
-        prawy={<span className="badge bg-grunt-surface-3 text-grunt-text-muted">{ETYK_PODSTAWA[p1.podstawa.typ]}{p1.podstawa.symbol ? ` · ${p1.podstawa.symbol}` : ""}</span>}
+        tytul="Pojemność zabudowy — prognoza potencjału"
+        podtytul="Orientacyjny potencjał z kształtu działki (ULDK), typowej zabudowy w sąsiedztwie i spadku terenu — nie zastępuje ustaleń planu/decyzji"
+        prawy={
+          <span className="badge bg-grunt-surface-3 text-grunt-text-muted">
+            {ETYK_PODSTAWA[p1.podstawa.typ] ?? "Prognoza potencjału"}
+            {p1.podstawa.symbol ? ` · ${p1.podstawa.symbol}` : ""} · {ETYK_MPZP[prog.flagaMpzp]}
+          </span>
+        }
       >
         {poj.pumM2 === null ? (
-          <p className="text-[12px] text-grunt-text-muted2">Pojemność nieoznaczona — brak wskaźników podstawy planistycznej (tryb ograniczony).</p>
+          <p className="text-[12px] text-grunt-text-muted2">Pojemność nieoznaczona — brak powierzchni działki (tryb ograniczony).</p>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <Statystyka etykieta="Powierzchnia działki" wartosc={liczba(p1.powierzchniaM2, " m²")} />
-            <Statystyka etykieta="Max pow. zabudowy" wartosc={liczba(poj.maxPowZabudowyM2, " m²")} />
-            <Statystyka etykieta="Pow. całkowita" wartosc={liczba(poj.powCalkowitaM2, " m²")} />
-            <Statystyka etykieta="PUM (szac.)" wartosc={liczba(poj.pumM2, " m²")} akcent />
-            <Statystyka etykieta="Szac. mieszkań (M / S)" wartosc={`${liczba(poj.szacLiczbaMieszkanMlodzi)} / ${liczba(poj.szacLiczbaMieszkanSeniorzy)}`} />
-          </div>
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <Statystyka etykieta="Powierzchnia działki" wartosc={liczba(p1.powierzchniaM2, " m²")} />
+              <Statystyka etykieta="Szac. pokrycie" wartosc={`${Math.round(prog.szacowanePokrycie * 100)}%`} />
+              <Statystyka etykieta="Szac. kondygnacje" wartosc={liczba(prog.szacowaneKondygnacje)} />
+              <Statystyka etykieta="Pow. zabudowy (szac.)" wartosc={liczba(poj.maxPowZabudowyM2, " m²")} />
+              <Statystyka etykieta="Pow. całkowita" wartosc={liczba(poj.powCalkowitaM2, " m²")} />
+              <Statystyka etykieta="PUM (szac.)" wartosc={liczba(poj.pumM2, " m²")} akcent />
+              <Statystyka etykieta="Szac. mieszkań (M / S)" wartosc={`${liczba(poj.szacLiczbaMieszkanMlodzi)} / ${liczba(poj.szacLiczbaMieszkanSeniorzy)}`} />
+              <Statystyka etykieta="Pewność prognozy" wartosc={`${prog.pewnosc}%`} />
+            </div>
+            {prog.flagi.length > 0 && (
+              <ul className="mt-3 space-y-1">
+                {prog.flagi.map((f, i) => (
+                  <li key={i} className="text-[11px] text-grunt-text-muted bg-grunt-surface-3 rounded px-2.5 py-1.5">• {f}</li>
+                ))}
+              </ul>
+            )}
+          </>
         )}
       </Karta>
 
