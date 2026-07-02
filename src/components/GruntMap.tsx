@@ -26,6 +26,7 @@ export function GruntMap({
   layers = {},
   height = 420,
   shape = "",
+  geo = "",
 }: {
   mode?: TrybMapy;
   view?: WidokMapy;
@@ -33,9 +34,13 @@ export function GruntMap({
   height?: number;
   /** Realny kontur działki (punkty SVG „x,y …" z geometrii ULDK). Pusty → schemat. */
   shape?: string;
+  /** Realny kontur działki WGS84 (JSON [[lon,lat]…]) — rysowany na mapie kaflowej OSM. Pusty → schemat. */
+  geo?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const layersJson = JSON.stringify(layers);
+  // atrybut HTML w dangerouslySetInnerHTML — escapujemy cudzysłowy z JSON geo.
+  const geoAttr = geo.replace(/"/g, "&quot;");
 
   useEffect(() => {
     // Ustawiamy atrybuty na istniejącym elemencie (jeśli już zdefiniowany) —
@@ -46,8 +51,9 @@ export function GruntMap({
       el.setAttribute("view", view);
       el.setAttribute("layers", layersJson);
       el.setAttribute("shape", shape);
+      el.setAttribute("geo", geo);
     }
-  }, [mode, view, layersJson, shape]);
+  }, [mode, view, layersJson, shape, geo]);
 
   return (
     <>
@@ -56,7 +62,7 @@ export function GruntMap({
         ref={ref}
         style={{ width: "100%", height }}
         dangerouslySetInnerHTML={{
-          __html: `<grunt-map mode="${mode}" view="${view}" layers='${layersJson}' shape="${shape}" style="display:block;width:100%;height:${height}px"></grunt-map>`,
+          __html: `<grunt-map mode="${mode}" view="${view}" layers='${layersJson}' shape="${shape}" geo="${geoAttr}" style="display:block;width:100%;height:${height}px"></grunt-map>`,
         }}
       />
     </>
@@ -70,12 +76,14 @@ export function PodgladTerenu({
   layers,
   height,
   shape = "",
+  geo = "",
 }: {
   mode: TrybMapy;
   view?: WidokMapy;
   layers?: WarstwyMapy;
   height?: number;
   shape?: string;
+  geo?: string;
 }) {
   const badge =
     mode === "ok"
@@ -90,7 +98,7 @@ export function PodgladTerenu({
         <span className={`badge ${badge.klasa}`}>{badge.txt}</span>
       </div>
       <div className="bg-grunt-map-bg">
-        <GruntMap mode={mode} view={view} layers={layers} height={height} shape={shape} />
+        <GruntMap mode={mode} view={view} layers={layers} height={height} shape={shape} geo={geo} />
       </div>
     </section>
   );

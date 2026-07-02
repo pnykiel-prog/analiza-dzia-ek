@@ -12,7 +12,7 @@ import { DZIALKI_PRZYKLADOWE } from "./sample";
 import { skomponujId, odwrotnyTeryt, type PozycjaDzialki } from "../teryt";
 import { statusRynkowy } from "../fieldModes";
 import { pobierzDzialkePoId } from "./uldk";
-import { centroid, centroid4326ZWkt, czyPrzylegaja, konturSvg } from "../geo";
+import { centroid, centroid4326ZWkt, czyPrzylegaja, konturSvg, konturGeo } from "../geo";
 import { uruchomKonektory } from "./connectors";
 import type { MetaPola, Teren } from "./connectors/types";
 import { medianaRynkowa, wartoscOdtworzeniowaDla } from "../config-rynek";
@@ -48,6 +48,8 @@ export interface MetaRozwiazania {
   metaPol: MetaPola[];
   /** Kontur działki (punkty SVG) z geometrii ULDK — do narysowania realnego kształtu; null bez geometrii. */
   ksztaltSvg: string | null;
+  /** Kontur działki WGS84 [[lon,lat]…] (JSON) — do umieszczenia na realnej mapie kaflowej; null bez geometrii. */
+  ksztaltGeo: string | null;
 }
 
 export interface RozwiazanieDzialek {
@@ -268,6 +270,8 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
   };
 
   const ksztaltSvg = wktZnalezione[0] ? konturSvg(wktZnalezione[0]) : null;
+  const geoPkt = wktZnalezione[0] ? konturGeo(wktZnalezione[0]) : null;
+  const ksztaltGeo = geoPkt && geoPkt.length >= 3 ? JSON.stringify(geoPkt) : null;
 
   return {
     dane,
@@ -280,6 +284,7 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
       raportZrodel,
       metaPol,
       ksztaltSvg,
+      ksztaltGeo,
     },
   };
 }
