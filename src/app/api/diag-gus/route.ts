@@ -2,6 +2,15 @@ import { NextResponse } from "next/server";
 import { KONFIG_KONEKTORY } from "@/lib/data/connectorsConfig";
 import { konektorGUS } from "@/lib/data/connectors/gus";
 import type { Teren } from "@/lib/data/connectors/types";
+import { rozwiazDzialki } from "@/lib/data/resolver";
+
+/** Maskowanie klucza API w dowolnej odpowiedzi diagnostyki. */
+function odpowiedz(obj: unknown): NextResponse {
+  let txt = JSON.stringify(obj, null, 2);
+  const klucz = KONFIG_KONEKTORY.gus.clientId;
+  if (klucz) txt = txt.split(klucz).join("***");
+  return new NextResponse(txt, { status: 200, headers: { "content-type": "application/json; charset=utf-8" } });
+}
 
 /**
  * Diagnostyka konektora GUS BDL — pokazuje DOKŁADNIE to, co dostaje aplikacja:
@@ -14,9 +23,38 @@ import type { Teren } from "@/lib/data/connectors/types";
  */
 export async function GET(req: Request) {
   const u = new URL(req.url);
+  const gus = KONFIG_KONEKTORY.gus;
+
+  // TRYB APLIKACJI: podaj identyfikator działki (?id=…) — uruchamiamy DOKŁADNIE ten sam
+  // resolver co /nowa i pokazujemy, jaką gminę rozpoznał i czy demografia GUS trafiła do danych.
+  const id = u.searchParams.get("id");
+  if (id) {
+    const r = await rozwiazDzialki([{ wojewodztwo: "", powiat: "", gmina: "", obreb: "", numer: "", idBezposredni: id }]);
+    const d = r.dane;
+    const gusRaport = r.meta.raportZrodel.find((x) => x.klucz === "GUS_BDL");
+    return odpowiedz({
+      trybAplikacji: true,
+      idWejscie: id,
+      rozpoznanaGmina: d?.gmina || "(pusta!)",
+      rozpoznaneWojewodztwo: d?.wojewodztwo || "(puste!)",
+      powierzchniaM2: d?.powierzchniaM2 ?? null,
+      demografia: {
+        udzial2039Pct: d?.udzial2039Pct ?? null,
+        udzial65PlusPct: d?.udzial65PlusPct ?? null,
+        mediana2039Woj: d?.mediana2039Woj ?? null,
+        bezrobociePct: d?.bezrobociePct ?? null,
+        saldoMigracjiMlodzi: d?.saldoMigracjiMlodzi ?? null,
+      },
+      gusRaport: gusRaport ?? "(konektor GUS nie w raporcie)",
+      wniosek:
+        d?.udzial2039Pct != null
+          ? "✅ Resolver ma demografię — aplikacja powinna pokazać zróżnicowany werdykt."
+          : `❌ Resolver NIE ma demografii. Rozpoznana gmina: „${d?.gmina || ""}". Powód z GUS: ${gusRaport?.debug ?? gusRaport?.status ?? "brak"}.`,
+    });
+  }
+
   const gmina = u.searchParams.get("gmina") ?? "Rzeszów";
   const woj = u.searchParams.get("woj") ?? "";
-  const gus = KONFIG_KONEKTORY.gus;
 
   const teren: Teren = {
     id: "diag", teryt: "", wojewodztwo: woj, powiat: "", gmina,
@@ -47,8 +85,5 @@ export async function GET(req: Request) {
     wniosek,
   };
 
-  // Maskujemy klucz API w całej odpowiedzi (diagnostyka bywa wklejana).
-  let txt = JSON.stringify(diag, null, 2);
-  if (gus.clientId) txt = txt.split(gus.clientId).join("***");
-  return new NextResponse(txt, { status: 200, headers: { "content-type": "application/json; charset=utf-8" } });
+  return odpowiedz(diag);
 }
