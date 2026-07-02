@@ -6,6 +6,11 @@ export function clamp(x: number, min = 0, max = 100): number {
   return Math.min(max, Math.max(min, x));
 }
 
+/** Obcięcie do [0,1] (indeksy znormalizowane). */
+export function clamp01(x: number): number {
+  return Math.min(1, Math.max(0, x));
+}
+
 /** Punktacja progowa malejąca: zwraca pkt dla pierwszego progu, który `x` spełnia. */
 export function progi(
   x: number,

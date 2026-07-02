@@ -259,12 +259,16 @@ export const konektorGUS: Konektor = {
     //  odporne (nie wymaga kompletu 13 pasm 0–64). Plus ludność ogółem, podmioty, saldo.
     const idPodmioty = gus.zmienneId.podmiotyNa10k ?? "60530";
     const idSaldo = gus.zmienneId.saldoMigracji ?? "1365234";
+    const idDochod = gus.dochodId;
+    const idZamel = gus.zameldowaniaId;
+    const idWymel = gus.wymeldowaniaId;
+    const opcjonalne = [idDochod, idZamel, idWymel].filter(Boolean) as string[];
     const pasma = await pasmaWiekuOgolem();
     const p2039 = pasma.filter((p) => p.lo >= 20 && p.hi <= 39 && p.hi - p.lo === 4);
     const p65_69 = pasma.find((p) => p.lo === 65 && p.hi === 69);
     const p70plus = pasma.find((p) => p.lo === 70 && p.hi === Infinity); // agregat „70 i więcej"
     const p65 = [p65_69, p70plus].filter(Boolean) as PasmoWieku[];
-    const potrzebne = [...new Set([P2137_OGOLEM_TOTAL, ...p2039.map((p) => p.id), ...p65.map((p) => p.id), idPodmioty, idSaldo])];
+    const potrzebne = [...new Set([P2137_OGOLEM_TOTAL, ...p2039.map((p) => p.id), ...p65.map((p) => p.id), idPodmioty, idSaldo, ...opcjonalne])];
     const m = await wartosciWielu(jednostka.id, potrzebne);
     if ([...m.values()].every((v) => v === null)) {
       return brakWyniku(
@@ -281,6 +285,20 @@ export const konektorGUS: Konektor = {
     const saldo = m.get(idSaldo) ?? null;
 
     const udzial65 = ogolem && ogolem > 0 && pop65 !== null ? (pop65 / ogolem) * 100 : null;
+    // Liczby bezwzględne (popyt P1: trójdzielny podział + benchmarki per mieszkaniec).
+    if (ogolem && ogolem > 0) dodaj("liczbaMieszkancowGminy", ogolem, 85);
+    if (pop2039 !== null) dodaj("liczba2039", pop2039, 80);
+    if (pop65 !== null) dodaj("liczba65Plus", pop65, 80);
+    // Dochód i migracje brutto — tylko gdy skonfigurowano ID zmiennych BDL (inaczej fallback w modelu).
+    if (idDochod) dodaj("dochodPrzecietnyGmina", m.get(idDochod) ?? null, 70);
+    if (idZamel && ogolem && ogolem > 0) {
+      const z = m.get(idZamel);
+      dodaj("naplywZameldowanNa1000", z == null ? null : (z / ogolem) * 1000, 75);
+    }
+    if (idWymel && ogolem && ogolem > 0) {
+      const w = m.get(idWymel);
+      dodaj("odplywMlodychNa1000", w == null ? null : (w / ogolem) * 1000, 65);
+    }
     if (ogolem && ogolem > 0) {
       if (udzial65 !== null) dodaj("udzial65PlusPct", udzial65, 80);
       if (pop2039 !== null) {

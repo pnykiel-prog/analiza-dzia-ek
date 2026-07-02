@@ -22,7 +22,8 @@ test("P1: działka wzorcowa → tryb pełny, funkcja dozwolona, rekomendacja mł
   assert.equal(w.tryb, "pelny");
   assert.ok(w.scoreMlodzi >= w.scoreSeniorzy);
   assert.ok(["mlodzi", "oba"].includes(w.profilRekomendowany));
-  assert.ok(w.pewnosc >= 80, `pewność powinna być wysoka, jest ${w.pewnosc}`);
+  // Pewność obniżana świadomie przez estymację podziału dochodowego (q) — wytyczne §8.
+  assert.ok(w.pewnosc >= 65, `pewność powinna być rozsądna, jest ${w.pewnosc}`);
   // Pojemność wyliczona z prognozy potencjału (kształt + sąsiedztwo).
   assert.ok(w.pojemnosc.pumM2 !== null && w.pojemnosc.pumM2! > 0);
   assert.ok(w.pojemnosc.szacLiczbaMieszkanMlodzi! >= 15);
