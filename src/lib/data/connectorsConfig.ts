@@ -99,7 +99,9 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
     // wynagrodzenie = 64429 (potwierdzone diagnostyką /api/diag-gus?vars=…): indeks
     // „w relacji do średniej krajowej (Polska=100)", jednostka %, poziom powiatu →
     // konektor przelicza na zł przez `wynagrodzenieKrajoweMies`.
-    zmienneId: { podmiotyNa10k: "60530", saldoMigracji: "1365234", wynagrodzenie: "64429" },
+    // Potwierdzone diagnostyką /api/diag-gus?vars=… (poziom gminy, „· ogółem"):
+    //   zameldowania (napływ) = 80121 [osoba]; wymeldowania (odpływ) = do potwierdzenia.
+    zmienneId: { podmiotyNa10k: "60530", saldoMigracji: "1365234", wynagrodzenie: "64429", zameldowania: "80121" },
     medianaWiek2039Pct: 25,
     rokBazowyTrend: 2015,
     // „grudzień" i „czerwiec" stopy bezrobocia rejestrowanego (poziom powiatu).
