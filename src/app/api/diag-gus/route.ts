@@ -58,6 +58,8 @@ export async function GET(req: Request) {
         liczba2039: d?.liczba2039 ?? null,
         liczba65Plus: d?.liczba65Plus ?? null,
         dochodPrzecietnyGmina: d?.dochodPrzecietnyGmina ?? null,
+        naplywZameldowanNa1000: d?.naplywZameldowanNa1000 ?? null,
+        odplywMlodychNa1000: d?.odplywMlodychNa1000 ?? null,
       },
       gusRaport: gusRaport ?? "(konektor GUS nie w raporcie)",
       wniosek:
