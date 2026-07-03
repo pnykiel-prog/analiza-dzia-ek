@@ -66,9 +66,13 @@ test("uzgodnienieM2: więcej danych → wyższa pewność i pozyskanychPct; brak
   assert.equal(wPuste.pozyskanychPct, 0);
 });
 
-test("uzgodnienieM2: formatowanie wartości (jednostka, bool)", () => {
+test("uzgodnienieM2: formatowanie wartości (jednostka, bool, wskaźniki → skrót)", () => {
   const w = uzgodnijM2(bazowa);
   assert.equal(wartoscPolaTekst(w.pola.find((p) => p.klucz === "sredniSpadekPct")!), "6 %");
   assert.equal(wartoscPolaTekst(w.pola.find((p) => p.klucz === "przystanekZCzestotliwoscia")!), "tak");
   assert.equal(wartoscPolaTekst(w.pola.find((p) => p.klucz === "natura2000")!), "—");
+  // Wskaźniki planistyczne (obiekt) → zwięzły skrót zamiast [object Object].
+  const zWsk = uzgodnijM2({ wskaznikiPlanistyczne: { intensywnosc: 1.2, maxKondygnacje: 5, maxPowZabudowyPct: 40 } } as unknown as DaneDzialki);
+  const wsk = zWsk.pola.find((p) => p.klucz === "wskaznikiPlanistyczne")!;
+  assert.equal(wartoscPolaTekst(wsk), "int. 1.2 · 5 kond. · 40% zab.");
 });
