@@ -127,22 +127,42 @@ export async function diagKimpzp(
   return { formatUzyty: null, url: ostatniUrl, dlugosc: 0, przeznaczenie: null, metryka: null, pusty: true, surowa: null };
 }
 
-/** Lekka sonda KIMPZP (jedno zapytanie z retry): klasyfikuje pokrycie planami w punkcie. */
+/** Sygnał pokrycia KIMPZP w punkcie — rozróżnia brak serwisu (dziura) od braku planu (pokryte). */
+export type SygnalKimpzp =
+  | "plan" // jest plan (metryka/przeznaczenie)
+  | "serwis_bez_planu" // serwis gminy odpowiada, w tym punkcie brak planu → POKRYTE
+  | "brak_serwisu" // „brak serwisu dla wskazanego obszaru" → DZIURA (brak integracji)
+  | "blad_serwisu" // ServiceException / nie da się wyrenderować → DZIURA (integracja zepsuta)
+  | "pusto" // pusty wynik strukturalny (ROWSET/features) → niejednoznaczne
+  | "niejasne" // treść nierozpoznana
+  | "blad"; // brak odpowiedzi (sieć)
+
+/** Klasyfikuje odpowiedź KIMPZP na sygnał pokrycia (czyta komunikaty serwisu). */
+export function sygnalZTekstu(tekst: string | null): { sygnal: SygnalKimpzp; przeznaczenie: StatusPlanistyczny | null; symbol?: string } {
+  if (tekst == null) return { sygnal: "blad", przeznaczenie: null };
+  const strukt = parsujMpzpJson(tekst);
+  if (strukt && (strukt.status || strukt.meta.symbol || strukt.meta.standard)) {
+    return { sygnal: "plan", przeznaczenie: strukt.status, symbol: strukt.meta.symbol ?? strukt.meta.standard };
+  }
+  const przez = rozpoznajPrzeznaczenie(tekst);
+  if (przez) return { sygnal: "plan", przeznaczenie: przez };
+  const t = tekst.toLowerCase();
+  if (/brak serwisu/.test(t)) return { sygnal: "brak_serwisu", przeznaczenie: null };
+  if (/serviceexception|invalidxsltemplate|can'?t template|nie mo[żz]na/.test(t)) return { sygnal: "blad_serwisu", przeznaczenie: null };
+  if (/brak wyniku dla wskazanego obszaru|brak wyniku/.test(t)) return { sygnal: "serwis_bez_planu", przeznaczenie: null };
+  if (czyPustyWynik(tekst)) return { sygnal: "pusto", przeznaczenie: null };
+  return { sygnal: "niejasne", przeznaczenie: null };
+}
+
+/** Lekka sonda KIMPZP (jedno zapytanie z retry): sygnał pokrycia w punkcie. */
 export async function sondaKimpzp(
   x: number,
   y: number,
   opcje?: { timeoutMs?: number; proby?: number; raw?: boolean }
-): Promise<{ status: "ma_plany" | "pusto" | "niejasne" | "blad"; przeznaczenie: StatusPlanistyczny | null; symbol?: string; raw?: string | null }> {
+): Promise<{ sygnal: SygnalKimpzp; przeznaczenie: StatusPlanistyczny | null; symbol?: string; raw?: string | null }> {
   const tekst = await fetchTekst(urlGetFeatureInfo(x, y), { timeoutMs: opcje?.timeoutMs ?? 8000, proby: opcje?.proby ?? 2 });
   const raw = opcje?.raw ? (tekst == null ? null : tekst.slice(0, 600)) : undefined;
-  if (tekst == null) return { status: "blad", przeznaczenie: null, raw };
-  const strukt = parsujMpzpJson(tekst);
-  if (strukt && (strukt.status || strukt.meta.symbol || strukt.meta.standard)) {
-    return { status: "ma_plany", przeznaczenie: strukt.status, symbol: strukt.meta.symbol ?? strukt.meta.standard, raw };
-  }
-  const przez = rozpoznajPrzeznaczenie(tekst);
-  if (przez) return { status: "ma_plany", przeznaczenie: przez, raw };
-  return { status: czyPustyWynik(tekst) ? "pusto" : "niejasne", przeznaczenie: null, raw };
+  return { ...sygnalZTekstu(tekst), raw };
 }
 
 export const konektorKIMPZP: Konektor = {
