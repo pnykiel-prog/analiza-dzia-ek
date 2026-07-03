@@ -88,11 +88,14 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       wynagrodzenie: "przeciętne miesięczne wynagrodzenia brutto",
     },
     dochodMnoznikWynagrodzenie: 1.0,
-    wynagrodzenieKrajoweMies: 7200,
+    wynagrodzenieKrajoweMies: 7155,
     // Potwierdzone ID zmiennych BDL (diagnostyka /api/diag-gus, gmina Rzeszów):
     // podmioty na 10 tys. = 60530 (wart. 1804), saldo migracji = 1365234 (wart. 622).
     // Pozostałe (ludność ogółem/wiek/bezrobocie) do przypięcia po eksploracji katalogu.
-    zmienneId: { podmiotyNa10k: "60530", saldoMigracji: "1365234" },
+    // wynagrodzenie = 64429 (potwierdzone diagnostyką /api/diag-gus?vars=…): indeks
+    // „w relacji do średniej krajowej (Polska=100)", jednostka %, poziom powiatu →
+    // konektor przelicza na zł przez `wynagrodzenieKrajoweMies`.
+    zmienneId: { podmiotyNa10k: "60530", saldoMigracji: "1365234", wynagrodzenie: "64429" },
     medianaWiek2039Pct: 25,
     rokBazowyTrend: 2015,
     // „grudzień" i „czerwiec" stopy bezrobocia rejestrowanego (poziom powiatu).
