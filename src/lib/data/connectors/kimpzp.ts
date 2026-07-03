@@ -127,6 +127,22 @@ export async function diagKimpzp(
   return { formatUzyty: null, url: ostatniUrl, dlugosc: 0, przeznaczenie: null, metryka: null, pusty: true, surowa: null };
 }
 
+/** Lekka sonda KIMPZP (jedno zapytanie): klasyfikuje pokrycie planami w punkcie. */
+export async function sondaKimpzp(
+  x: number,
+  y: number
+): Promise<{ status: "ma_plany" | "pusto" | "niejasne" | "blad"; przeznaczenie: StatusPlanistyczny | null; symbol?: string }> {
+  const tekst = await fetchTekst(urlGetFeatureInfo(x, y), { timeoutMs: 6000, proby: 1 });
+  if (tekst == null) return { status: "blad", przeznaczenie: null };
+  const strukt = parsujMpzpJson(tekst);
+  if (strukt && (strukt.status || strukt.meta.symbol || strukt.meta.standard)) {
+    return { status: "ma_plany", przeznaczenie: strukt.status, symbol: strukt.meta.symbol ?? strukt.meta.standard };
+  }
+  const przez = rozpoznajPrzeznaczenie(tekst);
+  if (przez) return { status: "ma_plany", przeznaczenie: przez };
+  return { status: czyPustyWynik(tekst) ? "pusto" : "niejasne", przeznaczenie: null };
+}
+
 export const konektorKIMPZP: Konektor = {
   klucz: "KIMPZP",
   zrodlo: "KIMPZP (Krajowa Integracja MPZP)",
