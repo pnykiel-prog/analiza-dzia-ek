@@ -44,16 +44,27 @@ export function czyPustyWynik(tekst: string): boolean {
   return false;
 }
 
-/** Poprawny, PUSTY GeoJSON FeatureCollection — dowód, że serwis wektorowy odpowiedział (brak planu w punkcie). */
-export function czyPustaKolekcjaGeoJson(tekst: string): boolean {
+/**
+ * Klasa odpowiedzi GeoJSON: „brak" (nie GeoJSON), „pusta" (FeatureCollection bez cech —
+ * serwis odpowiedział, brak planu w punkcie) lub „zCechami" (≥1 cecha — plan obecny w punkcie).
+ * Sam fakt poprawnego GeoJSON to dowód działającego serwisu wektorowego (raster/brak integracji
+ * zwraca komunikat lub XML, nie GeoJSON).
+ */
+export function klasaKolekcjiGeoJson(tekst: string): "brak" | "pusta" | "zCechami" {
   const t = tekst.trim();
-  if (!t.startsWith("{")) return false;
+  if (!t.startsWith("{")) return "brak";
   try {
     const o = JSON.parse(t) as { type?: string; features?: unknown[] };
-    return o?.type === "FeatureCollection" && Array.isArray(o.features) && o.features.length === 0;
+    if (o?.type !== "FeatureCollection" || !Array.isArray(o.features)) return "brak";
+    return o.features.length === 0 ? "pusta" : "zCechami";
   } catch {
-    return false;
+    return "brak";
   }
+}
+
+/** Poprawny, PUSTY GeoJSON FeatureCollection — dowód, że serwis wektorowy odpowiedział (brak planu w punkcie). */
+export function czyPustaKolekcjaGeoJson(tekst: string): boolean {
+  return klasaKolekcjiGeoJson(tekst) === "pusta";
 }
 
 /**
@@ -197,9 +208,12 @@ export function sygnalZTekstu(tekst: string | null): { sygnal: SygnalKimpzp; prz
   if (/brak serwisu/.test(t)) return { sygnal: "brak_serwisu", przeznaczenie: null };
   if (/serviceexception|invalidxsltemplate|can'?t template|nie mo[żz]na/.test(t)) return { sygnal: "blad_serwisu", przeznaczenie: null };
   if (/brak wyniku dla wskazanego obszaru|brak wyniku/.test(t)) return { sygnal: "serwis_bez_planu", przeznaczenie: null };
-  // Poprawny, PUSTY GeoJSON FeatureCollection = serwis wektorowy odpowiedział, brak planu w punkcie → POKRYTE.
-  // (Raster/brak integracji nie zwraca GeoJSON, lecz komunikat lub XML.)
-  if (czyPustaKolekcjaGeoJson(tekst)) return { sygnal: "serwis_bez_planu", przeznaczenie: null };
+  // GeoJSON = działający serwis wektorowy (raster/brak integracji zwraca komunikat lub XML).
+  //   ≥1 cecha → plan obecny w punkcie (atrybutów nie odczytano, ale POKRYTE, np. Szczecin/Zielona Góra);
+  //   pusta kolekcja → serwis odpowiedział, brak planu w tym punkcie → POKRYTE (np. Rzeszów/Gorzów/Radom).
+  const kl = klasaKolekcjiGeoJson(tekst);
+  if (kl === "zCechami") return { sygnal: "plan", przeznaczenie: null };
+  if (kl === "pusta") return { sygnal: "serwis_bez_planu", przeznaczenie: null };
   if (czyPustyWynik(tekst)) return { sygnal: "pusto", przeznaczenie: null };
   return { sygnal: "niejasne", przeznaczenie: null };
 }
