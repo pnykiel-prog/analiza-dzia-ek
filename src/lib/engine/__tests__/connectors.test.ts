@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { czyPrzylegaja, centroid } from "../../geo";
 import { wybierzJednostke, wartoscZmiennej, pierwszaZmienna } from "../../data/connectors/gus";
 import { dopasujPoNazwie } from "../../data/uldk";
-import { rozpoznajPrzeznaczenie } from "../../data/connectors/kimpzp";
+import { rozpoznajPrzeznaczenie, parsujMpzpJson, czyPustyWynik } from "../../data/connectors/kimpzp";
 import { uruchomKonektory } from "../../data/connectors";
 import type { Teren } from "../../data/connectors/types";
 import { DZIALKI_PRZYKLADOWE } from "../../data/sample";
@@ -85,6 +85,33 @@ test("kimpzp: opisy wielowyrazowe i symbole (MU/MN) → mieszkaniowy; usługowe 
   assert.equal(rozpoznajPrzeznaczenie("budynki mieszkalne wielorodzinne"), "mpzp_mieszkaniowy");
   // Sam „tereny zabudowy usługowej" (bez funkcji mieszkaniowej) nie może udawać mieszkaniowego.
   assert.equal(rozpoznajPrzeznaczenie("Tereny zabudowy usługowej U"), null);
+});
+
+test("kimpzp: parsowanie metryki GeoJSON (Rzeszów — gmina wektorowa)", () => {
+  const geojson = JSON.stringify({
+    type: "FeatureCollection",
+    features: [
+      { properties: { SYMBOL: "11MWs", S_STANDARD: "MW", OPIS: "Tereny mieszkalnictwa wielorodzinnego", STAWKA: "30", UCHWALA: "XXVIII/6/2000" } },
+      { properties: { NAZWA2: "Staromieście - Ogrody", D_WEJSCIA: "2000-08-25", DZIENNIK: "Dz. Urz. ..." } },
+    ],
+  });
+  const r = parsujMpzpJson(geojson)!;
+  assert.ok(r);
+  assert.equal(r.status, "mpzp_mieszkaniowy");
+  assert.equal(r.meta.symbol, "11MWs");
+  assert.equal(r.meta.standard, "MW");
+  assert.equal(r.meta.stawkaPct, 30);
+  assert.equal(r.meta.uchwala, "XXVIII/6/2000");
+  assert.equal(r.meta.nazwaPlanu, "Staromieście - Ogrody");
+  assert.equal(r.meta.dataWejscia, "2000-08-25");
+});
+
+test("kimpzp: pusty wynik (Warszawa — XML z pustymi ROWSET) vs GeoJSON", () => {
+  const xmlPusty = '<?xml version="1.0"?>\n<GetFeatureInfo_Result>\n  <ROWSET name="MPZP_PRZEZNACZENIE_TERENU"></ROWSET>\n</GetFeatureInfo_Result>';
+  assert.equal(czyPustyWynik(xmlPusty), true);
+  assert.equal(parsujMpzpJson(xmlPusty), null); // nie-JSON → brak metryki
+  assert.equal(czyPustyWynik('{"type":"FeatureCollection","features":[]}'), true);
+  assert.equal(czyPustyWynik('{"features":[{"properties":{"SYMBOL":"MW"}}]}'), false);
 });
 
 test("wms: ocena odpowiedzi GetFeatureInfo (obecny/pusty/błąd)", () => {

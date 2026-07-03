@@ -30,12 +30,15 @@ export async function GET(req: Request) {
   if (!c) return json({ id, blad: "Nie udało się wyliczyć centroidu z geometrii." });
 
   const diag = await diagKimpzp(c[0], c[1]);
+  const maMetryke = diag.metryka && (diag.metryka.symbol || diag.metryka.standard);
   const wniosek =
     diag.surowa == null
-      ? "❌ KIMPZP nie zwróciło treści (prawdopodobnie gmina rastrowa bez atrybutów albo serwis niedostępny). Silnik potraktuje to jako do-weryfikacji, nie wykluczone."
-      : diag.przeznaczenie
-        ? `✅ KIMPZP zwróciło atrybuty — rozpoznane przeznaczenie: ${diag.przeznaczenie}. To gmina wektorowa.`
-        : "⚠ KIMPZP zwróciło treść, ale heurystyka nie rozpoznała przeznaczenia — patrz `surowaOdpowiedz` (można dostroić parser).";
+      ? "❌ Serwis nie zwrócił treści (niedostępny). Silnik potraktuje to jako do-weryfikacji, nie wykluczone."
+      : maMetryke
+        ? `✅ Gmina WEKTOROWA — KIMPZP realnie pobiera MPZP: symbol ${diag.metryka!.symbol ?? diag.metryka!.standard}, przeznaczenie ${diag.przeznaczenie ?? "?"}.`
+        : diag.pusty
+          ? "⚠ Pusty wynik — w tym punkcie KIMPZP nie ma planu (możliwa luka pokrycia krajowego, np. Warszawa). Do weryfikacji, nie wykluczone."
+          : "⚠ Jest treść, ale bez rozpoznanej metryki (raster/nietypowy format) — patrz surowaOdpowiedz.";
 
   return json({
     id,
@@ -46,7 +49,9 @@ export async function GET(req: Request) {
     centroid2180: c,
     formatUzyty: diag.formatUzyty,
     dlugoscOdpowiedzi: diag.dlugosc,
+    pustyWynik: diag.pusty,
     rozpoznanePrzeznaczenie: diag.przeznaczenie ?? "(nie rozpoznano)",
+    metrykaPlanu: diag.metryka,
     kimpzpUrl: diag.url,
     surowaOdpowiedz: diag.surowa,
     wniosek,

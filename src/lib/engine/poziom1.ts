@@ -38,6 +38,11 @@ import { statusZeSymbolu } from "../mpzp";
 // ── Podstawa planistyczna ────────────────────────────────────────────────────
 
 function ustalPodstawe(d: DaneDzialki): PodstawaPlanistyczna {
+  // Jawna deklaracja MPZP użytkownika (z symbolem) ma pierwszeństwo.
+  if (d.podstawa?.typ === "MPZP" && d.podstawa.symbol) return d.podstawa;
+  // Auto z KIMPZP (gmina wektorowa) — gdy użytkownik nie podał własnego symbolu.
+  const symKimpzp = d.mpzpMeta?.standard || d.mpzpMeta?.symbol;
+  if (symKimpzp) return { typ: "MPZP", symbol: symKimpzp, zrodlo: "kimpzp" };
   if (d.podstawa) return d.podstawa;
   // Domyślnie: prognoza potencjału (bez ręcznych wskaźników).
   return { typ: "PROGNOZA", zrodlo: "prognoza" };
@@ -58,6 +63,13 @@ function obecnoscMpzp(d: DaneDzialki, podstawa: PodstawaPlanistyczna): "jest" | 
  * niemieszkaniowy lub jawnie sprzeczny status planistyczny).
  */
 function funkcjaDozwolona(d: DaneDzialki, podstawa: PodstawaPlanistyczna): boolean | null {
+  // Podstawa z KIMPZP: ufamy statusowi planistycznemu z konektora (heurystyka symbolu+opisu),
+  // nie samemu symbolowi — standard bywa spoza słownika i statusZeSymbolu myliłby się na „sprzeczny".
+  if (podstawa.zrodlo === "kimpzp") {
+    if (d.statusPlanistyczny === "sprzeczny") return false;
+    if (d.statusPlanistyczny === "mpzp_mieszkaniowy") return true;
+    return null;
+  }
   if (podstawa.symbol) return !statusZeSymbolu(podstawa.symbol).sprzeczne;
   if (d.statusPlanistyczny === "sprzeczny") return false;
   return null; // prognoza / brak deklaracji — nie blokujemy

@@ -9,8 +9,8 @@
  * zwraca „brak", nie błąd. Pełne dostrojenie po weryfikacji na żywych danych.
  */
 
-import type { DaneDzialki, StatusPlanistyczny } from "../../types";
-import type { Konektor, Teren, WynikKonektora } from "./types";
+import type { DaneDzialki, MetrykaPlanu, StatusPlanistyczny } from "../../types";
+import type { Konektor, Teren, WynikKonektora, MetaPola } from "./types";
 import { brakWyniku } from "./types";
 import { fetchTekst } from "./net";
 import { KONFIG_KONEKTORY } from "../connectorsConfig";
@@ -29,6 +29,41 @@ export function rozpoznajPrzeznaczenie(tekst: string): StatusPlanistyczny | null
   if (/mieszkanio|mieszkaln|funkcja mieszkan|zabudow[ay][^.]{0,40}mieszkan|\bm[nwu]\b|\bmwn\b/.test(t))
     return "mpzp_mieszkaniowy";
   return null;
+}
+
+/** Czy odpowiedź WMS jest PUSTA (brak planu w punkcie) — inaczej niż „raster bez atrybutów". */
+export function czyPustyWynik(tekst: string): boolean {
+  const t = tekst.trim();
+  if (!t) return true;
+  if (/"features"\s*:\s*\[\s*\]/.test(t)) return true; // GeoJSON: pusta lista cech
+  // XML GetFeatureInfo_Result z pustymi ROWSET i bez pól/wierszy.
+  if (/GetFeatureInfo_Result/i.test(t) && !/<FIELDS|<gml:|<wfs:|"properties"/i.test(t)) return true;
+  return false;
+}
+
+/** Wyciąga metrykę planu z odpowiedzi GeoJSON KIMPZP (gmina wektorowa). */
+export function parsujMpzpJson(tekst: string): { status: StatusPlanistyczny | null; meta: MetrykaPlanu } | null {
+  let obj: unknown;
+  try { obj = JSON.parse(tekst); } catch { return null; }
+  const feats = (obj as { features?: { properties?: Record<string, unknown> }[] })?.features;
+  if (!Array.isArray(feats) || feats.length === 0) return null;
+  const props = feats.map((f) => f?.properties ?? {});
+  const s = (v: unknown) => (v == null || v === "" ? undefined : String(v));
+  const przez = props.find((p) => p.SYMBOL || p.S_STANDARD || p.KOLOR); // warstwa przeznaczenia
+  const gran = props.find((p) => p.NAZWA || p.NAZWA2 || p.DZIENNIK || p.D_WEJSCIA); // warstwa granic planu
+  if (!przez && !gran) return null;
+  const meta: MetrykaPlanu = {
+    symbol: s(przez?.SYMBOL),
+    standard: s(przez?.S_STANDARD ?? przez?.KOLOR),
+    opis: s(przez?.OPIS),
+    stawkaPct: przez?.STAWKA != null && przez.STAWKA !== "" ? Number(przez.STAWKA) : null,
+    nazwaPlanu: s(gran?.NAZWA2 ?? gran?.NAZWA),
+    uchwala: s(przez?.UCHWALA ?? gran?.UCHWALA),
+    dataWejscia: s(gran?.D_WEJSCIA),
+  };
+  // Status z symbolu/standardu + opisu (ta sama heurystyka co dla tekstu).
+  const status = rozpoznajPrzeznaczenie(`${meta.standard ?? ""} ${meta.symbol ?? ""} ${meta.opis ?? ""}`);
+  return { status, meta };
 }
 
 /** Buduje URL GetFeatureInfo KIMPZP dla punktu (EPSG:2180). Współdzielony z diagnostyką. */
@@ -61,7 +96,15 @@ export function urlGetFeatureInfo(x: number, y: number, infoFormat: string = cfg
 export async function diagKimpzp(
   x: number,
   y: number
-): Promise<{ formatUzyty: string | null; url: string; dlugosc: number; przeznaczenie: StatusPlanistyczny | null; surowa: string | null }> {
+): Promise<{
+  formatUzyty: string | null;
+  url: string;
+  dlugosc: number;
+  przeznaczenie: StatusPlanistyczny | null;
+  metryka: MetrykaPlanu | null;
+  pusty: boolean;
+  surowa: string | null;
+}> {
   const formaty = [cfg.infoFormat, "text/plain", "text/html", "application/vnd.ogc.gml"];
   let ostatniUrl = urlGetFeatureInfo(x, y);
   for (const fmt of formaty) {
@@ -69,10 +112,19 @@ export async function diagKimpzp(
     ostatniUrl = url;
     const tekst = await fetchTekst(url, { timeoutMs: 6000, proby: 1 });
     if (tekst && tekst.trim().length > 0) {
-      return { formatUzyty: fmt, url, dlugosc: tekst.length, przeznaczenie: rozpoznajPrzeznaczenie(tekst), surowa: tekst.slice(0, 2500) };
+      const strukt = parsujMpzpJson(tekst);
+      return {
+        formatUzyty: fmt,
+        url,
+        dlugosc: tekst.length,
+        przeznaczenie: strukt?.status ?? rozpoznajPrzeznaczenie(tekst),
+        metryka: strukt?.meta ?? null,
+        pusty: czyPustyWynik(tekst),
+        surowa: tekst.slice(0, 2500),
+      };
     }
   }
-  return { formatUzyty: null, url: ostatniUrl, dlugosc: 0, przeznaczenie: null, surowa: null };
+  return { formatUzyty: null, url: ostatniUrl, dlugosc: 0, przeznaczenie: null, metryka: null, pusty: true, surowa: null };
 }
 
 export const konektorKIMPZP: Konektor = {
@@ -89,18 +141,39 @@ export const konektorKIMPZP: Konektor = {
     const tekst = await fetchTekst(urlGetFeatureInfo(x, y), { timeoutMs: 4500, proby: 1 });
     if (tekst === null) return brakWyniku(this.klucz, this.zrodlo, czas, "Brak odpowiedzi WMS.");
 
-    const przeznaczenie = rozpoznajPrzeznaczenie(tekst);
-    if (!przeznaczenie) {
-      return brakWyniku(this.klucz, this.zrodlo, czas, "Brak atrybutów (prawdopodobnie raster) — do weryfikacji.");
+    // 1) Ścieżka strukturalna (GeoJSON, gmina wektorowa) — metryka planu + status.
+    const strukt = parsujMpzpJson(tekst);
+    if (strukt && (strukt.status || strukt.meta.symbol || strukt.meta.standard)) {
+      const dane: Partial<DaneDzialki> = { mpzpMeta: strukt.meta };
+      const meta: MetaPola[] = [{ pole: "mpzpMeta", zrodlo: this.zrodlo, czas, pewnosc: 80, status: "ok", tryb: "A" }];
+      if (strukt.status) {
+        dane.statusPlanistyczny = strukt.status;
+        meta.push({ pole: "statusPlanistyczny", zrodlo: this.zrodlo, czas, pewnosc: 80, status: "ok", tryb: "A" });
+      }
+      return { klucz: this.klucz, zrodlo: this.zrodlo, status: "ok", czas, dane, meta };
     }
-    const dane: Partial<DaneDzialki> = { statusPlanistyczny: przeznaczenie };
-    return {
-      klucz: this.klucz,
-      zrodlo: this.zrodlo,
-      status: "ok",
+
+    // 2) Ścieżka tekstowa (HTML/plain) — sam status z heurystyki.
+    const przeznaczenie = rozpoznajPrzeznaczenie(tekst);
+    if (przeznaczenie) {
+      return {
+        klucz: this.klucz,
+        zrodlo: this.zrodlo,
+        status: "ok",
+        czas,
+        dane: { statusPlanistyczny: przeznaczenie },
+        meta: [{ pole: "statusPlanistyczny", zrodlo: this.zrodlo, czas, pewnosc: 60, status: "ok", tryb: "A" }],
+      };
+    }
+
+    // 3) Rozróżnienie: pusty wynik (brak planu w punkcie) vs raster (brak atrybutów).
+    return brakWyniku(
+      this.klucz,
+      this.zrodlo,
       czas,
-      dane,
-      meta: [{ pole: "statusPlanistyczny", zrodlo: this.zrodlo, czas, pewnosc: 60, status: "ok", tryb: "A" }],
-    };
+      czyPustyWynik(tekst)
+        ? "Brak planu w tym punkcie w KIMPZP (pusty wynik) — do weryfikacji (możliwa luka pokrycia, np. Warszawa)."
+        : "Odpowiedź bez rozpoznanych atrybutów (prawdopodobnie raster) — do weryfikacji."
+    );
   },
 };

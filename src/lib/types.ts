@@ -72,6 +72,8 @@ export interface DaneDzialki {
   mpzpZadeklarowany?: Maybe<boolean>;
   /** Ręcznie wprowadzona podstawa planistyczna (P1, S3): typ + symbol/funkcja. */
   podstawa?: PodstawaPlanistyczna;
+  /** Metryka planu z KIMPZP (gmina wektorowa): symbol, przeznaczenie, uchwała, data. */
+  mpzpMeta?: MetrykaPlanu | null;
   wskaznikiPlanistyczne: Maybe<WskaznikiPlanistyczne>;
   zabudowaMieszkaniowaWSasiedztwie: Maybe<boolean>;
   przeznaczenieSprzeczneZMieszkaniowa: Maybe<boolean>;
@@ -261,7 +263,18 @@ export interface PodstawaPlanistyczna {
   typ: PodstawaTyp;
   symbol?: string; // symbol MPZP (np. MW, MN) — opcjonalna adnotacja
   funkcja?: string; // opis funkcji dla WZ/PnB
-  zrodlo: "ręczne" | "prognoza";
+  zrodlo: "ręczne" | "prognoza" | "kimpzp";
+}
+
+/** Metryka planu miejscowego z KIMPZP (gmina wektorowa udostępnia atrybuty). */
+export interface MetrykaPlanu {
+  symbol?: string; // symbol z planu, np. „11MWs"
+  standard?: string; // standard przeznaczenia, np. „MW", „MN"
+  opis?: string; // opis przeznaczenia
+  nazwaPlanu?: string; // nazwa MPZP
+  uchwala?: string; // nr uchwały
+  dataWejscia?: string; // data wejścia w życie
+  stawkaPct?: number | null; // renta planistyczna [%]
 }
 
 /** Sygnał z sąsiedztwa do prognozy potencjału (docelowo BDOT + NMT; teraz deterministyczny). */
