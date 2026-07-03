@@ -124,6 +124,9 @@ test("kimpzp: sygnał pokrycia — rozróżnia brak serwisu (dziura) od braku pl
   ); // Kraków → dziura funkcjonalna
   assert.equal(sygnalZTekstu('<GetFeatureInfo_Result><ROWSET name="MPZP_PRZEZNACZENIE_TERENU"></ROWSET></GetFeatureInfo_Result>').sygnal, "pusto"); // pusty ROWSET (bez wierszy)
   assert.equal(sygnalZTekstu('{"features":[{"properties":{"SYMBOL":"11MWs","S_STANDARD":"MW"}}]}').sygnal, "plan"); // Rzeszów (działka)
+  // Pusty, poprawny GeoJSON = serwis wektorowy odpowiedział → POKRYTE (Rzeszów/Gorzów/Radom — centrum poza planem).
+  assert.equal(sygnalZTekstu('{"features": [], "type": "FeatureCollection"}').sygnal, "serwis_bez_planu");
+  assert.equal(sygnalZTekstu('{"type":"FeatureCollection","features":[],"numberReturned":0,"crs":null}').sygnal, "serwis_bez_planu");
   assert.equal(sygnalZTekstu(null).sygnal, "blad");
 });
 

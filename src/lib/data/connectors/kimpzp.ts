@@ -44,6 +44,18 @@ export function czyPustyWynik(tekst: string): boolean {
   return false;
 }
 
+/** Poprawny, PUSTY GeoJSON FeatureCollection — dowód, że serwis wektorowy odpowiedział (brak planu w punkcie). */
+export function czyPustaKolekcjaGeoJson(tekst: string): boolean {
+  const t = tekst.trim();
+  if (!t.startsWith("{")) return false;
+  try {
+    const o = JSON.parse(t) as { type?: string; features?: unknown[] };
+    return o?.type === "FeatureCollection" && Array.isArray(o.features) && o.features.length === 0;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Parsuje odpowiedź XML ROWSET GetFeatureInfo (schemat warszawski i pokrewne):
  * <ROWSET name="MPZP_PRZEZNACZENIE_TERENU"><ROW><FUN_SYMB>…</FUN_SYMB>…</ROW></ROWSET>.
@@ -185,6 +197,9 @@ export function sygnalZTekstu(tekst: string | null): { sygnal: SygnalKimpzp; prz
   if (/brak serwisu/.test(t)) return { sygnal: "brak_serwisu", przeznaczenie: null };
   if (/serviceexception|invalidxsltemplate|can'?t template|nie mo[żz]na/.test(t)) return { sygnal: "blad_serwisu", przeznaczenie: null };
   if (/brak wyniku dla wskazanego obszaru|brak wyniku/.test(t)) return { sygnal: "serwis_bez_planu", przeznaczenie: null };
+  // Poprawny, PUSTY GeoJSON FeatureCollection = serwis wektorowy odpowiedział, brak planu w punkcie → POKRYTE.
+  // (Raster/brak integracji nie zwraca GeoJSON, lecz komunikat lub XML.)
+  if (czyPustaKolekcjaGeoJson(tekst)) return { sygnal: "serwis_bez_planu", przeznaczenie: null };
   if (czyPustyWynik(tekst)) return { sygnal: "pusto", przeznaczenie: null };
   return { sygnal: "niejasne", przeznaczenie: null };
 }
