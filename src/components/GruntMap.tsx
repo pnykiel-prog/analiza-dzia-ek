@@ -27,6 +27,7 @@ export function GruntMap({
   height = 420,
   shape = "",
   geo = "",
+  fill = false,
 }: {
   mode?: TrybMapy;
   view?: WidokMapy;
@@ -36,11 +37,14 @@ export function GruntMap({
   shape?: string;
   /** Realny kontur działki WGS84 (JSON [[lon,lat]…]) — rysowany na mapie kaflowej OSM. Pusty → schemat. */
   geo?: string;
+  /** Wypełnij rodzica (np. kontener aspect-square) zamiast stałej wysokości w px. */
+  fill?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const layersJson = JSON.stringify(layers);
   // atrybut HTML w dangerouslySetInnerHTML — escapujemy cudzysłowy z JSON geo.
   const geoAttr = geo.replace(/"/g, "&quot;");
+  const wysStyl = fill ? "100%" : `${height}px`;
 
   useEffect(() => {
     // Ustawiamy atrybuty na istniejącym elemencie (jeśli już zdefiniowany) —
@@ -60,9 +64,9 @@ export function GruntMap({
       <Script src="/grunt-map.js" strategy="afterInteractive" />
       <div
         ref={ref}
-        style={{ width: "100%", height }}
+        style={{ width: "100%", height: fill ? "100%" : height }}
         dangerouslySetInnerHTML={{
-          __html: `<grunt-map mode="${mode}" view="${view}" layers='${layersJson}' shape="${shape}" geo="${geoAttr}" style="display:block;width:100%;height:${height}px"></grunt-map>`,
+          __html: `<grunt-map mode="${mode}" view="${view}" layers='${layersJson}' shape="${shape}" geo="${geoAttr}" style="display:block;width:100%;height:${wysStyl}"></grunt-map>`,
         }}
       />
     </>
@@ -77,6 +81,7 @@ export function PodgladTerenu({
   height,
   shape = "",
   geo = "",
+  kwadrat = false,
 }: {
   mode: TrybMapy;
   view?: WidokMapy;
@@ -84,6 +89,8 @@ export function PodgladTerenu({
   height?: number;
   shape?: string;
   geo?: string;
+  /** Mapa w kwadracie (aspect-square) wypełniającym szerokość panelu — zamiast stałej wysokości. */
+  kwadrat?: boolean;
 }) {
   const badge =
     mode === "ok"
@@ -97,8 +104,8 @@ export function PodgladTerenu({
         <div className="text-[13px] font-semibold text-grunt-text">Podgląd terenu</div>
         <span className={`badge ${badge.klasa}`}>{badge.txt}</span>
       </div>
-      <div className="bg-grunt-map-bg">
-        <GruntMap mode={mode} view={view} layers={layers} height={height} shape={shape} geo={geo} />
+      <div className={`bg-grunt-map-bg${kwadrat ? " aspect-square" : ""}`}>
+        <GruntMap mode={mode} view={view} layers={layers} height={height} shape={shape} geo={geo} fill={kwadrat} />
       </div>
     </section>
   );
