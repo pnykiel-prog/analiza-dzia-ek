@@ -127,6 +127,11 @@ test("kimpzp: sygnał pokrycia — rozróżnia brak serwisu (dziura) od braku pl
   // Pusty, poprawny GeoJSON = serwis wektorowy odpowiedział → POKRYTE (Rzeszów/Gorzów/Radom — centrum poza planem).
   assert.equal(sygnalZTekstu('{"features": [], "type": "FeatureCollection"}').sygnal, "serwis_bez_planu");
   assert.equal(sygnalZTekstu('{"type":"FeatureCollection","features":[],"numberReturned":0,"crs":null}').sygnal, "serwis_bez_planu");
+  // Niepusty GeoJSON z cechą, ale bez rozpoznanych atrybutów (Szczecin/Zielona Góra) → plan obecny → POKRYTE.
+  assert.equal(
+    sygnalZTekstu('{"type":"FeatureCollection","features":[{"type":"Feature","id":"app.AktPlanowaniaPrzestrzennego.MPZP.abc","geometry":{"type":"MultiPolygon","coordinates":[[[[260597.9,457883.3],[260623.6,457867.7]]]]}}]}').sygnal,
+    "plan"
+  );
   assert.equal(sygnalZTekstu(null).sygnal, "blad");
 });
 
