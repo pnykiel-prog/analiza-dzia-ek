@@ -434,6 +434,7 @@ export interface DefinicjaPolaM2 {
   rola: RolaPolaM2;
   podpowiedz?: string; // „skąd wziąć daną" dla sekcji B
   jednostka?: string; // sufiks wartości (np. „m", „%")
+  typWartosci?: "liczba" | "flaga" | "tekst" | "zlozone"; // typ pola do wprowadzania ręcznego
 }
 
 /** Stan pojedynczego pola po przejściu uzgodnienia (E2/E3). */

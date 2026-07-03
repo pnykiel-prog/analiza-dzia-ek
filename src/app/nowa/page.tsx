@@ -10,6 +10,7 @@ import { OPIS_TRYBU, trybRynkowy, type Tryb } from "@/lib/fieldModes";
 import { Karta } from "@/components/ui";
 import { Poziom1View } from "@/components/Poziom1View";
 import { Poziom2View } from "@/components/Poziom2View";
+import { UzgodnienieM2 } from "@/components/UzgodnienieM2";
 import { Poziom3View } from "@/components/Poziom3View";
 import { AnkietaFinansowa } from "@/components/AnkietaFinansowa";
 import { Stepper, BannerBramki, Chip } from "@/components/grunt";
@@ -543,22 +544,8 @@ export default function NowaAnalizaPage() {
             </div>
           </Karta>
 
-          <Karta tytul="Poziom 2 — uwarunkowania (A°, tylko odczyt)" podtytul="Pobrane automatycznie z NMT / ISOK / OSM / GDOŚ">
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
-              <Odczyt e="Średni spadek" v={fmtv(dane.sredniSpadekPct, "%")} />
-              <Odczyt e="Powódź szczególna" v={tak(dane.ryzykoPowodzioweSzczegolne)} />
-              <Odczyt e="Osuwisko" v={tak(dane.osuwisko)} />
-              <Odczyt e="Natura 2000" v={tak(dane.natura2000)} />
-              <Odczyt e="Dojazd do aglomeracji" v={fmtv(dane.czasDojazdAglomeracjaMin, " min")} />
-              <Odczyt e="Przystanek (częstotliwość)" v={tak(dane.przystanekZCzestotliwoscia)} />
-              <Odczyt e="Usługi pieszo" v={tak(dane.uslugiPodstawowePieszo)} />
-              <Odczyt e="POZ w zasięgu" v={tak(dane.pozWZasiegu)} />
-              <Odczyt e="Odległość do sieci" v={fmtv(dane.odlegloscDoSieciM, " m")} />
-              <Odczyt e="Ochrona wykluczająca" v={tak(dane.ochronaWykluczajaca)} />
-              <Odczyt e="Strefa konserwatorska" v={tak(dane.strefaKonserwatorska)} />
-              <Odczyt e="Dostęp do drogi" v={tak(dane.dostepDrogaPubliczna)} />
-            </div>
-          </Karta>
+          {/* E3: uzgodnienie danych M2 — pozyskane / do uzupełnienia (Pomiń) / niedostępne */}
+          <UzgodnienieM2 dane={dane} />
 
           <Karta tytul="Poziom 2 — dane ręczne / wąskie gardła (R, R?)" podtytul="Brak API — wprowadzenie ręczne; nie wpływa na obliczenia na tym etapie, sygnalizuje braki">
             <div className="grid sm:grid-cols-3 gap-3">

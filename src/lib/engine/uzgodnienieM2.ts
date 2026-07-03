@@ -35,33 +35,34 @@ export const KATALOG_M2: DefinicjaPolaM2[] = [
     manualFallback: "on",
     rola: "wskaznik",
     podpowiedz: "z wypisu i wyrysu z MPZP lub z planu ogólnego",
+    typWartosci: "zlozone",
   },
   // Fizyka terenu
-  { klucz: "sredniSpadekPct", blok: "Fizyka terenu", etykieta: "Średni spadek terenu", zrodloAuto: "NMT (GUGiK)", manualFallback: "on", rola: "koszt", podpowiedz: "z NMT/operatu geodezyjnego", jednostka: "%" },
-  { klucz: "ryzykoPowodzioweSzczegolne", blok: "Fizyka terenu", etykieta: "Zagrożenie powodziowe (obszary szczególnego zagrożenia)", zrodloAuto: "ISOK / Wody Polskie", manualFallback: "gate", rola: "bramka", podpowiedz: "z map zagrożenia powodziowego (ISOK)" },
-  { klucz: "osuwisko", blok: "Fizyka terenu", etykieta: "Osuwisko / teren zagrożony ruchami masowymi", zrodloAuto: "PIG SOPO", manualFallback: "gate", rola: "bramka", podpowiedz: "z rejestru osuwisk (SOPO)" },
-  { klucz: "terenGorniczy", blok: "Fizyka terenu", etykieta: "Teren górniczy", zrodloAuto: "PIG MIDAS", manualFallback: "gate", rola: "bramka", podpowiedz: "z rejestru obszarów górniczych (MIDAS)" },
+  { klucz: "sredniSpadekPct", blok: "Fizyka terenu", etykieta: "Średni spadek terenu", zrodloAuto: "NMT (GUGiK)", manualFallback: "on", rola: "koszt", podpowiedz: "z NMT/operatu geodezyjnego", jednostka: "%", typWartosci: "liczba" },
+  { klucz: "ryzykoPowodzioweSzczegolne", blok: "Fizyka terenu", etykieta: "Zagrożenie powodziowe (obszary szczególnego zagrożenia)", zrodloAuto: "ISOK / Wody Polskie", manualFallback: "gate", rola: "bramka", podpowiedz: "z map zagrożenia powodziowego (ISOK)", typWartosci: "flaga" },
+  { klucz: "osuwisko", blok: "Fizyka terenu", etykieta: "Osuwisko / teren zagrożony ruchami masowymi", zrodloAuto: "PIG SOPO", manualFallback: "gate", rola: "bramka", podpowiedz: "z rejestru osuwisk (SOPO)", typWartosci: "flaga" },
+  { klucz: "terenGorniczy", blok: "Fizyka terenu", etykieta: "Teren górniczy", zrodloAuto: "PIG MIDAS", manualFallback: "gate", rola: "bramka", podpowiedz: "z rejestru obszarów górniczych (MIDAS)", typWartosci: "flaga" },
   // Uzbrojenie
-  { klucz: "odlegloscDoSieciM", blok: "Uzbrojenie", etykieta: "Odległość do najbliższej sieci (proxy kosztu przyłączenia)", zrodloAuto: "GESUT / BDOT", manualFallback: "on", rola: "koszt", podpowiedz: "z mapy zasadniczej / warunków od gestora", jednostka: "m" },
-  { klucz: "odlegloscDoZabudowyM", blok: "Uzbrojenie", etykieta: "Odległość do istniejącej zabudowy (w tkance)", zrodloAuto: "BDOT", manualFallback: "on", rola: "wskaznik", podpowiedz: "z mapy / ortofotomapy", jednostka: "m" },
+  { klucz: "odlegloscDoSieciM", blok: "Uzbrojenie", etykieta: "Odległość do najbliższej sieci (proxy kosztu przyłączenia)", zrodloAuto: "GESUT / BDOT", manualFallback: "on", rola: "koszt", podpowiedz: "z mapy zasadniczej / warunków od gestora", jednostka: "m", typWartosci: "liczba" },
+  { klucz: "odlegloscDoZabudowyM", blok: "Uzbrojenie", etykieta: "Odległość do istniejącej zabudowy (w tkance)", zrodloAuto: "BDOT", manualFallback: "on", rola: "wskaznik", podpowiedz: "z mapy / ortofotomapy", jednostka: "m", typWartosci: "liczba" },
   // Dostęp i dostępność
-  { klucz: "dostepDrogaPubliczna", blok: "Dostęp komunikacyjny", etykieta: "Dostęp do drogi publicznej", zrodloAuto: "BDOT / EGiB / OSM", manualFallback: "gate", rola: "bramka", podpowiedz: "z MPZP/EGiB lub decyzji o zjeździe" },
-  { klucz: "czasDojazdAglomeracjaMin", blok: "Dostęp komunikacyjny", etykieta: "Czas dojazdu do aglomeracji", zrodloAuto: "OSM / routing", manualFallback: "off", rola: "wskaznik", jednostka: "min" },
-  { klucz: "przystanekZCzestotliwoscia", blok: "Dostęp komunikacyjny", etykieta: "Przystanek z częstotliwością (≤800 m)", zrodloAuto: "OSM / GTFS", manualFallback: "on", rola: "wskaznik", podpowiedz: "z rozkładu jazdy przewoźnika" },
+  { klucz: "dostepDrogaPubliczna", blok: "Dostęp komunikacyjny", etykieta: "Dostęp do drogi publicznej", zrodloAuto: "BDOT / EGiB / OSM", manualFallback: "gate", rola: "bramka", podpowiedz: "z MPZP/EGiB lub decyzji o zjeździe", typWartosci: "flaga" },
+  { klucz: "czasDojazdAglomeracjaMin", blok: "Dostęp komunikacyjny", etykieta: "Czas dojazdu do aglomeracji", zrodloAuto: "OSM / routing", manualFallback: "off", rola: "wskaznik", jednostka: "min", typWartosci: "liczba" },
+  { klucz: "przystanekZCzestotliwoscia", blok: "Dostęp komunikacyjny", etykieta: "Przystanek z częstotliwością (≤800 m)", zrodloAuto: "OSM / GTFS", manualFallback: "on", rola: "wskaznik", podpowiedz: "z rozkładu jazdy przewoźnika", typWartosci: "flaga" },
   // Infrastruktura społeczna
-  { klucz: "pozWZasiegu", blok: "Infrastruktura społeczna", etykieta: "POZ / apteka w zasięgu (seniorzy)", zrodloAuto: "RPWDL / Overpass", manualFallback: "on", rola: "wskaznik", podpowiedz: "z rejestru RPWDL lub mapy" },
-  { klucz: "uslugiPodstawowePieszo", blok: "Infrastruktura społeczna", etykieta: "Usługi podstawowe w zasięgu pieszym (seniorzy)", zrodloAuto: "Overpass", manualFallback: "on", rola: "wskaznik", podpowiedz: "z mapy usług w promieniu spaceru" },
-  { klucz: "zlobkiSzkolyWZasiegu", blok: "Infrastruktura społeczna", etykieta: "Żłobki / szkoły w zasięgu (młodzi)", zrodloAuto: "RSPO / Overpass", manualFallback: "on", rola: "wskaznik", podpowiedz: "z rejestru RSPO lub mapy" },
+  { klucz: "pozWZasiegu", blok: "Infrastruktura społeczna", etykieta: "POZ / apteka w zasięgu (seniorzy)", zrodloAuto: "RPWDL / Overpass", manualFallback: "on", rola: "wskaznik", podpowiedz: "z rejestru RPWDL lub mapy", typWartosci: "flaga" },
+  { klucz: "uslugiPodstawowePieszo", blok: "Infrastruktura społeczna", etykieta: "Usługi podstawowe w zasięgu pieszym (seniorzy)", zrodloAuto: "Overpass", manualFallback: "on", rola: "wskaznik", podpowiedz: "z mapy usług w promieniu spaceru", typWartosci: "flaga" },
+  { klucz: "zlobkiSzkolyWZasiegu", blok: "Infrastruktura społeczna", etykieta: "Żłobki / szkoły w zasięgu (młodzi)", zrodloAuto: "RSPO / Overpass", manualFallback: "on", rola: "wskaznik", podpowiedz: "z rejestru RSPO lub mapy", typWartosci: "flaga" },
   // Środowisko i ochrona
-  { klucz: "natura2000", blok: "Środowisko i ochrona", etykieta: "Natura 2000", zrodloAuto: "GDOŚ", manualFallback: "gate", rola: "bramka", podpowiedz: "z geoportalu GDOŚ" },
-  { klucz: "ochronaWykluczajaca", blok: "Środowisko i ochrona", etykieta: "Ochrona wykluczająca (rezerwat / park narodowy)", zrodloAuto: "GDOŚ", manualFallback: "gate", rola: "bramka", podpowiedz: "z geoportalu GDOŚ" },
-  { klucz: "strefaKonserwatorska", blok: "Środowisko i ochrona", etykieta: "Strefa konserwatorska / zabytki", zrodloAuto: "NID", manualFallback: "gate", rola: "wskaznik", podpowiedz: "z rejestru zabytków (NID)" },
+  { klucz: "natura2000", blok: "Środowisko i ochrona", etykieta: "Natura 2000", zrodloAuto: "GDOŚ", manualFallback: "gate", rola: "bramka", podpowiedz: "z geoportalu GDOŚ", typWartosci: "flaga" },
+  { klucz: "ochronaWykluczajaca", blok: "Środowisko i ochrona", etykieta: "Ochrona wykluczająca (rezerwat / park narodowy)", zrodloAuto: "GDOŚ", manualFallback: "gate", rola: "bramka", podpowiedz: "z geoportalu GDOŚ", typWartosci: "flaga" },
+  { klucz: "strefaKonserwatorska", blok: "Środowisko i ochrona", etykieta: "Strefa konserwatorska / zabytki", zrodloAuto: "NID", manualFallback: "gate", rola: "wskaznik", podpowiedz: "z rejestru zabytków (NID)", typWartosci: "flaga" },
   // Grunt i prawo
-  { klucz: "klasaUzytku", blok: "Grunt", etykieta: "Klasa użytku gruntowego", zrodloAuto: "EGiB", manualFallback: "gate", rola: "bramka", podpowiedz: "z wypisu z rejestru gruntów" },
-  { klucz: "gruntLesny", blok: "Grunt", etykieta: "Grunt leśny (Ls)", zrodloAuto: "EGiB", manualFallback: "gate", rola: "bramka", podpowiedz: "z wypisu z rejestru gruntów" },
-  { klucz: "gruntRolnyKlasaIdoIII", blok: "Grunt", etykieta: "Grunt rolny klasy I–III (ochrona)", zrodloAuto: "EGiB", manualFallback: "gate", rola: "bramka", podpowiedz: "z wypisu z rejestru gruntów" },
+  { klucz: "klasaUzytku", blok: "Grunt", etykieta: "Klasa użytku gruntowego", zrodloAuto: "EGiB", manualFallback: "gate", rola: "bramka", podpowiedz: "z wypisu z rejestru gruntów", typWartosci: "tekst" },
+  { klucz: "gruntLesny", blok: "Grunt", etykieta: "Grunt leśny (Ls)", zrodloAuto: "EGiB", manualFallback: "gate", rola: "bramka", podpowiedz: "z wypisu z rejestru gruntów", typWartosci: "flaga" },
+  { klucz: "gruntRolnyKlasaIdoIII", blok: "Grunt", etykieta: "Grunt rolny klasy I–III (ochrona)", zrodloAuto: "EGiB", manualFallback: "gate", rola: "bramka", podpowiedz: "z wypisu z rejestru gruntów", typWartosci: "flaga" },
   // Potencjał rozwoju
-  { klucz: "pustostanyPct", blok: "Potencjał rozwoju", etykieta: "Pustostany w gminie", zrodloAuto: "GUS BDL", manualFallback: "off", rola: "wskaznik", jednostka: "%" },
+  { klucz: "pustostanyPct", blok: "Potencjał rozwoju", etykieta: "Pustostany w gminie", zrodloAuto: "GUS BDL", manualFallback: "off", rola: "wskaznik", jednostka: "%", typWartosci: "liczba" },
 ];
 
 // Pewność źródeł: auto-pozyskane (średnia wiarygodność), ręczne (user-sourced, „do potwierdzenia").
@@ -116,10 +117,23 @@ export function uzgodnijM2(
   return { pola, sekcjaA, sekcjaB, sekcjaC, pozyskanychPct, pewnosc };
 }
 
-/** Sformatowana wartość pola do wyświetlenia (z jednostką / bool → tak/nie). */
+/** Sformatowana wartość pola do wyświetlenia (z jednostką / bool → tak/nie / wskaźniki → skrót). */
 export function wartoscPolaTekst(p: PoleM2): string {
   if (p.wartosc == null) return "—";
   if (typeof p.wartosc === "boolean") return p.wartosc ? "tak" : "nie";
+  if (typeof p.wartosc === "object") {
+    // Wskaźniki planistyczne: zwięzły skrót (intensywność · kondygnacje · % zabudowy).
+    const o = p.wartosc as { intensywnosc?: number; maxKondygnacje?: number; maxPowZabudowyPct?: number };
+    if (o.intensywnosc != null || o.maxKondygnacje != null) {
+      const cz = [
+        o.intensywnosc != null ? `int. ${o.intensywnosc}` : null,
+        o.maxKondygnacje != null ? `${o.maxKondygnacje} kond.` : null,
+        o.maxPowZabudowyPct != null ? `${o.maxPowZabudowyPct}% zab.` : null,
+      ].filter(Boolean);
+      return cz.length ? cz.join(" · ") : "uzupełnione";
+    }
+    return "uzupełnione";
+  }
   const suf = p.jednostka ? ` ${p.jednostka}` : "";
   return `${p.wartosc}${suf}`;
 }
