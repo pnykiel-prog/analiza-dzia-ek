@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { powierzchniaZWkt, metrykiZWkt, bbox, bboxStykaja, pl1992ToWgs84, konturSvg, konturGeo, zwartoscKsztaltu, minSzerokoscKsztaltu } from "../../geo";
+import { powierzchniaZWkt, metrykiZWkt, bbox, bboxStykaja, pl1992ToWgs84, wgs84ToPl1992, konturSvg, konturGeo, zwartoscKsztaltu, minSzerokoscKsztaltu } from "../../geo";
 import { parsujOdpowiedzUldk } from "../../data/uldk";
 
 test("geo: powierzchnia prostokąta 100×50 = 5000 m²", () => {
@@ -87,6 +87,17 @@ test("geo: reprojekcja PUWG1992 → WGS84 (okolice Głuchołazów)", () => {
   const [lon, lat] = pl1992ToWgs84(386924, 269276);
   assert.ok(lon > 16.5 && lon < 18.5, `lon poza zakresem: ${lon}`);
   assert.ok(lat > 49.5 && lat < 51.0, `lat poza zakresem: ${lat}`);
+});
+
+test("geo: WGS84 ↔ EPSG:2180 — odwracalność (Rzeszów, Warszawa)", () => {
+  for (const [lon, lat] of [[21.999, 50.041], [21.012, 52.230]] as [number, number][]) {
+    const [x, y] = wgs84ToPl1992(lon, lat);
+    // Sensowny zakres 2180 dla Polski.
+    assert.ok(x > 150000 && x < 900000, `easting poza zakresem: ${x}`);
+    assert.ok(y > 100000 && y < 800000, `northing poza zakresem: ${y}`);
+    const [lon2, lat2] = pl1992ToWgs84(x, y);
+    assert.ok(Math.abs(lon2 - lon) < 1e-5 && Math.abs(lat2 - lat) < 1e-5, `roundtrip: ${lon2},${lat2}`);
+  }
 });
 
 test("uldk: parsowanie odpowiedzi OK (status 0 + wiersze)", () => {

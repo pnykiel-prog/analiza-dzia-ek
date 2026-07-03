@@ -292,6 +292,42 @@ export function pl1992ToWgs84(easting: number, northing: number): [number, numbe
   return [(lon * 180) / Math.PI, (lat * 180) / Math.PI];
 }
 
+/**
+ * Reprojekcja WGS84 [lon, lat] → EPSG:2180 (PUWG1992 / CS92) [easting, northing].
+ * Transwersalna Merkatora (GRS80) — odwrotność `pl1992ToWgs84`. Pozwala odpytać
+ * usługi w 2180 (np. KIMPZP) po współrzędnych geograficznych punktu.
+ */
+export function wgs84ToPl1992(lon: number, lat: number): [number, number] {
+  const a = 6378137.0;
+  const f = 1 / 298.257222101;
+  const k0 = 0.9993;
+  const lon0 = (19 * Math.PI) / 180;
+  const FE = 500000;
+  const FN = -5300000;
+
+  const e2 = f * (2 - f);
+  const ep2 = e2 / (1 - e2);
+  const phi = (lat * Math.PI) / 180;
+  const lam = (lon * Math.PI) / 180;
+  const sinP = Math.sin(phi), cosP = Math.cos(phi), tanP = Math.tan(phi);
+  const N = a / Math.sqrt(1 - e2 * sinP * sinP);
+  const T = tanP * tanP;
+  const C = ep2 * cosP * cosP;
+  const A = (lam - lon0) * cosP;
+  const M =
+    a *
+    ((1 - e2 / 4 - (3 * e2 * e2) / 64 - (5 * e2 ** 3) / 256) * phi -
+      ((3 * e2) / 8 + (3 * e2 * e2) / 32 + (45 * e2 ** 3) / 1024) * Math.sin(2 * phi) +
+      ((15 * e2 * e2) / 256 + (45 * e2 ** 3) / 1024) * Math.sin(4 * phi) -
+      ((35 * e2 ** 3) / 3072) * Math.sin(6 * phi));
+
+  const easting = FE + k0 * N * (A + ((1 - T + C) * A ** 3) / 6 + ((5 - 18 * T + T * T + 72 * C - 58 * ep2) * A ** 5) / 120);
+  const northing =
+    FN +
+    k0 * (M + N * tanP * ((A * A) / 2 + ((5 - T + 9 * C + 4 * C * C) * A ** 4) / 24 + ((61 - 58 * T + T * T + 600 * C - 330 * ep2) * A ** 6) / 720));
+  return [easting, northing];
+}
+
 /** Centroid WGS84 [lon, lat] z geometrii WKT w EPSG:2180. */
 export function centroid4326ZWkt(wkt2180: string): [number, number] | null {
   const c = centroid(wkt2180);
