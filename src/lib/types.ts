@@ -405,6 +405,56 @@ export interface WynikPoziom2 {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// M2a — UZGODNIENIE DANYCH (pobierz → pokaż co masz → uzupełnij → analizuj)
+// wg docs/dane-m2.md §2–§3. „brak danych ≠ nie": pominięcie obniża pewność, nigdy nie blokuje.
+// ────────────────────────────────────────────────────────────────────────────
+
+/** Stan pozyskania pola M2: auto OK / nie pobrano lub błąd / klient kliknął Pomiń. */
+export type StatusPolaM2 = "pozyskane" | "brak" | "pominiete";
+
+/**
+ * Tryb ręcznego uzupełnienia:
+ *  - `on`   — klient może zdobyć daną → pole ręczne + Pomiń (sekcja B),
+ *  - `off`  — dane statystyczne/wyliczane → brak pola, tylko niższa pewność (sekcja C),
+ *  - `gate` — dane bramkowe → pole ręczne z ostrożnością: można DODAĆ ograniczenie,
+ *             ale nie ZNIEŚĆ twardej bramki bez dokumentu (sekcja B, wariant ostrzegawczy).
+ */
+export type ManualFallback = "on" | "off" | "gate";
+
+/** Rola pola w ocenie M2. */
+export type RolaPolaM2 = "bramka" | "wskaznik" | "koszt";
+
+/** Definicja pola M2 w katalogu (statyczna) — patrz docs/dane-m2.md §4. */
+export interface DefinicjaPolaM2 {
+  klucz: keyof DaneDzialki; // pole w DaneDzialki, którego dotyczy
+  blok: string; // grupa tematyczna (np. „Fizyka terenu")
+  etykieta: string;
+  zrodloAuto: string; // np. „NMT", „GESUT", „GDOŚ"
+  manualFallback: ManualFallback;
+  rola: RolaPolaM2;
+  podpowiedz?: string; // „skąd wziąć daną" dla sekcji B
+  jednostka?: string; // sufiks wartości (np. „m", „%")
+}
+
+/** Stan pojedynczego pola po przejściu uzgodnienia (E2/E3). */
+export interface PoleM2 extends DefinicjaPolaM2 {
+  status: StatusPolaM2;
+  wartosc: string | number | boolean | null;
+  zrodlo: string; // prowenancja rzeczywista (auto źródło / „ręczne")
+  pewnosc: number; // 0–100
+}
+
+/** Wynik uzgodnienia danych M2 — mapa statusu pól + podział na sekcje E3 + pewność. */
+export interface WynikUzgodnienia {
+  pola: PoleM2[];
+  sekcjaA: PoleM2[]; // pozyskane automatycznie
+  sekcjaB: PoleM2[]; // do uzupełnienia ręcznego (brak + manual_fallback on/gate)
+  sekcjaC: PoleM2[]; // niedostępne automatycznie (brak + manual_fallback off)
+  pozyskanychPct: number; // udział pól pozyskanych (0–100)
+  pewnosc: number; // ogólna pewność kompletu danych M2 (0–100)
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // WYNIK POZIOMU 3 — model finansowy SIM
 // ────────────────────────────────────────────────────────────────────────────
 
