@@ -375,7 +375,12 @@ export const konektorGUS: Konektor = {
       // Nie nadpisujemy dochodu, jeśli wcześniej ustawiono go z jawnej zmiennej gminnej (gus.dochodId).
       if (idWyn && dane.dochodPrzecietnyGmina == null) {
         const wyn = mPow.get(idWyn);
-        if (wyn != null) dodaj("dochodPrzecietnyGmina", wyn * gus.dochodMnoznikWynagrodzenie, 68);
+        if (wyn != null) {
+          // Odporność na dobór zmiennej-indeksu „Polska=100" (wartość ~50–200 zamiast zł):
+          // gdy wartość jest zbyt mała na wynagrodzenie, traktujemy ją jako % średniej krajowej.
+          const zl = wyn < 400 ? (wyn / 100) * gus.wynagrodzenieKrajoweMies : wyn;
+          dodaj("dochodPrzecietnyGmina", zl * gus.dochodMnoznikWynagrodzenie, 68);
+        }
       }
     }
 

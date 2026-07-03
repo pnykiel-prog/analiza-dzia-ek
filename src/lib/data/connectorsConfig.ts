@@ -31,6 +31,8 @@ export interface KonfiguracjaKonektorow {
     };
     /** Mnożnik: przeciętne wynagrodzenie brutto (powiat) → proxy dochodu gosp. dom. [zł/mc]. */
     dochodMnoznikWynagrodzenie: number;
+    /** Średnia krajowa wynagrodzenia [zł/mc] — do przeliczenia indeksu „Polska=100" na zł. */
+    wynagrodzenieKrajoweMies: number;
     /** Opcjonalne nadpisanie ID (pomija auto-dobór, gdy ustawione). */
     zmienneId: Partial<Record<keyof KonfiguracjaKonektorow["gus"]["zapytania"], string>>;
     /** Krajowa mediana odniesienia udziału 20–39 lat [%] — fallback, gdy brak danych wojewódzkich. */
@@ -86,6 +88,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       wynagrodzenie: "przeciętne miesięczne wynagrodzenia brutto",
     },
     dochodMnoznikWynagrodzenie: 1.0,
+    wynagrodzenieKrajoweMies: 7200,
     // Potwierdzone ID zmiennych BDL (diagnostyka /api/diag-gus, gmina Rzeszów):
     // podmioty na 10 tys. = 60530 (wart. 1804), saldo migracji = 1365234 (wart. 622).
     // Pozostałe (ludność ogółem/wiek/bezrobocie) do przypięcia po eksploracji katalogu.
