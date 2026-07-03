@@ -911,6 +911,20 @@ function PotwierdzenieDanych({ dane, meta }: { dane: DaneDzialki; meta: MetaRozw
           )}
         </div>
       )}
+      {dane.mpzpMeta && (dane.mpzpMeta.symbol || dane.mpzpMeta.standard) && (
+        <div className="mt-3 rounded-md border border-grunt-green/25 bg-grunt-green-bg/50 px-3 py-2.5">
+          <div className="text-xs font-semibold text-grunt-green mb-1">Metryka MPZP (KIMPZP — gmina wektorowa)</div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1 text-[12px] text-grunt-text-muted">
+            {dane.mpzpMeta.symbol && <div><span className="text-grunt-text-faint">Symbol:</span> <span className="mono text-grunt-text">{dane.mpzpMeta.symbol}</span></div>}
+            {dane.mpzpMeta.standard && <div><span className="text-grunt-text-faint">Przeznaczenie:</span> <span className="text-grunt-text">{dane.mpzpMeta.standard}</span></div>}
+            {dane.mpzpMeta.stawkaPct != null && <div><span className="text-grunt-text-faint">Renta plan.:</span> {dane.mpzpMeta.stawkaPct}%</div>}
+            {dane.mpzpMeta.uchwala && <div><span className="text-grunt-text-faint">Uchwała:</span> {dane.mpzpMeta.uchwala}</div>}
+            {dane.mpzpMeta.dataWejscia && <div><span className="text-grunt-text-faint">W życie od:</span> {dane.mpzpMeta.dataWejscia}</div>}
+          </div>
+          {dane.mpzpMeta.nazwaPlanu && <div className="text-[11px] text-grunt-text-faint2 mt-1">Plan: {dane.mpzpMeta.nazwaPlanu}</div>}
+          {dane.mpzpMeta.opis && <div className="text-[11px] text-grunt-text-faint2">{dane.mpzpMeta.opis}</div>}
+        </div>
+      )}
       {meta.bledy.length > 0 && (
         <ul className="mt-3 space-y-1">
           {meta.bledy.map((b, i) => (
