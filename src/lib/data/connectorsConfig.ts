@@ -27,7 +27,10 @@ export interface KonfiguracjaKonektorow {
       bezrobocie: string;
       podmiotyNa10k: string;
       saldoMigracji: string;
+      wynagrodzenie: string;
     };
+    /** Mnożnik: przeciętne wynagrodzenie brutto (powiat) → proxy dochodu gosp. dom. [zł/mc]. */
+    dochodMnoznikWynagrodzenie: number;
     /** Opcjonalne nadpisanie ID (pomija auto-dobór, gdy ustawione). */
     zmienneId: Partial<Record<keyof KonfiguracjaKonektorow["gus"]["zapytania"], string>>;
     /** Krajowa mediana odniesienia udziału 20–39 lat [%] — fallback, gdy brak danych wojewódzkich. */
@@ -80,7 +83,9 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       bezrobocie: "udział bezrobotnych zarejestrowanych w liczbie ludności w wieku produkcyjnym",
       podmiotyNa10k: "podmioty wpisane do rejestru REGON na 10 tys. ludności",
       saldoMigracji: "saldo migracji",
+      wynagrodzenie: "przeciętne miesięczne wynagrodzenia brutto",
     },
+    dochodMnoznikWynagrodzenie: 1.0,
     // Potwierdzone ID zmiennych BDL (diagnostyka /api/diag-gus, gmina Rzeszów):
     // podmioty na 10 tys. = 60530 (wart. 1804), saldo migracji = 1365234 (wart. 622).
     // Pozostałe (ludność ogółem/wiek/bezrobocie) do przypięcia po eksploracji katalogu.

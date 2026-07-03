@@ -223,6 +223,33 @@ async function medianaWoj2039(wojNazwa: string, p2039: PasmoWieku[]): Promise<nu
   return udzial;
 }
 
+/** Cache: id zmiennej „przeciętne wynagrodzenie" (auto-dobór z katalogu po frazie). */
+let cacheIdWynagrodzenie: string | null | undefined;
+async function idWynagrodzenia(): Promise<string | null> {
+  if (gus.zmienneId.wynagrodzenie) return gus.zmienneId.wynagrodzenie;
+  if (cacheIdWynagrodzenie !== undefined) return cacheIdWynagrodzenie;
+  const odp = await fetchJson(url("variables/search", { name: gus.zapytania.wynagrodzenie, "page-size": "30" }), {
+    ...KONFIG_KONEKTORY.siec,
+    naglowki: naglowki(),
+  });
+  cacheIdWynagrodzenie = pierwszaZmienna(odp);
+  return cacheIdWynagrodzenie;
+}
+
+/** Diagnostyka: wyszukiwanie zmiennych BDL po frazie (id, nazwa, jednostka, poziom). */
+export async function diagZmienne(fraza: string): Promise<unknown> {
+  const odp = await fetchJson<{ results?: Record<string, unknown>[] }>(
+    url("variables/search", { name: fraza, "page-size": "30" }),
+    { ...KONFIG_KONEKTORY.siec, naglowki: naglowki() }
+  );
+  return (odp?.results ?? []).map((r) => ({
+    id: r.id,
+    nazwa: [r.n1, r.n2, r.n3].filter(Boolean).join(" · "),
+    jednostka: r.measureUnitName ?? null,
+    poziom: r.level ?? null,
+  }));
+}
+
 export const konektorGUS: Konektor = {
   klucz: "GUS_BDL",
   zrodlo: "GUS Bank Danych Lokalnych",
@@ -335,12 +362,21 @@ export const konektorGUS: Konektor = {
       }
     }
 
-    // Stopa bezrobocia rejestrowanego — poziom powiatu (jednostka nadrzędna gminy).
+    // Poziom powiatu (jednostka nadrzędna gminy): stopa bezrobocia + przeciętne wynagrodzenie.
+    // BDL nie publikuje dochodu gospodarstw na poziomie GMINY — realnym zakotwiczeniem
+    // podziału dochodowego (K/S/R) jest wynagrodzenie powiatowe (proxy), nie estymacja regionalna.
     const powiatId = jednostka.parentId;
     if (powiatId) {
-      const mBezr = await wartosciWielu(powiatId, gus.stopaBezrobociaIds);
-      const stopa = gus.stopaBezrobociaIds.map((id) => mBezr.get(id)).find((v) => v !== null && v !== undefined) ?? null;
+      const idWyn = await idWynagrodzenia();
+      const potrzebnePow = idWyn ? [...gus.stopaBezrobociaIds, idWyn] : gus.stopaBezrobociaIds;
+      const mPow = await wartosciWielu(powiatId, potrzebnePow);
+      const stopa = gus.stopaBezrobociaIds.map((id) => mPow.get(id)).find((v) => v !== null && v !== undefined) ?? null;
       dodaj("bezrobociePct", stopa ?? null, 85);
+      // Nie nadpisujemy dochodu, jeśli wcześniej ustawiono go z jawnej zmiennej gminnej (gus.dochodId).
+      if (idWyn && dane.dochodPrzecietnyGmina == null) {
+        const wyn = mPow.get(idWyn);
+        if (wyn != null) dodaj("dochodPrzecietnyGmina", wyn * gus.dochodMnoznikWynagrodzenie, 68);
+      }
     }
 
     if (Object.keys(dane).length === 0) {
