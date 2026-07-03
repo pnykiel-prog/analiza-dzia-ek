@@ -911,13 +911,16 @@ function PotwierdzenieDanych({ dane, meta }: { dane: DaneDzialki; meta: MetaRozw
           )}
         </div>
       )}
-      {dane.mpzpMeta && (dane.mpzpMeta.symbol || dane.mpzpMeta.standard) && (
+      {dane.mpzpMeta && (dane.mpzpMeta.symbol || dane.mpzpMeta.standard || dane.mpzpMeta.nazwaPlanu) && (
         <div className="mt-3 rounded-md border border-grunt-green/25 bg-grunt-green-bg/50 px-3 py-2.5">
-          <div className="text-xs font-semibold text-grunt-green mb-1">Metryka MPZP (KIMPZP — gmina wektorowa)</div>
+          <div className="text-xs font-semibold text-grunt-green mb-1">Metryka MPZP (KIMPZP)</div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1 text-[12px] text-grunt-text-muted">
             {dane.mpzpMeta.symbol && <div><span className="text-grunt-text-faint">Symbol:</span> <span className="mono text-grunt-text">{dane.mpzpMeta.symbol}</span></div>}
             {dane.mpzpMeta.standard && <div><span className="text-grunt-text-faint">Przeznaczenie:</span> <span className="text-grunt-text">{dane.mpzpMeta.standard}</span></div>}
+            {dane.mpzpMeta.maxWysokoscM && <div><span className="text-grunt-text-faint">Maks. wys.:</span> <span className="text-grunt-text">{dane.mpzpMeta.maxWysokoscM}</span></div>}
+            {dane.mpzpMeta.intensywnoscZabudowy && <div><span className="text-grunt-text-faint">Intensywność:</span> <span className="text-grunt-text">{dane.mpzpMeta.intensywnoscZabudowy}</span></div>}
             {dane.mpzpMeta.stawkaPct != null && <div><span className="text-grunt-text-faint">Renta plan.:</span> {dane.mpzpMeta.stawkaPct}%</div>}
+            {dane.mpzpMeta.jednostka && <div><span className="text-grunt-text-faint">Jednostka:</span> {dane.mpzpMeta.jednostka}</div>}
             {dane.mpzpMeta.uchwala && <div><span className="text-grunt-text-faint">Uchwała:</span> {dane.mpzpMeta.uchwala}</div>}
             {dane.mpzpMeta.dataWejscia && <div><span className="text-grunt-text-faint">W życie od:</span> {dane.mpzpMeta.dataWejscia}</div>}
           </div>

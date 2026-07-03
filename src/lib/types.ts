@@ -275,6 +275,11 @@ export interface MetrykaPlanu {
   uchwala?: string; // nr uchwały
   dataWejscia?: string; // data wejścia w życie
   stawkaPct?: number | null; // renta planistyczna [%]
+  // Parametry zabudowy z planu (gdy serwis je udostępnia, np. schemat warszawski).
+  intensywnoscZabudowy?: string; // INTEN_ZAB — dozwolona intensywność zabudowy
+  maxWysokoscM?: string; // MAX_WYS — maksymalna wysokość zabudowy
+  jednostka?: string; // dzielnica / jednostka administracyjna w planie
+  www?: string; // odnośnik do karty/rysunku planu
 }
 
 /** Sygnał z sąsiedztwa do prognozy potencjału (docelowo BDOT + NMT; teraz deterministyczny). */
