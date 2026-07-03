@@ -39,7 +39,7 @@ const KROPKA: Record<Werdykt, string> = {
  * społeczne (ocena projektu vs pojemność) i komunalne (skala potrzeby w gminie
  * per mieszkaniec). Plus atrakcyjność migracyjna, kwalifikacje i prognoza pojemności.
  */
-export function Poziom1View({ p1, pelny = true }: { p1: WynikPoziom1; pelny?: boolean }) {
+export function Poziom1View({ p1, pelny = true, pokazRekomendacje = true }: { p1: WynikPoziom1; pelny?: boolean; pokazRekomendacje?: boolean }) {
   const poj = p1.pojemnosc;
   const prog = p1.prognoza;
   const ocena = p1.ocenaPopytu;
@@ -58,14 +58,16 @@ export function Poziom1View({ p1, pelny = true }: { p1: WynikPoziom1; pelny?: bo
         </div>
       )}
 
-      {/* Rekomendowany kierunek */}
-      <div className="flex items-center justify-between gap-3 rounded-md border border-grunt-ink/15 bg-grunt-surface-3 px-3.5 py-2.5">
-        <div className="text-[13px] text-grunt-text-muted">
-          Rekomendowany kierunek: <strong className="text-grunt-text">{ETYK_WERDYKT[ocena.rekomendowanyKierunek]}</strong>
-          <span className={`ml-2 font-semibold ${KOLOR_STATUSU[rek.werdykt]}`}>{statusSlowny[rek.werdykt]} · {rek.score}/100</span>
+      {/* Rekomendowany kierunek (ukrywany, gdy pokazany w panelu potwierdzenia) */}
+      {pokazRekomendacje && (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-grunt-ink/15 bg-grunt-surface-3 px-3.5 py-2.5">
+          <div className="text-[13px] text-grunt-text-muted">
+            Rekomendowany kierunek: <strong className="text-grunt-text">{ETYK_WERDYKT[ocena.rekomendowanyKierunek]}</strong>
+            <span className={`ml-2 font-semibold ${KOLOR_STATUSU[rek.werdykt]}`}>{statusSlowny[rek.werdykt]} · {rek.score}/100</span>
+          </div>
+          <span className="text-[11px] text-grunt-text-faint2">pewność ogólna {ocena.pewnoscOgolna}%</span>
         </div>
-        <span className="text-[11px] text-grunt-text-faint2">pewność ogólna {ocena.pewnoscOgolna}%</span>
-      </div>
+      )}
 
       {/* SIATKA 4 WERDYKTÓW */}
       <div>

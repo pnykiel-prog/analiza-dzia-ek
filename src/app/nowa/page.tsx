@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { DaneDzialki, WynikAnalizy } from "@/lib/types";
+import type { DaneDzialki, WynikAnalizy, WynikPoziom1, KluczWerdyktu } from "@/lib/types";
 import type { ProfilFinansowy } from "@/lib/finanse/typy";
 import { domyslnaKonfiguracja, type Konfiguracja } from "@/lib/config";
 import { WOJEWODZTWA } from "@/lib/wojewodztwa";
@@ -16,7 +16,19 @@ import { Stepper, BannerBramki, Chip } from "@/components/grunt";
 import { SYMBOLE_MPZP, statusZeSymbolu } from "@/lib/mpzp";
 import { PodgladTerenu, type TrybMapy, type WarstwyMapy } from "@/components/GruntMap";
 import { RaportView } from "@/components/RaportView";
-import { liczba } from "@/lib/format";
+import { liczba, statusSlowny } from "@/lib/format";
+
+const ETYK_WERDYKT_KIER: Record<KluczWerdyktu, string> = {
+  spolecznyMlodzi: "Społeczny — młodzi",
+  spolecznySeniorzy: "Społeczny — seniorzy",
+  komunalnyMlodzi: "Komunalny — młodzi",
+  komunalnySeniorzy: "Komunalny — seniorzy",
+};
+const KOLOR_WERD: Record<string, string> = {
+  zielony: "text-grunt-green",
+  zolty: "text-grunt-amber",
+  czerwony: "text-grunt-red",
+};
 
 interface MetaRozw {
   pozycje: { id: string; znaleziona: boolean; znanyTeryt: boolean; zrodlo: "demo" | "uldk" | "brak" }[];
@@ -318,7 +330,7 @@ export default function NowaAnalizaPage() {
     <div className="space-y-5">
       <div className="-mx-6 -mt-6">
         <Stepper aktywny={stepAktywny} maxOsiagniety={maxKrok} onKrok={idzDoKroku} />
-        {dane && ekran !== "wejscie" && (
+        {dane && ekran !== "wejscie" && ekran !== "poziom1" && (
           <div className="bg-grunt-surface border-b border-grunt-border px-6 py-2 flex flex-wrap items-center gap-x-6 gap-y-1">
             <span className="text-[10px] uppercase tracking-wider text-grunt-text-faint">Teren inwestycji</span>
             <span className="mono text-[12px] text-grunt-text">{dane.id}</span>
@@ -465,7 +477,7 @@ export default function NowaAnalizaPage() {
 
       {/* POZIOM 1 — potwierdzenie wczytania: teren, mapa, źródła (jeden ekran) */}
       {ekran === "poziom1" && dane && meta && (
-        <PotwierdzenieDanych dane={dane} meta={meta} />
+        <PotwierdzenieDanych dane={dane} meta={meta} p1={wynik?.poziom1} />
       )}
 
       {/* Działka spoza ULDK demo — brak geometrii, powierzchnia ręczna (na ekranie wejścia) */}
@@ -621,7 +633,8 @@ export default function NowaAnalizaPage() {
         <div className="space-y-4">
           {ekran === "poziom1" && (
             <>
-              <Poziom1View p1={wynik.poziom1} pelny />
+              {/* Rekomendacja pokazana już w lewym panelu potwierdzenia — tu tylko szczegóły. */}
+              <Poziom1View p1={wynik.poziom1} pelny pokazRekomendacje={false} />
               <BannerBramki
                 tytul="Poziom 1 zaliczony — przejdź do oceny działki"
                 opis="Poziom 2 odsłania model zabudowy i warianty."
@@ -865,11 +878,30 @@ function PozycjaWiersz({
   );
 }
 
-function PotwierdzenieDanych({ dane, meta }: { dane: DaneDzialki; meta: MetaRozw }) {
+function PotwierdzenieDanych({ dane, meta, p1 }: { dane: DaneDzialki; meta: MetaRozw; p1?: WynikPoziom1 }) {
   const trybMapy: TrybMapy = dane.powierzchniaM2 === 0 ? "notfound" : meta.przylegajace === false ? "nonadjacent" : "ok";
+  const ocena = p1?.ocenaPopytu;
+  const rek = ocena ? ocena.werdykty[ocena.rekomendowanyKierunek] : null;
   return (
-    <div className="grid lg:grid-cols-[1fr_minmax(0,440px)] gap-4 items-start">
+    <div className="grid lg:grid-cols-2 gap-4 items-start">
     <Karta tytul="Teren inwestycji (A°, potwierdzenie wczytania)" podtytul="Scalona geometria z ULDK — dane automatyczne pobrane w tle">
+      {/* Identyfikacja terenu (konsolidacja górnego paska) */}
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mb-3 pb-3 border-b border-grunt-divider">
+        <span className="text-[10px] uppercase tracking-wider text-grunt-text-faint">Teren inwestycji</span>
+        <span className="mono text-[13px] text-grunt-text">{dane.id}</span>
+        {dane.powierzchniaM2 > 0 && <span className="mono text-[12px] text-grunt-text-muted">{liczba(dane.powierzchniaM2, " m²")}</span>}
+        {dane.gmina && <span className="text-[12px] text-grunt-text-muted">{dane.gmina}</span>}
+      </div>
+      {/* Rekomendowany kierunek (konsolidacja dolnego paska) */}
+      {rek && ocena && (
+        <div className="flex items-center justify-between gap-3 mb-3 rounded-md border border-grunt-ink/15 bg-grunt-surface-3 px-3.5 py-2.5">
+          <div className="text-[13px] text-grunt-text-muted">
+            Rekomendowany kierunek: <strong className="text-grunt-text">{ETYK_WERDYKT_KIER[ocena.rekomendowanyKierunek]}</strong>
+            <span className={`ml-2 font-semibold ${KOLOR_WERD[rek.werdykt]}`}>{statusSlowny[rek.werdykt]} · {rek.score}/100</span>
+          </div>
+          <span className="text-[11px] text-grunt-text-faint2 whitespace-nowrap">pewność ogólna {ocena.pewnoscOgolna}%</span>
+        </div>
+      )}
       <div className="flex flex-wrap gap-2 mb-3 text-xs">
         {meta.pozycje.map((p, i) => (
           <span key={i} className={`badge ${p.znaleziona ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
@@ -937,7 +969,7 @@ function PotwierdzenieDanych({ dane, meta }: { dane: DaneDzialki; meta: MetaRozw
       )}
     </Karta>
     <div className="lg:sticky" style={{ top: "var(--grunt-sticky-top)" }}>
-      <PodgladTerenu mode={trybMapy} view="start" layers={{ parcel: true }} shape={meta.ksztaltSvg ?? ""} geo={meta.ksztaltGeo ?? ""} />
+      <PodgladTerenu mode={trybMapy} view="start" layers={{ parcel: true }} shape={meta.ksztaltSvg ?? ""} geo={meta.ksztaltGeo ?? ""} kwadrat />
     </div>
     </div>
   );
