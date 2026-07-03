@@ -127,20 +127,22 @@ export async function diagKimpzp(
   return { formatUzyty: null, url: ostatniUrl, dlugosc: 0, przeznaczenie: null, metryka: null, pusty: true, surowa: null };
 }
 
-/** Lekka sonda KIMPZP (jedno zapytanie): klasyfikuje pokrycie planami w punkcie. */
+/** Lekka sonda KIMPZP (jedno zapytanie z retry): klasyfikuje pokrycie planami w punkcie. */
 export async function sondaKimpzp(
   x: number,
-  y: number
-): Promise<{ status: "ma_plany" | "pusto" | "niejasne" | "blad"; przeznaczenie: StatusPlanistyczny | null; symbol?: string }> {
-  const tekst = await fetchTekst(urlGetFeatureInfo(x, y), { timeoutMs: 6000, proby: 1 });
-  if (tekst == null) return { status: "blad", przeznaczenie: null };
+  y: number,
+  opcje?: { timeoutMs?: number; proby?: number; raw?: boolean }
+): Promise<{ status: "ma_plany" | "pusto" | "niejasne" | "blad"; przeznaczenie: StatusPlanistyczny | null; symbol?: string; raw?: string | null }> {
+  const tekst = await fetchTekst(urlGetFeatureInfo(x, y), { timeoutMs: opcje?.timeoutMs ?? 8000, proby: opcje?.proby ?? 2 });
+  const raw = opcje?.raw ? (tekst == null ? null : tekst.slice(0, 600)) : undefined;
+  if (tekst == null) return { status: "blad", przeznaczenie: null, raw };
   const strukt = parsujMpzpJson(tekst);
   if (strukt && (strukt.status || strukt.meta.symbol || strukt.meta.standard)) {
-    return { status: "ma_plany", przeznaczenie: strukt.status, symbol: strukt.meta.symbol ?? strukt.meta.standard };
+    return { status: "ma_plany", przeznaczenie: strukt.status, symbol: strukt.meta.symbol ?? strukt.meta.standard, raw };
   }
   const przez = rozpoznajPrzeznaczenie(tekst);
-  if (przez) return { status: "ma_plany", przeznaczenie: przez };
-  return { status: czyPustyWynik(tekst) ? "pusto" : "niejasne", przeznaczenie: null };
+  if (przez) return { status: "ma_plany", przeznaczenie: przez, raw };
+  return { status: czyPustyWynik(tekst) ? "pusto" : "niejasne", przeznaczenie: null, raw };
 }
 
 export const konektorKIMPZP: Konektor = {

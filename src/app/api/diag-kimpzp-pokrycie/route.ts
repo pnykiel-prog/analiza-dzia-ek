@@ -4,13 +4,17 @@ import { sondaKimpzp } from "@/lib/data/connectors/kimpzp";
 
 /**
  * Diagnostyka POKRYCIA KIMPZP — sonduje krajowy serwis w centrach największych
- * miast (miasta na prawach powiatu / stolice województw) i wskazuje „dziury"
- * (jak Warszawa): miejsca, gdzie KIMPZP zwraca pusto mimo pewnego istnienia MPZP.
- * To sygnał, gdzie potrzebny jest dedykowany fallback (lokalny WMS gminy).
+ * miast i wskazuje „dziury" (jak Warszawa): pusto mimo pewnego MPZP → potrzebny
+ * lokalny fallback WMS. Łagodna równoległość (KIMPZP dławi serie zapytań).
  *
- * Użycie:  GET /api/diag-kimpzp-pokrycie
- * Bezpieczne: tylko odczyt publicznego WMS.
+ * Użycie:
+ *   GET /api/diag-kimpzp-pokrycie                      — pełny skan (24 miasta)
+ *   GET /api/diag-kimpzp-pokrycie?miasta=Kraków,Łódź   — tylko wybrane (rzetelnie)
+ *   GET /api/diag-kimpzp-pokrycie?raw=1                — dołącz surową odpowiedź (do parsera)
  */
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 function json(obj: unknown): NextResponse {
   return new NextResponse(JSON.stringify(obj, null, 2), {
     status: 200,
@@ -18,8 +22,6 @@ function json(obj: unknown): NextResponse {
   });
 }
 
-// Największe miasta (centra) — lon, lat (WGS84). Centrum gęstej zabudowy niemal
-// zawsze objęte MPZP → pusty wynik = luka pokrycia krajowego KIMPZP dla tego miasta.
 const MIASTA: { nazwa: string; lon: number; lat: number }[] = [
   { nazwa: "Warszawa", lon: 21.012, lat: 52.23 },
   { nazwa: "Kraków", lon: 19.937, lat: 50.061 },
@@ -47,30 +49,47 @@ const MIASTA: { nazwa: string; lon: number; lat: number }[] = [
   { nazwa: "Gliwice", lon: 18.665, lat: 50.294 },
 ];
 
-export async function GET() {
-  const wyniki = await Promise.all(
-    MIASTA.map(async (m) => {
-      const [x, y] = wgs84ToPl1992(m.lon, m.lat);
-      const s = await sondaKimpzp(x, y);
-      return { miasto: m.nazwa, status: s.status, przeznaczenie: s.przeznaczenie, symbol: s.symbol ?? null };
-    })
-  );
-  const dziury = wyniki.filter((w) => w.status === "pusto").map((w) => w.miasto);
-  const niejasne = wyniki.filter((w) => w.status === "niejasne").map((w) => w.miasto);
-  const blad = wyniki.filter((w) => w.status === "blad").map((w) => w.miasto);
-  const maPlany = wyniki.filter((w) => w.status === "ma_plany").map((w) => w.miasto);
+/** Mapowanie z ograniczoną równoległością (pula workerów) — łagodne dla WMS. */
+async function mapaOgraniczona<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
+  const wyniki = new Array<R>(items.length);
+  let i = 0;
+  async function worker() {
+    while (i < items.length) {
+      const idx = i++;
+      wyniki[idx] = await fn(items[idx]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return wyniki;
+}
 
+const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
+
+export async function GET(req: Request) {
+  const u = new URL(req.url);
+  const raw = u.searchParams.get("raw") === "1";
+  const filtr = (u.searchParams.get("miasta") ?? "").split(",").map((s) => norm(s.trim())).filter(Boolean);
+  const lista = filtr.length ? MIASTA.filter((m) => filtr.includes(norm(m.nazwa))) : MIASTA;
+
+  // Mniejsza pula gdy pełny skan (łagodniej), większa dla małych podzbiorów.
+  const rownolegle = lista.length > 8 ? 4 : Math.min(lista.length, 4);
+
+  const wyniki = await mapaOgraniczona(lista, rownolegle, async (m) => {
+    const [x, y] = wgs84ToPl1992(m.lon, m.lat);
+    const s = await sondaKimpzp(x, y, { timeoutMs: 8000, proby: 2, raw });
+    return { miasto: m.nazwa, status: s.status, przeznaczenie: s.przeznaczenie, symbol: s.symbol ?? null, ...(raw ? { raw: s.raw } : {}) };
+  });
+
+  const grupy = (st: string) => wyniki.filter((w) => w.status === st).map((w) => w.miasto);
   return json({
-    opis: "Sonda pokrycia KIMPZP w centrach największych miast (1 punkt/miasto).",
-    sprawdzono: MIASTA.length,
-    liczbaDziur: dziury.length,
-    dziury, // miasta jak Warszawa — pusto mimo pewnego MPZP → potrzebny lokalny fallback
-    niejasne, // treść bez rozpoznanej metryki (raster/nietypowy format) — do sprawdzenia ręcznie
-    blad, // serwis nie odpowiedział — spróbuj ponownie
-    maPlany, // KIMPZP realnie zwraca MPZP
+    opis: "Sonda pokrycia KIMPZP (łagodna równoległość, retry). 1 punkt/miasto.",
+    sprawdzono: lista.length,
+    liczbaDziur: grupy("pusto").length,
+    dziury: grupy("pusto"),
+    niejasne: grupy("niejasne"),
+    blad: grupy("blad"),
+    maPlany: grupy("ma_plany"),
     wyniki,
-    uwaga:
-      "Sonda pojedynczego punktu (centrum). Wynik 'pusto' w centrum dużego miasta silnie wskazuje lukę pokrycia; " +
-      "'ma_plany' potwierdza działanie. Małe gminy są zwykle objęte krajowym KIMPZP i nie są tu sondowane.",
+    uwaga: "Jeśli nadal dużo 'blad' — powtórz na mniejszej grupie: ?miasta=Rzeszów,Kraków,Wrocław. Dodaj ?raw=1, by zobaczyć surową odpowiedź 'niejasnych'.",
   });
 }
