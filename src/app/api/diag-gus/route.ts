@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { KONFIG_KONEKTORY } from "@/lib/data/connectorsConfig";
-import { konektorGUS, diagJednostki } from "@/lib/data/connectors/gus";
+import { konektorGUS, diagJednostki, diagZmienne } from "@/lib/data/connectors/gus";
 import type { Teren } from "@/lib/data/connectors/types";
 import { rozwiazDzialki } from "@/lib/data/resolver";
 
@@ -27,6 +27,11 @@ export async function GET(req: Request) {
 
   // TRYB APLIKACJI: podaj identyfikator działki (?id=…) — uruchamiamy DOKŁADNIE ten sam
   // resolver co /nowa i pokazujemy, jaką gminę rozpoznał i czy demografia GUS trafiła do danych.
+  // TRYB WYSZUKANIA ZMIENNYCH: ?vars=przeciętne miesięczne wynagrodzenia — pokazuje id/nazwę/jednostkę/poziom,
+  // do potwierdzenia właściwej zmiennej (np. wynagrodzenia) i wpisania w gus.zmienneId.
+  const vars = u.searchParams.get("vars");
+  if (vars) return odpowiedz({ fraza: vars, wyniki: await diagZmienne(vars) });
+
   // TRYB SUROWYCH JEDNOSTEK: ?units=Warszawa — pokazuje, co BDL zwraca dla units/search
   // (z filtrem poziomu i bez), z id/nazwą/poziomem — do namierzenia właściwej jednostki.
   const units = u.searchParams.get("units");
@@ -49,6 +54,10 @@ export async function GET(req: Request) {
         mediana2039Woj: d?.mediana2039Woj ?? null,
         bezrobociePct: d?.bezrobociePct ?? null,
         saldoMigracjiMlodzi: d?.saldoMigracjiMlodzi ?? null,
+        liczbaMieszkancowGminy: d?.liczbaMieszkancowGminy ?? null,
+        liczba2039: d?.liczba2039 ?? null,
+        liczba65Plus: d?.liczba65Plus ?? null,
+        dochodPrzecietnyGmina: d?.dochodPrzecietnyGmina ?? null,
       },
       gusRaport: gusRaport ?? "(konektor GUS nie w raporcie)",
       wniosek:
