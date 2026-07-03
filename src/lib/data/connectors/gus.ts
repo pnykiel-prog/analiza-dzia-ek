@@ -223,17 +223,18 @@ async function medianaWoj2039(wojNazwa: string, p2039: PasmoWieku[]): Promise<nu
   return udzial;
 }
 
-/** Cache: id zmiennej „przeciętne wynagrodzenie" (auto-dobór z katalogu po frazie). */
-let cacheIdWynagrodzenie: string | null | undefined;
-async function idWynagrodzenia(): Promise<string | null> {
-  if (gus.zmienneId.wynagrodzenie) return gus.zmienneId.wynagrodzenie;
-  if (cacheIdWynagrodzenie !== undefined) return cacheIdWynagrodzenie;
-  const odp = await fetchJson(url("variables/search", { name: gus.zapytania.wynagrodzenie, "page-size": "30" }), {
+/** Auto-dobór id zmiennej BDL z katalogu po frazie (cache per fraza). */
+const cacheIdFraza = new Map<string, string | null>();
+async function idZmiennejPoFrazie(fraza: string): Promise<string | null> {
+  if (!fraza) return null;
+  if (cacheIdFraza.has(fraza)) return cacheIdFraza.get(fraza)!;
+  const odp = await fetchJson(url("variables/search", { name: fraza, "page-size": "30" }), {
     ...KONFIG_KONEKTORY.siec,
     naglowki: naglowki(),
   });
-  cacheIdWynagrodzenie = pierwszaZmienna(odp);
-  return cacheIdWynagrodzenie;
+  const id = pierwszaZmienna(odp);
+  cacheIdFraza.set(fraza, id);
+  return id;
 }
 
 /** Diagnostyka: wyszukiwanie zmiennych BDL po frazie (id, nazwa, jednostka, poziom). */
@@ -287,8 +288,9 @@ export const konektorGUS: Konektor = {
     const idPodmioty = gus.zmienneId.podmiotyNa10k ?? "60530";
     const idSaldo = gus.zmienneId.saldoMigracji ?? "1365234";
     const idDochod = gus.dochodId;
-    const idZamel = gus.zameldowaniaId;
-    const idWymel = gus.wymeldowaniaId;
+    // Napływ/odpływ migracji brutto — ID z konfiguracji lub auto-dobór po frazie (weryfikacja: ?vars=).
+    const idZamel = gus.zameldowaniaId ?? (await idZmiennejPoFrazie(gus.zapytania.zameldowania));
+    const idWymel = gus.wymeldowaniaId ?? (await idZmiennejPoFrazie(gus.zapytania.wymeldowania));
     const opcjonalne = [idDochod, idZamel, idWymel].filter(Boolean) as string[];
     const pasma = await pasmaWiekuOgolem();
     const p2039 = pasma.filter((p) => p.lo >= 20 && p.hi <= 39 && p.hi - p.lo === 4);
@@ -367,7 +369,7 @@ export const konektorGUS: Konektor = {
     // podziału dochodowego (K/S/R) jest wynagrodzenie powiatowe (proxy), nie estymacja regionalna.
     const powiatId = jednostka.parentId;
     if (powiatId) {
-      const idWyn = await idWynagrodzenia();
+      const idWyn = gus.zmienneId.wynagrodzenie ?? (await idZmiennejPoFrazie(gus.zapytania.wynagrodzenie));
       const potrzebnePow = idWyn ? [...gus.stopaBezrobociaIds, idWyn] : gus.stopaBezrobociaIds;
       const mPow = await wartosciWielu(powiatId, potrzebnePow);
       const stopa = gus.stopaBezrobociaIds.map((id) => mPow.get(id)).find((v) => v !== null && v !== undefined) ?? null;

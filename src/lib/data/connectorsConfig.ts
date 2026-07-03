@@ -28,6 +28,8 @@ export interface KonfiguracjaKonektorow {
       podmiotyNa10k: string;
       saldoMigracji: string;
       wynagrodzenie: string;
+      zameldowania: string;
+      wymeldowania: string;
     };
     /** Mnożnik: przeciętne wynagrodzenie brutto (powiat) → proxy dochodu gosp. dom. [zł/mc]. */
     dochodMnoznikWynagrodzenie: number;
@@ -86,6 +88,8 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       podmiotyNa10k: "podmioty wpisane do rejestru REGON na 10 tys. ludności",
       saldoMigracji: "saldo migracji",
       wynagrodzenie: "przeciętne miesięczne wynagrodzenia brutto",
+      zameldowania: "zameldowania w ruchu wewnętrznym",
+      wymeldowania: "wymeldowania w ruchu wewnętrznym",
     },
     dochodMnoznikWynagrodzenie: 1.0,
     wynagrodzenieKrajoweMies: 7155,
