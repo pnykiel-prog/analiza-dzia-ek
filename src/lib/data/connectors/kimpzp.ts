@@ -21,8 +21,9 @@ const cfg = KONFIG_KONEKTORY.kimpzp;
 export function rozpoznajPrzeznaczenie(tekst: string): StatusPlanistyczny | null {
   const t = tekst.toLowerCase();
   if (!t.trim()) return null;
-  // Sprzeczne z mieszkaniową (przemysł, las, drogi, tereny zamknięte).
-  if (/\b(przemys|produkcyj|tereny zamkn|las|leśn|cmentar|górnicz)/.test(t)) return "sprzeczny";
+  // Sprzeczne z mieszkaniową (przemysł, las, drogi, tereny zamknięte, wody).
+  if (/\b(przemys|produkcyj|tereny zamkn|las|leśn|cmentar|górnicz|droga|drogi|drogow|ulica|komunikacj|\bkd[a-z]?\b|\bks\b|wody|wód|rzek)/.test(t))
+    return "sprzeczny";
   // Mieszkaniowe: symbole (MN/MW/MU/MWn) oraz opisy wielowyrazowe
   // („zabudowa … mieszkaniowa/wielofunkcyjna", „funkcja mieszkaniowa").
   // „mieszkanio” łapie deklinacje (mieszkaniowa/-ej/-ych); „mieszkalni” — budynki mieszkalne.
@@ -36,9 +37,43 @@ export function czyPustyWynik(tekst: string): boolean {
   const t = tekst.trim();
   if (!t) return true;
   if (/"features"\s*:\s*\[\s*\]/.test(t)) return true; // GeoJSON: pusta lista cech
-  // XML GetFeatureInfo_Result z pustymi ROWSET i bez pól/wierszy.
-  if (/GetFeatureInfo_Result/i.test(t) && !/<FIELDS|<gml:|<wfs:|"properties"/i.test(t)) return true;
+  // ROWSET z realnymi wierszami (schemat warszawski MPZP_PRZEZNACZENIE_TERENU) NIE jest pusty.
+  if (/<ROW\b/i.test(t) && /<(FUN_SYMB|FUN_NAZWA|NAZWA_PLAN|SYMBOL|OZNACZENIE|PRZEZNACZ)/i.test(t)) return false;
+  // XML GetFeatureInfo_Result bez wierszy/pól/geometrii.
+  if (/GetFeatureInfo_Result/i.test(t) && !/<ROW\b|<FIELDS|<gml:|<wfs:|"properties"/i.test(t)) return true;
   return false;
+}
+
+/**
+ * Parsuje odpowiedź XML ROWSET GetFeatureInfo (schemat warszawski i pokrewne):
+ * <ROWSET name="MPZP_PRZEZNACZENIE_TERENU"><ROW><FUN_SYMB>…</FUN_SYMB>…</ROW></ROWSET>.
+ * Zwraca metrykę planu z symbolem/funkcją i parametrami zabudowy (INTEN_ZAB, MAX_WYS).
+ */
+export function parsujMpzpXml(tekst: string): { status: StatusPlanistyczny | null; meta: MetrykaPlanu } | null {
+  if (!/<ROW\b/i.test(tekst)) return null;
+  const pole = (nazwa: string): string | undefined => {
+    const m = new RegExp(`<${nazwa}\\b[^>]*>([\\s\\S]*?)</${nazwa}>`, "i").exec(tekst);
+    if (!m) return undefined;
+    const v = m[1].replace(/<!\[CDATA\[|\]\]>/g, "").trim();
+    return v && v.toLowerCase() !== "null" ? v : undefined;
+  };
+  const symbol = pole("FUN_SYMB") ?? pole("SYMBOL") ?? pole("OZNACZENIE");
+  const funNazwa = pole("FUN_NAZWA") ?? pole("PRZEZNACZ") ?? pole("PRZEZNACZENIE");
+  const nazwaPlanu = pole("NAZWA_PLAN") ?? pole("NAZWA_PLANU") ?? pole("NAZWA");
+  if (!symbol && !funNazwa && !nazwaPlanu) return null;
+  const meta: MetrykaPlanu = {
+    symbol,
+    opis: funNazwa,
+    nazwaPlanu,
+    intensywnoscZabudowy: pole("INTEN_ZAB") ?? pole("INTENSYWN"),
+    maxWysokoscM: pole("MAX_WYS") ?? pole("WYSOKOSC"),
+    jednostka: pole("DZIELNICA") ?? pole("JEDNOSTKA"),
+    www: pole("WWW"),
+    uchwala: pole("UCHWALA"),
+    dataWejscia: pole("D_WEJSCIA") ?? pole("DATA_WEJSCIA"),
+  };
+  const status = rozpoznajPrzeznaczenie(`${symbol ?? ""} ${funNazwa ?? ""} ${nazwaPlanu ?? ""}`);
+  return { status, meta };
 }
 
 /** Wyciąga metrykę planu z odpowiedzi GeoJSON KIMPZP (gmina wektorowa). */
@@ -112,7 +147,7 @@ export async function diagKimpzp(
     ostatniUrl = url;
     const tekst = await fetchTekst(url, { timeoutMs: 6000, proby: 1 });
     if (tekst && tekst.trim().length > 0) {
-      const strukt = parsujMpzpJson(tekst);
+      const strukt = parsujMpzpJson(tekst) ?? parsujMpzpXml(tekst);
       return {
         formatUzyty: fmt,
         url,
@@ -140,8 +175,8 @@ export type SygnalKimpzp =
 /** Klasyfikuje odpowiedź KIMPZP na sygnał pokrycia (czyta komunikaty serwisu). */
 export function sygnalZTekstu(tekst: string | null): { sygnal: SygnalKimpzp; przeznaczenie: StatusPlanistyczny | null; symbol?: string } {
   if (tekst == null) return { sygnal: "blad", przeznaczenie: null };
-  const strukt = parsujMpzpJson(tekst);
-  if (strukt && (strukt.status || strukt.meta.symbol || strukt.meta.standard)) {
+  const strukt = parsujMpzpJson(tekst) ?? parsujMpzpXml(tekst);
+  if (strukt && (strukt.status || strukt.meta.symbol || strukt.meta.standard || strukt.meta.nazwaPlanu)) {
     return { sygnal: "plan", przeznaczenie: strukt.status, symbol: strukt.meta.symbol ?? strukt.meta.standard };
   }
   const przez = rozpoznajPrzeznaczenie(tekst);
@@ -179,9 +214,9 @@ export const konektorKIMPZP: Konektor = {
     const tekst = await fetchTekst(urlGetFeatureInfo(x, y), { timeoutMs: 4500, proby: 1 });
     if (tekst === null) return brakWyniku(this.klucz, this.zrodlo, czas, "Brak odpowiedzi WMS.");
 
-    // 1) Ścieżka strukturalna (GeoJSON, gmina wektorowa) — metryka planu + status.
-    const strukt = parsujMpzpJson(tekst);
-    if (strukt && (strukt.status || strukt.meta.symbol || strukt.meta.standard)) {
+    // 1) Ścieżka strukturalna (GeoJSON gminy wektorowej lub XML ROWSET, np. Warszawa) — metryka planu + status.
+    const strukt = parsujMpzpJson(tekst) ?? parsujMpzpXml(tekst);
+    if (strukt && (strukt.status || strukt.meta.symbol || strukt.meta.standard || strukt.meta.nazwaPlanu)) {
       const dane: Partial<DaneDzialki> = { mpzpMeta: strukt.meta };
       const meta: MetaPola[] = [{ pole: "mpzpMeta", zrodlo: this.zrodlo, czas, pewnosc: 80, status: "ok", tryb: "A" }];
       if (strukt.status) {

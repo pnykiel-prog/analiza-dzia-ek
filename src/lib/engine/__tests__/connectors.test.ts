@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { czyPrzylegaja, centroid } from "../../geo";
 import { wybierzJednostke, wartoscZmiennej, pierwszaZmienna } from "../../data/connectors/gus";
 import { dopasujPoNazwie } from "../../data/uldk";
-import { rozpoznajPrzeznaczenie, parsujMpzpJson, czyPustyWynik, sygnalZTekstu } from "../../data/connectors/kimpzp";
+import { rozpoznajPrzeznaczenie, parsujMpzpJson, parsujMpzpXml, czyPustyWynik, sygnalZTekstu } from "../../data/connectors/kimpzp";
 import { uruchomKonektory } from "../../data/connectors";
 import type { Teren } from "../../data/connectors/types";
 import { DZIALKI_PRZYKLADOWE } from "../../data/sample";
@@ -122,9 +122,29 @@ test("kimpzp: sygnał pokrycia — rozróżnia brak serwisu (dziura) od braku pl
     sygnalZTekstu('<ServiceExceptionReport><ServiceException code="InvalidXslTemplate">Can\'t template xml document.</ServiceException></ServiceExceptionReport>').sygnal,
     "blad_serwisu"
   ); // Kraków → dziura funkcjonalna
-  assert.equal(sygnalZTekstu('<GetFeatureInfo_Result><ROWSET name="MPZP_PRZEZNACZENIE_TERENU"></ROWSET></GetFeatureInfo_Result>').sygnal, "pusto"); // Warszawa
+  assert.equal(sygnalZTekstu('<GetFeatureInfo_Result><ROWSET name="MPZP_PRZEZNACZENIE_TERENU"></ROWSET></GetFeatureInfo_Result>').sygnal, "pusto"); // pusty ROWSET (bez wierszy)
   assert.equal(sygnalZTekstu('{"features":[{"properties":{"SYMBOL":"11MWs","S_STANDARD":"MW"}}]}').sygnal, "plan"); // Rzeszów (działka)
   assert.equal(sygnalZTekstu(null).sygnal, "blad");
+});
+
+test("kimpzp: Warszawa — XML ROWSET z wierszem to PLAN (pokryte), nie pusto", () => {
+  // Realna odpowiedź KIMPZP dla centrum Warszawy (schemat MPZP_PRZEZNACZENIE_TERENU).
+  const warszawa =
+    '<?xml version="1.0" encoding="UTF-8"?>\n<GetFeatureInfo_Result>\n  <ROWSET name="MPZP_PRZEZNACZENIE_TERENU">\n    <ROW num="1">\n      <INTEN_ZAB> </INTEN_ZAB>\n      <MAX_WYS>12</MAX_WYS>\n      <FUN_NAZWA>zabudowa mieszkaniowa wielorodzinna</FUN_NAZWA>\n      <FUN_SYMB>3.MW</FUN_SYMB>\n      <DZIELNICA>Śródmieście</DZIELNICA>\n      <NAZWA_PLAN>otoczenie PKiN</NAZWA_PLAN>\n      <WWW>../dane/plany/9.07.html</WWW>\n    </ROW>\n  </ROWSET>\n</GetFeatureInfo_Result>';
+  assert.equal(czyPustyWynik(warszawa), false); // ROWSET z wierszem NIE jest pusty
+  const r = parsujMpzpXml(warszawa)!;
+  assert.ok(r);
+  assert.equal(r.meta.symbol, "3.MW");
+  assert.equal(r.meta.nazwaPlanu, "otoczenie PKiN");
+  assert.equal(r.meta.maxWysokoscM, "12");
+  assert.equal(r.meta.jednostka, "Śródmieście");
+  assert.equal(r.status, "mpzp_mieszkaniowy"); // MW + „mieszkaniowa" → mieszkaniowy
+  assert.equal(sygnalZTekstu(warszawa).sygnal, "plan"); // → POKRYTE
+
+  // A „droga zbiorcza / 1.KDZ" (jak realny punkt PKiN) → sprzeczny, ale wciąż PLAN (pokryte).
+  const droga = warszawa.replace("zabudowa mieszkaniowa wielorodzinna", "droga zbiorcza").replace("3.MW", "1.KDZ");
+  assert.equal(parsujMpzpXml(droga)!.status, "sprzeczny");
+  assert.equal(sygnalZTekstu(droga).sygnal, "plan"); // serwis odpowiada → pokryte
 });
 
 test("wms: ocena odpowiedzi GetFeatureInfo (obecny/pusty/błąd)", () => {
