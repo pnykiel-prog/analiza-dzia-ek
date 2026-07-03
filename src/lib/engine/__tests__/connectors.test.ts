@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { czyPrzylegaja, centroid } from "../../geo";
 import { wybierzJednostke, wartoscZmiennej, pierwszaZmienna } from "../../data/connectors/gus";
 import { dopasujPoNazwie } from "../../data/uldk";
-import { rozpoznajPrzeznaczenie, parsujMpzpJson, czyPustyWynik } from "../../data/connectors/kimpzp";
+import { rozpoznajPrzeznaczenie, parsujMpzpJson, czyPustyWynik, sygnalZTekstu } from "../../data/connectors/kimpzp";
 import { uruchomKonektory } from "../../data/connectors";
 import type { Teren } from "../../data/connectors/types";
 import { DZIALKI_PRZYKLADOWE } from "../../data/sample";
@@ -112,6 +112,19 @@ test("kimpzp: pusty wynik (Warszawa — XML z pustymi ROWSET) vs GeoJSON", () =>
   assert.equal(parsujMpzpJson(xmlPusty), null); // nie-JSON → brak metryki
   assert.equal(czyPustyWynik('{"type":"FeatureCollection","features":[]}'), true);
   assert.equal(czyPustyWynik('{"features":[{"properties":{"SYMBOL":"MW"}}]}'), false);
+});
+
+test("kimpzp: sygnał pokrycia — rozróżnia brak serwisu (dziura) od braku planu (pokryte)", () => {
+  // Realne komunikaty z sondy pokrycia:
+  assert.equal(sygnalZTekstu("brak serwisu dla wskazanego obszaru").sygnal, "brak_serwisu"); // Gdańsk → dziura
+  assert.equal(sygnalZTekstu("m. Wrocław: brak wyniku dla wskazanego obszaru").sygnal, "serwis_bez_planu"); // Wrocław → pokryte
+  assert.equal(
+    sygnalZTekstu('<ServiceExceptionReport><ServiceException code="InvalidXslTemplate">Can\'t template xml document.</ServiceException></ServiceExceptionReport>').sygnal,
+    "blad_serwisu"
+  ); // Kraków → dziura funkcjonalna
+  assert.equal(sygnalZTekstu('<GetFeatureInfo_Result><ROWSET name="MPZP_PRZEZNACZENIE_TERENU"></ROWSET></GetFeatureInfo_Result>').sygnal, "pusto"); // Warszawa
+  assert.equal(sygnalZTekstu('{"features":[{"properties":{"SYMBOL":"11MWs","S_STANDARD":"MW"}}]}').sygnal, "plan"); // Rzeszów (działka)
+  assert.equal(sygnalZTekstu(null).sygnal, "blad");
 });
 
 test("wms: ocena odpowiedzi GetFeatureInfo (obecny/pusty/błąd)", () => {

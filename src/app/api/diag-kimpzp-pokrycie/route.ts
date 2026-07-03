@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { wgs84ToPl1992 } from "@/lib/geo";
-import { sondaKimpzp } from "@/lib/data/connectors/kimpzp";
+import { sondaKimpzp, type SygnalKimpzp } from "@/lib/data/connectors/kimpzp";
 
 /**
  * Diagnostyka POKRYCIA KIMPZP — sonduje krajowy serwis w centrach największych
@@ -65,31 +65,70 @@ async function mapaOgraniczona<T, R>(items: T[], limit: number, fn: (t: T) => Pr
 
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
 
+// Ranking sygnałów (mniejszy = lepszy dowód pokrycia). Do łączenia wielu punktów.
+const RANGA: Record<SygnalKimpzp, number> = {
+  plan: 0,
+  serwis_bez_planu: 1,
+  brak_serwisu: 2,
+  blad_serwisu: 3,
+  pusto: 4,
+  niejasne: 5,
+  blad: 6,
+};
+// Punkt centrum niekiedy trafia poza plan (fałszywe „pusto") — dosondowanie w pobliżu.
+const PRZESUNIECIA: [number, number][] = [
+  [0, 0],
+  [0.012, 0.01],
+  [-0.012, -0.01],
+];
+
+function ocena(sygnal: SygnalKimpzp): "pokryte" | "dziura" | "niejednoznaczne" | "blad" {
+  if (sygnal === "plan" || sygnal === "serwis_bez_planu") return "pokryte";
+  if (sygnal === "brak_serwisu" || sygnal === "blad_serwisu") return "dziura";
+  if (sygnal === "blad") return "blad";
+  return "niejednoznaczne";
+}
+
 export async function GET(req: Request) {
   const u = new URL(req.url);
   const raw = u.searchParams.get("raw") === "1";
   const filtr = (u.searchParams.get("miasta") ?? "").split(",").map((s) => norm(s.trim())).filter(Boolean);
   const lista = filtr.length ? MIASTA.filter((m) => filtr.includes(norm(m.nazwa))) : MIASTA;
-
-  // Mniejsza pula gdy pełny skan (łagodniej), większa dla małych podzbiorów.
-  const rownolegle = lista.length > 8 ? 4 : Math.min(lista.length, 4);
+  const rownolegle = 4;
 
   const wyniki = await mapaOgraniczona(lista, rownolegle, async (m) => {
-    const [x, y] = wgs84ToPl1992(m.lon, m.lat);
-    const s = await sondaKimpzp(x, y, { timeoutMs: 8000, proby: 2, raw });
-    return { miasto: m.nazwa, status: s.status, przeznaczenie: s.przeznaczenie, symbol: s.symbol ?? null, ...(raw ? { raw: s.raw } : {}) };
+    // Punkt centrum; jeśli sygnał niejednoznaczny (pusto/niejasne/blad) — dosondowanie okolicy.
+    const [x0, y0] = wgs84ToPl1992(m.lon, m.lat);
+    let best = await sondaKimpzp(x0, y0, { timeoutMs: 8000, proby: 2, raw });
+    if (RANGA[best.sygnal] >= 4) {
+      for (const [dLat, dLon] of PRZESUNIECIA.slice(1)) {
+        const [x, y] = wgs84ToPl1992(m.lon + dLon, m.lat + dLat);
+        const s = await sondaKimpzp(x, y, { timeoutMs: 8000, proby: 1, raw });
+        if (RANGA[s.sygnal] < RANGA[best.sygnal]) best = s;
+        if (best.sygnal === "plan" || best.sygnal === "serwis_bez_planu") break;
+      }
+    }
+    return {
+      miasto: m.nazwa,
+      ocena: ocena(best.sygnal),
+      sygnal: best.sygnal,
+      przeznaczenie: best.przeznaczenie,
+      symbol: best.symbol ?? null,
+      ...(raw ? { raw: best.raw } : {}),
+    };
   });
 
-  const grupy = (st: string) => wyniki.filter((w) => w.status === st).map((w) => w.miasto);
+  const grupy = (o: string) => wyniki.filter((w) => w.ocena === o).map((w) => w.miasto);
+  const dziury = grupy("dziura");
   return json({
-    opis: "Sonda pokrycia KIMPZP (łagodna równoległość, retry). 1 punkt/miasto.",
+    opis: "Sonda pokrycia KIMPZP — klasyfikacja po komunikatach serwisu, dosondowanie okolicy przy pustych.",
     sprawdzono: lista.length,
-    liczbaDziur: grupy("pusto").length,
-    dziury: grupy("pusto"),
-    niejasne: grupy("niejasne"),
+    liczbaDziur: dziury.length,
+    dziury, // brak serwisu / integracja zepsuta → potrzebny lokalny fallback WMS
+    pokryte: grupy("pokryte"), // serwis gminy odpowiada (jest plan lub „brak wyniku w punkcie")
+    niejednoznaczne: grupy("niejednoznaczne"), // pusto/niejasne mimo dosondowania — sprawdź ręcznie
     blad: grupy("blad"),
-    maPlany: grupy("ma_plany"),
     wyniki,
-    uwaga: "Jeśli nadal dużo 'blad' — powtórz na mniejszej grupie: ?miasta=Rzeszów,Kraków,Wrocław. Dodaj ?raw=1, by zobaczyć surową odpowiedź 'niejasnych'.",
+    uwaga: "Dziura = 'brak serwisu' albo błąd renderowania KIMPZP. Pokryte = serwis odpowiada. Dodaj ?raw=1 dla surowych odpowiedzi; ?miasta=A,B dla podzbioru.",
   });
 }
