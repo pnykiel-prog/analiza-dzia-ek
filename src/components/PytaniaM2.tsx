@@ -110,7 +110,7 @@ export function PytaniaM2({
         {odlAuto.length > 0 && (
           <div className="mb-3 rounded-md bg-grunt-green-bg/50 border border-grunt-green/20 px-3 py-2">
             <div className="text-[11px] font-medium text-grunt-green mb-1.5">
-              Ustalone automatycznie (OSM) — {odlAuto.length} z {KONFIG_M2.odleglosciPieszo.length}
+              Ustalone automatycznie — {odlAuto.length} z {KONFIG_M2.odleglosciPieszo.length}
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1">
               {odlAuto.map((o) => (

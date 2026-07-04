@@ -38,11 +38,17 @@ export const USLUGI_STALE: UslugaStala[] = ((surowe as { rekordy?: UslugaStala[]
 
 export const META_USLUGI_STALE = (surowe as { meta?: Record<string, unknown> }).meta ?? {};
 
-/** k-najbliższych obiektów każdej kategorii statycznej (po linii prostej) — kandydaci do routingu. */
-export function kandydaciStale(lat: number, lon: number, k: number, dane: UslugaStala[] = USLUGI_STALE): Kandydat[] {
+/**
+ * k-najbliższych obiektów każdej kategorii statycznej (po linii prostej) — kandydaci do routingu.
+ * `maxM` = bufor „w zasięgu": punkty dalej niż `maxM` są POMIJANE (luka rejestru / brak pokrycia
+ * seedu) — kategoria bez punktu w zasięgu → pytana ręcznie, NIE absurdalna odległość (spec §4/§7).
+ */
+export function kandydaciStale(lat: number, lon: number, k: number, dane: UslugaStala[] = USLUGI_STALE, maxM = Infinity): Kandydat[] {
   const wg: Record<string, Kandydat[]> = {};
   for (const u of dane) {
-    (wg[u.kategoria] ??= []).push({ usluga: u.kategoria, lat: u.lat, lon: u.lon, dLinia: haversineM(lat, lon, u.lat, u.lon) });
+    const dLinia = haversineM(lat, lon, u.lat, u.lon);
+    if (dLinia > maxM) continue; // poza zasięgiem → luka, nie „daleko"
+    (wg[u.kategoria] ??= []).push({ usluga: u.kategoria, lat: u.lat, lon: u.lon, dLinia });
   }
   const out: Kandydat[] = [];
   for (const arr of Object.values(wg)) {
