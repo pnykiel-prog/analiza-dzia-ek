@@ -185,6 +185,58 @@ function flagiRyzyka(d: DaneDzialki, obw: Obwiednia, w: WskaznikiUzyte, cfg: Kon
   return flagi;
 }
 
+/**
+ * Trzy warianty zabudowy dla jednego profilu (rozstrzygnięta obwiednia):
+ *  1. Optymalny (rekomendowany) — sensowny program pod profil,
+ *  2. Maksymalny — pełna obwiednia (najwięcej mieszkań),
+ *  3. Kameralny — niższa intensywność (mniej kondygnacji, więcej zieleni).
+ * Optymalny jako pierwszy → oznaczany „rekomendowany" w widoku.
+ */
+function triadaWariantow(
+  profil: Profil,
+  d: DaneDzialki,
+  obwiednia: Obwiednia,
+  w: WskaznikiUzyte,
+  cfg: KonfiguracjaZabudowy,
+  udzialUslug: number
+): WariantZabudowy[] {
+  const maks = obwiednia.maxKondygnacje;
+  const kameralne = Math.max(1, maks <= 2 ? maks - 1 || 1 : maks - 2);
+  if (profil === "seniorzy") {
+    return [
+      budujWariant("Optymalny — senioralny w pełni dostępny", "seniorzy", d, obwiednia, w, cfg, {
+        typologia: "senioralna_wspomagana",
+        kondygnacje: Math.min(4, maks),
+        udzialUslugPct: 8,
+      }),
+      budujWariant("Maksymalny — pełna obwiednia", "seniorzy", d, obwiednia, w, cfg, {
+        typologia: "senioralna_wspomagana",
+        kondygnacje: maks,
+        udzialUslugPct: 0,
+      }),
+      budujWariant("Kameralny — niższa intensywność", "seniorzy", d, obwiednia, w, cfg, {
+        typologia: "senioralna_wspomagana",
+        kondygnacje: kameralne,
+        udzialUslugPct: 8,
+      }),
+    ];
+  }
+  return [
+    budujWariant("Optymalny — zrównoważony z parterem usługowym", "mlodzi", d, obwiednia, w, cfg, {
+      typologia: "pierzejowa_mixed_use",
+      kondygnacje: Math.max(3, maks - 1),
+      udzialUslugPct: Math.min(udzialUslug, 20),
+    }),
+    budujWariant("Maksymalny — najwięcej mieszkań", "mlodzi", d, obwiednia, w, cfg, {
+      kondygnacje: maks,
+    }),
+    budujWariant("Kameralny — niższa intensywność", "mlodzi", d, obwiednia, w, cfg, {
+      typologia: "niska_wielorodzinna",
+      kondygnacje: kameralne,
+    }),
+  ];
+}
+
 export function uruchomPoziom2(
   d: DaneDzialki,
   p1: WynikPoziom1,
@@ -194,43 +246,17 @@ export function uruchomPoziom2(
   const obwiednia = liczObwiednie(d, w, cfg);
   const udzialUslug = d.wskaznikiPlanistyczne?.udzialUslugPct ?? 15;
 
-  const warianty: WariantZabudowy[] = [];
-  const profile: Profil[] =
-    p1.profilRekomendowany === "oba"
-      ? ["mlodzi", "seniorzy"]
-      : p1.profilRekomendowany === "seniorzy"
-        ? ["seniorzy"]
-        : p1.profilRekomendowany === "mlodzi"
-          ? ["mlodzi"]
-          : // "zaden" — pokazujemy oba warianty informacyjnie
-            ["mlodzi", "seniorzy"];
-
-  for (const profil of profile) {
-    if (profil === "mlodzi") {
-      // Wariant 1: maksymalna liczba mieszkań
-      warianty.push(
-        budujWariant("Maks. liczba mieszkań (dla młodych)", "mlodzi", d, obwiednia, w, cfg, {
-          kondygnacje: obwiednia.maxKondygnacje,
-        })
-      );
-      // Wariant 2: zrównoważony z parterem usługowym
-      warianty.push(
-        budujWariant("Zrównoważony z parterem usługowym", "mlodzi", d, obwiednia, w, cfg, {
-          typologia: "pierzejowa_mixed_use",
-          kondygnacje: Math.max(3, obwiednia.maxKondygnacje - 1),
-          udzialUslugPct: Math.min(udzialUslug, 20),
-        })
-      );
-    } else {
-      warianty.push(
-        budujWariant("Senioralny w pełni dostępny", "seniorzy", d, obwiednia, w, cfg, {
-          typologia: "senioralna_wspomagana",
-          kondygnacje: Math.min(4, obwiednia.maxKondygnacje),
-          udzialUslugPct: 8,
-        })
-      );
-    }
-  }
+  // Trzy warianty (optymalny/maksymalny/kameralny) dla profilu sterowanego rekomendacją.
+  // Dla „oba"/„zaden" bierzemy profil o wyższym score P1 jako wiodący.
+  const wiodacy: Profil =
+    p1.profilRekomendowany === "seniorzy"
+      ? "seniorzy"
+      : p1.profilRekomendowany === "mlodzi"
+        ? "mlodzi"
+        : p1.scoreSeniorzy > p1.scoreMlodzi
+          ? "seniorzy"
+          : "mlodzi";
+  const warianty = triadaWariantow(wiodacy, d, obwiednia, w, cfg, udzialUslug);
 
   // Uwarunkowania przeniesione z P1: bramki środowiskowe/formalne, sygnały, braki.
   const bramki = liczBramki(d);
