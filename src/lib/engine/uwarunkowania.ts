@@ -164,8 +164,8 @@ export function liczSygnaly(d: DaneDzialki, szczegoly: WynikBramki[], cfg: Konfi
   poz(d.zlobkiSzkolyWZasiegu, "Szkoła / żłobek w zasięgu");
   poz(d.pozWZasiegu, "POZ w zasięgu");
   poz(d.uslugiPodstawowePieszo, "Usługi podstawowe pieszo");
-  const luka = lukaPctZDanych(d, cfg);
-  if (luka !== null && luka >= 30) s.push({ tekst: `Wysoka luka cenowa (${Math.round(luka)}%) — realny popyt na najem społeczny`, ton: "pozytyw" });
+  // Luka czynszowa i popyt na najem społeczny to ESTYMACJA — flaga należy do M1 (popytP1),
+  // nie do M2 (tu tylko dane pozyskane/mierzone). Patrz werdyktSpoleczny w popytP1.ts.
   return s;
 }
 
