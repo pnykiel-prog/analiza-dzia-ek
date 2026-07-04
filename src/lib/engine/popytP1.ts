@@ -51,6 +51,9 @@ function logNormCdf(t: number, srednia: number, sigma: number): number {
 const pasmo = (score: number, cfg: KonfiguracjaPopytP1): Werdykt =>
   score >= cfg.pasma.zielony ? "zielony" : score >= cfg.pasma.zolty ? "zolty" : "czerwony";
 
+/** Próg luki cenowej [%], od którego flagujemy realny popyt na najem społeczny (M1). */
+const PROG_LUKI_FLAGA = 30;
+
 // ── Trójdzielny podział dochodowy (K / S / R) → liczby bezwzględne ────────────
 
 function kwalifikacje(
@@ -188,6 +191,8 @@ function werdyktSpoleczny(
   const baza = wagi.wew * popytWew + wagi.zew * atrakcyjnosc.wartosc;
   const score = clamp(Math.round(baza * mLuka(luka, cfg) * skala(napiecie01(d), cfg.mNapiecie.min, cfg.mNapiecie.max)));
 
+  // Luka czynszowa → sygnał popytu na najem społeczny (estymacja — miejsce w M1, nie M2).
+  if (luka != null && luka >= PROG_LUKI_FLAGA) flagi.push(`Wysoka luka cenowa (${Math.round(luka)}%) — realny popyt na najem społeczny.`);
   if (kw.nSpoleczny == null) flagi.push("Brak liczb ludności/dochodu — popyt społeczny szacowany (obniżona pewność).");
   if (kw.estymacja) flagi.push("Udział dochodowy (segment społeczny) estymowany z rozkładu regionalnego — do potwierdzenia na P2.");
   if (luka == null) flagi.push("Brak lokalnego czynszu rynkowego — luka i atrakcyjność szacunkowe.");
@@ -226,7 +231,7 @@ function werdyktKomunalny(
   let pewnosc = clamp(Math.round((kw.nKomunalny == null ? 45 : 70) - (kw.estymacja ? 8 : 0)));
   if (profil === "seniorzy") {
     pewnosc = clamp(pewnosc - 10);
-    flagi.push("kierunek: senioralne ze wsparciem");
+    flagi.push("Kierunek: mieszkania wspomagane dla seniorów (senioralne ze wsparciem).");
   }
   const komentarz =
     kw.nKomunalny == null

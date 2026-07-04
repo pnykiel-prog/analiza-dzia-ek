@@ -58,6 +58,19 @@ test("popytP1: komunalny-seniorzy ma flage senioralne-ze-wsparciem i najnizsza p
   assert.ok(ks.pewnosc <= o.werdykty.komunalnyMlodzi.pewnosc);
 });
 
+test("popytP1: wysoka luka czynszowa → flaga popytu na najem społeczny w M1 (estymacja)", () => {
+  // Wysoka luka: drogi czynsz vs niska wartość odtworzeniowa → pułap niski → luka duża.
+  const wysokaLuka: DaneDzialki = { ...wzorcowa, czynszRynkowyM2: 100, wartoscOdtworzeniowaM2: 3000 };
+  const o = ocenPopytP1(wysokaLuka, POJ);
+  const flagi = [...o.werdykty.spolecznyMlodzi.flagi, ...o.werdykty.spolecznySeniorzy.flagi];
+  assert.ok(flagi.some((f) => f.includes("realny popyt na najem społeczny")), `flagi: ${flagi.join(" | ")}`);
+  // Niska/ujemna luka → brak flagi.
+  const niskaLuka: DaneDzialki = { ...wzorcowa, czynszRynkowyM2: 20, wartoscOdtworzeniowaM2: 9000 };
+  const o2 = ocenPopytP1(niskaLuka, POJ);
+  const flagi2 = [...o2.werdykty.spolecznyMlodzi.flagi, ...o2.werdykty.spolecznySeniorzy.flagi];
+  assert.ok(!flagi2.some((f) => f.includes("realny popyt na najem społeczny")));
+});
+
 test("popytP1: wyższy dochód gminy → mniejszy segment komunalny (qK), większy rynek", () => {
   const biedna = ocenPopytP1({ ...wzorcowa, dochodPrzecietnyGmina: 3500 }, POJ);
   const bogata = ocenPopytP1({ ...wzorcowa, dochodPrzecietnyGmina: 12000 }, POJ);
