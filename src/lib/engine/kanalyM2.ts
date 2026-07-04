@@ -80,11 +80,19 @@ export function przydatnoscEkonomicznaB(d: DaneDzialki, cfg: KonfiguracjaM2 = KO
 export function modyfikatorPopytuC(d: DaneDzialki, profil: Profil, cfg: KonfiguracjaM2 = KONFIG_M2): { mnoznik: number; powody: string[] } {
   const powody: string[] = [];
   let m = 1;
-  const dojazd = d.czasDojazdAglomeracjaMin;
-  if (dojazd != null) {
+  // Bliskość aglomeracji: model pierścieni (preferowany) — sygnał → modyfikator per profil.
+  if (d.bliskoscAglomeracji) {
+    const ba = d.bliskoscAglomeracji;
+    m *= ba.modyfikator[profil];
+    const czolo = ba.miastaWPoblizu[0];
+    if (czolo) powody.push(`Bliskość aglomeracji: ${czolo.nazwa} ${czolo.odlegloscKm} km (${czolo.pierscien === 0 ? "rdzeń" : "pierścień " + czolo.pierscien}), sygnał ${ba.sygnal} → ×${ba.modyfikator[profil]}.`);
+    else powody.push(`Poza zasięgiem dużych ośrodków (sygnał ${ba.sygnal}) — tłumi popyt${profil === "mlodzi" ? " młodych" : ""}.`);
+  } else if (d.czasDojazdAglomeracjaMin != null) {
+    // Fallback (gdy brak modelu): proxy czasu dojazdu.
+    const dojazd = d.czasDojazdAglomeracjaMin;
     const t = clamp01((cfg.modyfikatorPopytu.dojazdMaxMin - dojazd) / (cfg.modyfikatorPopytu.dojazdMaxMin - cfg.modyfikatorPopytu.dojazdKomfortMin));
     const waga = cfg.modyfikatorPopytu.wagaAglomeracji[profil];
-    m *= 1 - waga * (1 - t); // dojazd komfortowy → 1; daleki → 1−waga
+    m *= 1 - waga * (1 - t);
     if (dojazd > cfg.modyfikatorPopytu.dojazdMaxMin && profil === "mlodzi") powody.push(`Daleki dojazd do aglomeracji (${dojazd} min) — tłumi popyt młodych.`);
   }
   if (d.liczbaPodmiotowGosp != null) {

@@ -43,6 +43,24 @@ export interface WskaznikiPlanistyczne {
   udzialUslugPct: number; // dopuszczalny udział usług [%]
 }
 
+export type KlasaMiasta = "A" | "B" | "C" | "D";
+
+/** Ośrodek w zasięgu oddziaływania (kanał C, model pierścieni). */
+export interface MiastoWPoblizu {
+  nazwa: string;
+  klasa: KlasaMiasta;
+  odlegloscKm: number;
+  pierscien: number; // 0 = rdzeń
+  sila: number; // 0–100
+}
+
+/** Bliskość aglomeracji (kanał C) — sygnał + lista ośrodków + modyfikator per profil. */
+export interface BliskoscAglomeracji {
+  sygnal: number; // 0–100
+  miastaWPoblizu: MiastoWPoblizu[];
+  modyfikator: { mlodzi: number; seniorzy: number };
+}
+
 export interface DaneDzialki {
   // A. Identyfikacja i geometria (ULDK / EGiB)
   id: string; // identyfikator ewidencyjny TERYT + obręb + nr
@@ -95,6 +113,8 @@ export interface DaneDzialki {
 
   // E. Dostępność komunikacyjna (OSM / routing / GTFS)
   czasDojazdAglomeracjaMin: Maybe<number>;
+  /** M2 kanał C: bliskość aglomeracji z pierścieni klas miast (sygnał + modyfikator per profil). */
+  bliskoscAglomeracji?: Maybe<BliskoscAglomeracji>;
   przystanekZCzestotliwoscia: Maybe<boolean>; // ≥X kursów/dobę, ≤800 m
 
   // G. Infrastruktura społeczna (różne dla profili)

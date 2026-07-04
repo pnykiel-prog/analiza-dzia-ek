@@ -15,6 +15,7 @@ import type { Konektor, Teren, WynikKonektora, MetaPola } from "./types";
 import { brakWyniku } from "./types";
 import { KONFIG_KONEKTORY } from "../connectorsConfig";
 import { haversineM } from "./odleglosci";
+import { bliskoscAglomeracji } from "../../engine/bliskoscAglomeracji";
 
 /** Duże ośrodki (rdzenie aglomeracji) [nazwa, lat, lon] — dojazd do rynku pracy/usług wyższego rzędu. */
 export const AGLOMERACJE: { nazwa: string; lat: number; lon: number }[] = [
@@ -62,18 +63,24 @@ const cfg = KONFIG_KONEKTORY.aglomeracja;
 
 export const konektorAglomeracja: Konektor = {
   klucz: "AGLOMERACJA",
-  zrodlo: "Bliskość aglomeracji (proxy geometryczne)",
+  zrodlo: "Bliskość aglomeracji (pierścienie klas miast)",
   poziom: "P2",
   aktywny: cfg.aktywny,
   async pobierz(teren: Teren): Promise<WynikKonektora> {
     const czas = new Date().toISOString();
     if (!teren.centroid4326) return brakWyniku(this.klucz, this.zrodlo, czas, "Brak centroidu WGS84 (brak geometrii).");
     const [lon, lat] = teren.centroid4326;
+    // Model pierścieni (kanał C) — sygnał + lista ośrodków + modyfikator per profil.
+    const ba = bliskoscAglomeracji(lat, lon);
+    // czasDojazd zostaje jako heurystyka transportu (parking) — najbliższy duży ośrodek.
     const { nazwa, distKm } = najblizszaAglomeracja(lat, lon);
     const minuty = czasDojazdMin(distKm, cfg.sredniaPredkoscKmh, cfg.wspKretosci);
-    const dane: Partial<DaneDzialki> = { czasDojazdAglomeracjaMin: minuty };
+    const czolo = ba.miastaWPoblizu[0];
+    const opis = czolo ? `${czolo.nazwa} ~${czolo.odlegloscKm} km (${czolo.pierscien === 0 ? "rdzeń" : "pierścień " + czolo.pierscien}), sygnał ${ba.sygnal}` : `poza zasięgiem ośrodków (sygnał ${ba.sygnal})`;
+    const dane: Partial<DaneDzialki> = { bliskoscAglomeracji: ba, czasDojazdAglomeracjaMin: minuty };
     const meta: MetaPola[] = [
-      { pole: "czasDojazdAglomeracjaMin", zrodlo: `${this.zrodlo} — ${nazwa} ~${Math.round(distKm)} km`, czas, pewnosc: 55, status: "ok", tryb: "A" },
+      { pole: "bliskoscAglomeracji", zrodlo: `${this.zrodlo} — ${opis}`, czas, pewnosc: 60, status: "ok", tryb: "A" },
+      { pole: "czasDojazdAglomeracjaMin", zrodlo: `Najbliższy ośrodek: ${nazwa} ~${Math.round(distKm)} km`, czas, pewnosc: 50, status: "ok", tryb: "A" },
     ];
     return { klucz: this.klucz, zrodlo: this.zrodlo, status: "ok", czas, dane, meta };
   },
