@@ -37,6 +37,33 @@ Przystanki i sklepy **NIE tutaj** — przystanek z OSM (+ GTFS na częstotliwoś
 - **Bez `lat`/`lon` rekord jest bezużyteczny** do liczenia odległości → wykluczany przez loader.
 - Skalowanie: docelowo tabela `uslugi_stale` w PostGIS z indeksem GiST (gdy dane trafią do reszty warstwy geo).
 
+## Uruchomienie importera (`import.ts`)
+
+Wymaga internetu (RSPO API + geokoder GUGiK). Node 22+, bez dodatkowych zależności.
+**Uruchamiasz u siebie** (nie na produkcji) — wynik (`uslugi_stale.json`) commitujesz do repo.
+
+```bash
+# Próbny bieg (bez nadpisania pełnej warstwy — mały limit, do pliku obok):
+npx tsx tools/uslugi-stale/import.ts --rspo --limit 500 --out /tmp/uslugi_test.json
+
+# Pełny import (nadpisuje src/lib/data/uslugi_stale.json — atomowo):
+npx tsx tools/uslugi-stale/import.ts --rspo --rpwdl poz.csv --ra apteki.csv
+#   --rspo             szkoły + przedszkola z RSPO API (mają współrzędne)
+#   --rpwdl <plik.csv> POZ z eksportu RPWDL (adresy → geokoder GUGiK)
+#   --ra <plik.csv>    apteki z eksportu Rejestru Aptek (adresy → geokoder GUGiK)
+#   --no-geocode       pomiń geokodowanie (tylko rekordy z gotowymi współrzędnymi)
+#   --limit <n>        ogranicz liczbę rekordów (test)
+```
+
+Po biegu sprawdź podsumowanie (liczby per kategoria + `bez_wspolrzednych.log.json`).
+Bez flag źródeł importer NIE nadpisuje pliku (ochrona seedu). Cache geokodowania:
+`tools/uslugi-stale/geocode_cache.json` (kolejny bieg geokoduje tylko nowe adresy).
+
+**Mapowanie kolumn CSV** (RPWDL/RA) jest tolerancyjne — szuka nagłówków zawierających:
+`nazwa`, `miejscowo/miasto`, `ulica/adres`, `numer budynku`, `kod pocztowy`, `teryt`,
+`szeroko/latitude` i `dlugo/longitude` (gdy eksport ma już współrzędne — geokoder pominięty).
+Jeśli Twój eksport ma inne nagłówki, dostosuj `pole(...)` w `import.ts`.
+
 ## Procedura importu (raz w roku, wsadowo)
 
 ```
