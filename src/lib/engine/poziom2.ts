@@ -46,11 +46,15 @@ function wyznaczWskazniki(d: DaneDzialki, cfg: KonfiguracjaZabudowy): WskaznikiU
       pewnosc: d.statusPlanistyczny === "mpzp_mieszkaniowy" ? 95 : 80,
     };
   }
-  // Fallback "dobrego sąsiedztwa": wskaźniki z otoczenia.
+  // Fallback "dobrego sąsiedztwa": wskaźniki z otoczenia. Gdy klient podał wysokość
+  // zabudowy w okolicy (piętra) — bierzemy ją jako liczbę kondygnacji i wyprowadzamy
+  // spójną intensywność (kondygnacje × % zabudowy), zamiast stałej z konfiguracji.
   const f = cfg.fallbackSasiedztwo;
+  const kond = d.wysokoscOkolicyPieter != null && d.wysokoscOkolicyPieter > 0 ? Math.floor(d.wysokoscOkolicyPieter) : f.maxKondygnacje;
+  const intensywnosc = d.wysokoscOkolicyPieter != null && d.wysokoscOkolicyPieter > 0 ? kond * (f.maxPowZabudowyPct / 100) : f.intensywnosc;
   return {
-    intensywnosc: f.intensywnosc,
-    maxKondygnacje: f.maxKondygnacje,
+    intensywnosc,
+    maxKondygnacje: kond,
     maxPowZabudowyPct: f.maxPowZabudowyPct,
     minPbcPct: f.minPbcPct,
     normatywParkingowy: cfg.normatywParkingowy.mlodzi,
@@ -60,12 +64,15 @@ function wyznaczWskazniki(d: DaneDzialki, cfg: KonfiguracjaZabudowy): WskaznikiU
 }
 
 function liczObwiednie(d: DaneDzialki, w: WskaznikiUzyte, cfg: KonfiguracjaZabudowy): Obwiednia {
-  const maxPowZabudowyM2 = (d.powierzchniaM2 * w.maxPowZabudowyPct) / 100;
-  const powCalkowitaNadziemnaM2 = d.powierzchniaM2 * w.intensywnosc;
+  const maxPowZabudowyM2 = (d.powierzchniaM2 * w.maxPowZabudowyPct) / 100; // limit footprintu (% zabudowy)
+  // Liczba kondygnacji = LIMIT z wysokości/planu/sąsiedztwa („ile wolno") — NIE redukowana
+  // przez intensywność. Niska intensywność ogranicza PUM (footprint), a nie wysokość budynku.
+  const maxKondygnacje = Math.max(1, Math.floor(w.maxKondygnacje));
+  // GFA nadziemna: z intensywności (FAR) gdy podana, ograniczona obwiednią footprint × kondygnacje.
+  const gfaObwiedni = maxPowZabudowyM2 * maxKondygnacje;
+  const gfaZIntensywnosci = w.intensywnosc > 0 ? d.powierzchniaM2 * w.intensywnosc : gfaObwiedni;
+  const powCalkowitaNadziemnaM2 = Math.min(gfaZIntensywnosci, gfaObwiedni);
   const pumM2 = powCalkowitaNadziemnaM2 * cfg.wspolczynnikEfektywnosci;
-  // max liczba kondygnacji = min( z wysokości , z intensywności / pow. zabudowy )
-  const kondZIntensywnosci = maxPowZabudowyM2 > 0 ? powCalkowitaNadziemnaM2 / maxPowZabudowyM2 : w.maxKondygnacje;
-  const maxKondygnacje = Math.max(1, Math.floor(Math.min(w.maxKondygnacje, kondZIntensywnosci)));
   return {
     maxPowZabudowyM2: Math.round(maxPowZabudowyM2),
     powCalkowitaNadziemnaM2: Math.round(powCalkowitaNadziemnaM2),
