@@ -98,16 +98,14 @@ test("P2: fallback z sąsiedztwa — wysokość okolicy steruje liczbą kondygna
   assert.equal(o.maxKondygnacje, 4); // z sąsiadów (4 piętra), nie ze stałej
 });
 
-test("P2: zawsze 3 warianty (optymalny/maksymalny/kameralny) — także dla profilu senioralnego", () => {
+test("P2: dwa kierunki × 3 warianty (6) — senioralny i społeczny dla młodych; wiodący pierwszy", () => {
   const p1 = { ...uruchomPoziom1(senioralna), profilRekomendowany: "seniorzy" as const };
   const p2 = uruchomPoziom2(senioralna, p1);
-  assert.equal(p2.warianty.length, 3);
-  assert.ok(p2.warianty.every((w) => w.profil === "seniorzy"));
+  assert.equal(p2.warianty.length, 6);
+  assert.equal(p2.warianty.filter((w) => w.profil === "seniorzy").length, 3);
+  assert.equal(p2.warianty.filter((w) => w.profil === "mlodzi").length, 3);
+  assert.equal(p2.warianty[0].profil, "seniorzy"); // profil wiodący (rekomendowany) pierwszy
   assert.ok(p2.warianty.every((w) => w.liczbaMieszkan > 0));
-  // Zróżnicowane: maksymalny ma nie mniej mieszkań niż kameralny.
-  const maks = p2.warianty.find((w) => w.nazwa.startsWith("Maksymalny"))!;
-  const kam = p2.warianty.find((w) => w.nazwa.startsWith("Kameralny"))!;
-  assert.ok(maks.liczbaMieszkan >= kam.liczbaMieszkan);
 });
 
 test("P2: wariant senioralny zawsze ma windę", () => {

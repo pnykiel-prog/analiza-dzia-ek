@@ -246,8 +246,10 @@ export function uruchomPoziom2(
   const obwiednia = liczObwiednie(d, w, cfg);
   const udzialUslug = d.wskaznikiPlanistyczne?.udzialUslugPct ?? 15;
 
-  // Trzy warianty (optymalny/maksymalny/kameralny) dla profilu sterowanego rekomendacją.
-  // Dla „oba"/„zaden" bierzemy profil o wyższym score P1 jako wiodący.
+  // Trzy warianty (optymalny/maksymalny/kameralny) dla OBU profili — senioralnego
+  // i społecznego dla młodych — żeby porównać oba kierunki. Profil wiodący
+  // (sterowany rekomendacją; dla „oba"/„zaden" wg wyższego score) idzie pierwszy;
+  // jego wariant optymalny jest oznaczany jako rekomendowany.
   const wiodacy: Profil =
     p1.profilRekomendowany === "seniorzy"
       ? "seniorzy"
@@ -256,7 +258,11 @@ export function uruchomPoziom2(
         : p1.scoreSeniorzy > p1.scoreMlodzi
           ? "seniorzy"
           : "mlodzi";
-  const warianty = triadaWariantow(wiodacy, d, obwiednia, w, cfg, udzialUslug);
+  const drugi: Profil = wiodacy === "seniorzy" ? "mlodzi" : "seniorzy";
+  const warianty = [
+    ...triadaWariantow(wiodacy, d, obwiednia, w, cfg, udzialUslug),
+    ...triadaWariantow(drugi, d, obwiednia, w, cfg, udzialUslug),
+  ];
 
   // Uwarunkowania przeniesione z P1: bramki środowiskowe/formalne, sygnały, braki.
   const bramki = liczBramki(d);
