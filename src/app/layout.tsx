@@ -46,7 +46,7 @@ function PasekGorny() {
         className="mx-auto h-full px-6 flex items-center justify-between gap-6"
         style={{ maxWidth: "var(--grunt-page-max)" }}
       >
-        <Link href="/" className="flex items-center gap-2.5 shrink-0">
+        <Link href="/nowa" className="flex items-center gap-2.5 shrink-0">
           <span className="relative grid place-items-center w-[30px] h-[30px] rounded-sm bg-grunt-ink">
             <span className="block w-2.5 h-2.5 rounded-[3px] bg-grunt-mint" />
           </span>
@@ -61,7 +61,6 @@ function PasekGorny() {
         </Link>
 
         <nav className="flex items-center gap-5 text-[13px] text-grunt-text-3">
-          <Link href="/" className="hover:text-grunt-ink">Działki</Link>
           <Link href="/nowa" className="hover:text-grunt-ink">Nowa analiza</Link>
           <Link href="/konfiguracja" className="hover:text-grunt-ink">Konfiguracja</Link>
           <Link href="/o-aplikacji" className="hover:text-grunt-ink">O aplikacji</Link>

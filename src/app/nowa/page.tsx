@@ -358,20 +358,11 @@ export default function NowaAnalizaPage() {
       )}
 
       {/* EKRAN: WEJŚCIE — wyłącznie identyfikacja działki */}
+      {/* EKRAN: WEJŚCIE — dwa kafle: lewy treść o analizie, prawy formularz wprowadzania danych */}
       {ekran === "wejscie" && (
-        <div className="card p-[18px]">
-          <h1 className="text-[25px] font-semibold text-grunt-text tracking-[-0.01em]">Wprowadzenie danych działki</h1>
-          <p className="text-grunt-text-muted mt-1 text-[13px] max-w-3xl">
-            Podaj identyfikator działki (lub kaskadę TERYT). Poziom 1 zaciąga dane automatycznie i liczy przesiew —
-            wynik pojawi się na kolejnym ekranie. Brakujące źródła są uzupełniane założeniami i obniżają pewność.
-          </p>
-          <Legenda />
-        </div>
-      )}
-
-      {/* EKRAN: WEJŚCIE — formularz identyfikacji */}
-      {ekran === "wejscie" && (
-        <form onSubmit={analizujP1} className="space-y-4">
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] gap-5 items-start">
+          <PanelWprowadzenia />
+          <form onSubmit={analizujP1} className="space-y-4">
           <Karta tytul="Poziom 1 — identyfikacja działek" podtytul="Jedyne widoczne pola do wprowadzenia. Z TERYT składany jest identyfikator ULDK.">
             {/* Wybór trybu wejścia */}
             <div className="mb-3 flex flex-wrap items-center gap-3">
@@ -467,10 +458,11 @@ export default function NowaAnalizaPage() {
             )}
           </Karta>
 
-          <button type="submit" disabled={licze} className="btn-primary" style={{ height: "var(--grunt-h-cta)" }}>
+          <button type="submit" disabled={licze} className="btn-primary w-full" style={{ height: "var(--grunt-h-cta)" }}>
             {licze ? "Pobieram dane i liczę…" : "Pobierz dane i analizuj (Poziom 1)"}
           </button>
-        </form>
+          </form>
+        </div>
       )}
 
       {/* POZIOM 1 — potwierdzenie wczytania: teren, mapa, źródła (jeden ekran) */}
@@ -685,6 +677,43 @@ function Legenda() {
           <TrybBadge tryb={t} /> <span className="text-slate-500">{OPIS_TRYBU[t].opis}</span>
         </span>
       ))}
+    </div>
+  );
+}
+
+/** Lewy kafel ekranu wejścia — treść o analizie (hero + poziomy + legenda + liczby). */
+function PanelWprowadzenia() {
+  return (
+    <div className="card p-6 lg:sticky" style={{ top: "var(--grunt-sticky-top)" }}>
+      <span className="badge bg-grunt-green-bg text-grunt-green">
+        <span className="w-2 h-2 rounded-full bg-grunt-green" /> Dla samorządów i inwestorów mieszkalnictwa społecznego
+      </span>
+      <h1 className="text-[27px] font-semibold text-grunt-text tracking-[-0.01em] mt-3 leading-[1.15]">
+        Oceń potencjał inwestycyjny działki <span className="text-grunt-young">w kilka minut</span>
+      </h1>
+      <p className="text-grunt-text-muted mt-3 text-[13px]">
+        Od numeru ewidencyjnego do modelu finansowego. GRUNT łączy dane publiczne, planistykę i reżimy finansowania
+        w jedno studium — z jawną pewnością każdego wyniku.
+      </p>
+      <p className="text-grunt-text-muted2 mt-3 text-[12px] leading-relaxed">
+        Trzy poziomy: <strong className="text-grunt-text">P1</strong> — szybki przesiew (popyt × pojemność),
+        <strong className="text-grunt-text"> P2</strong> — ocena działki i model zabudowy,
+        <strong className="text-grunt-text"> P3</strong> — model finansowy SIM (montaż, oś czasu, reżim „as-of", wymagana dotacja).
+      </p>
+      <div className="text-[11px] font-medium text-grunt-text-faint mt-4">Prowenancja danych</div>
+      <Legenda />
+      <div className="grid grid-cols-3 gap-3 mt-5 pt-4 border-t border-grunt-divider">
+        {[
+          ["3", "poziomy analizy"],
+          ["6+", "rejestrów publicznych"],
+          ["2027", "gotowe na nowy reżim"],
+        ].map(([v, e]) => (
+          <div key={e}>
+            <div className="text-[22px] font-semibold text-grunt-text leading-none">{v}</div>
+            <div className="text-[11px] text-grunt-text-muted2 mt-1">{e}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
