@@ -48,10 +48,14 @@ npx tsx tools/uslugi-stale/import.ts --rspo --limit 500 --out /tmp/uslugi_test.j
 
 # Pełny import (nadpisuje src/lib/data/uslugi_stale.json — atomowo):
 #   Gotowe wsady w wsad/ (kategoria,nazwa,adres,teryt_gmina — geokodowane przy imporcie):
-npx tsx tools/uslugi-stale/import.ts --rspo \
+npx tsx tools/uslugi-stale/import.ts \
   --csv tools/uslugi-stale/wsad/apteki.csv \
-  --csv tools/uslugi-stale/wsad/poz.csv
-#   --rspo             szkoły + przedszkola z RSPO API (mają współrzędne)
+  --csv tools/uslugi-stale/wsad/poz.csv \
+  --csv tools/uslugi-stale/wsad/przedszkola.csv \
+  --csv tools/uslugi-stale/wsad/szkoly.csv
+#   Wszystkie 4 kategorie z gotowych wsadów (geokodowane przez GUGiK przy imporcie).
+#   --rspo             szkoły + przedszkola z API RSPO — UWAGA: stare API wyłączone,
+#                      nowe (api.rspo.gov.pl) wymaga wniosku o dostęp → używamy wsadów CSV.
 #   --csv <plik.csv>   czysty wsad (kategoria,nazwa,adres,teryt_gmina) → geokoduje; można wiele --csv
 #   --rpwdl <plik.csv> POZ z surowego eksportu RPWDL (mapowanie heurystyczne)
 #   --ra <plik.csv>    apteki z surowego eksportu Rejestru Aptek (mapowanie heurystyczne)
