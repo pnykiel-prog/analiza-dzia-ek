@@ -69,6 +69,10 @@ export interface KonfiguracjaKonektorow {
   odleglosci: { aktywny: boolean; endpointy: string[]; promienM: number; timeoutMs: number };
   /** Kanał A (M2) — routing pieszy (realna trasa) do k-najbliższych POI; klucz ORS z env. */
   routingPieszy: { aktywny: boolean; endpointMatrix: string; timeoutMs: number; k: number };
+  /** Kanał B (M2) — spadek terenu z NMT (próbki wysokości wokół centroidu). */
+  spadek: { aktywny: boolean; endpoint: string; offsetM: number; timeoutMs: number };
+  /** Kanał C (M2) — dojazd do aglomeracji (proxy geometryczne, offline). */
+  aglomeracja: { aktywny: boolean; sredniaPredkoscKmh: number; wspKretosci: number };
   /** Katalog pozostałych źródeł (mapa architektury; włączane w M2/M3). */
   katalog: { klucz: string; zrodlo: string; endpoint: string; poziom: "P1" | "P2"; etap: "M1" | "M2" | "M3"; aktywny: boolean }[];
 }
@@ -207,6 +211,19 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
     endpointMatrix: "https://api.openrouteservice.org/v2/matrix/foot-walking",
     timeoutMs: 8000,
     k: 3, // k-najbliższych po linii prostej → routing tylko do nich (spec §5)
+  },
+  spadek: {
+    aktywny: true,
+    // Publiczne API wysokości (EU-DEM 25 m); bez klucza. Awaria → „brak" (nie dyskwalifikuje).
+    endpoint: "https://api.opentopodata.org/v1/eudem25m",
+    offsetM: 40,
+    timeoutMs: 8000,
+  },
+  aglomeracja: {
+    aktywny: true,
+    // Proxy: linia prosta × krętość / prędkość. Bez egresu (deterministyczne).
+    sredniaPredkoscKmh: 65,
+    wspKretosci: 1.3,
   },
   katalog: [
     { klucz: "ULDK", zrodlo: "ULDK (GUGiK)", endpoint: "https://uldk.gugik.gov.pl/", poziom: "P1", etap: "M1", aktywny: true },
