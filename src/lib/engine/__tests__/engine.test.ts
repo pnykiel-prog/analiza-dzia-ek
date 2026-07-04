@@ -75,6 +75,29 @@ test("P2: obwiednia z MPZP ma wyższą pewność niż fallback z sąsiedztwa", (
   assert.ok(z.poziom2.warianty.every((w) => w.liczbaMieszkan > 0));
 });
 
+test("P2: obwiednia honoruje wysokość — niska intensywność NIE zeruje kondygnacji", () => {
+  // Scenariusz błędu: MPZP 12 m (≈4 kond.), ale intensywność = % zabudowy/100 (0.35).
+  // Dawniej liczba kondygnacji spadała do 1; teraz = limit z wysokości (4).
+  const d = {
+    ...wzorcowa,
+    powierzchniaM2: 11860,
+    statusPlanistyczny: "plan_ogolny_sprzyjajacy" as const,
+    wskaznikiPlanistyczne: { intensywnosc: 0.35, maxWysokoscM: 12, maxKondygnacje: 4, maxPowZabudowyPct: 35, minPbcPct: 30, normatywParkingowy: 0.8, udzialUslugPct: 15 },
+  };
+  const p1 = uruchomPoziom1(d);
+  const o = uruchomPoziom2(d, p1).obwiednia;
+  assert.equal(o.maxKondygnacje, 4);
+  assert.ok(o.pumM2 > 0);
+});
+
+test("P2: fallback z sąsiedztwa — wysokość okolicy steruje liczbą kondygnacji", () => {
+  const d = { ...bialePlamy, wskaznikiPlanistyczne: null, wysokoscOkolicyPieter: 4 };
+  const p1 = uruchomPoziom1(d);
+  const o = uruchomPoziom2(d, p1).obwiednia;
+  assert.equal(o.zrodloWskaznikow, "sasiedztwo_fallback");
+  assert.equal(o.maxKondygnacje, 4); // z sąsiadów (4 piętra), nie ze stałej
+});
+
 test("P2: wariant senioralny zawsze ma windę", () => {
   // Wymuszamy rekomendację senioralną, by P2 zbudował wariant senioralny.
   const p1 = { ...uruchomPoziom1(senioralna), profilRekomendowany: "seniorzy" as const };
