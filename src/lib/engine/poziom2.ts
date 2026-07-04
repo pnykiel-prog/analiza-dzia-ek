@@ -24,6 +24,7 @@ import type { KonfiguracjaZabudowy } from "../config";
 import { KONFIG_ZABUDOWA, KONFIG_SCORING } from "../config";
 import { liczBramki, liczBraki, liczKluczoweLiczby, liczSygnaly } from "./uwarunkowania";
 import { kaskadaWskaznikow } from "./kaskadaWskaznikow";
+import { ocenM2 } from "./kanalyM2";
 
 interface WskaznikiUzyte {
   intensywnosc: number;
@@ -246,29 +247,29 @@ export function uruchomPoziom2(
   const obwiednia = liczObwiednie(d, w, cfg);
   const udzialUslug = d.wskaznikiPlanistyczne?.udzialUslugPct ?? 15;
 
-  // Trzy warianty (optymalny/maksymalny/kameralny) dla OBU profili — senioralnego
-  // i społecznego dla młodych — żeby porównać oba kierunki. Profil wiodący
-  // (sterowany rekomendacją; dla „oba"/„zaden" wg wyższego score) idzie pierwszy;
-  // jego wariant optymalny jest oznaczany jako rekomendowany.
+  // Uwarunkowania przeniesione z P1: bramki (kanał E), sygnały, braki, kluczowe liczby.
+  const bramki = liczBramki(d);
+  const sygnaly = liczSygnaly(d, bramki.szczegoly, KONFIG_SCORING);
+  const braki = liczBraki(d, bramki.szczegoly);
+  const kluczoweLiczby = liczKluczoweLiczby(d, KONFIG_SCORING);
+
+  // DOMKNIĘCIE M2 (kanały A–F): popyt realizowalny + przydatność ekonomiczna + bramki
+  // → werdykt per profil + rekomendacja. To TU wpisane dane (odległości) zmieniają wynik.
+  const ocenaM2 = ocenM2(d, p1, bramki.status);
+
+  // Trzy warianty (optymalny/maksymalny/kameralny) dla OBU profili. Profil wiodący =
+  // rekomendacja M2 (nie tylko z M1); „brak" → wyższy score M2 jako informacyjny wiodący.
   const wiodacy: Profil =
-    p1.profilRekomendowany === "seniorzy"
-      ? "seniorzy"
-      : p1.profilRekomendowany === "mlodzi"
-        ? "mlodzi"
-        : p1.scoreSeniorzy > p1.scoreMlodzi
-          ? "seniorzy"
-          : "mlodzi";
+    ocenaM2.rekomendacja !== "brak"
+      ? ocenaM2.rekomendacja
+      : ocenaM2.werdykty.seniorzy.score >= ocenaM2.werdykty.mlodzi.score
+        ? "seniorzy"
+        : "mlodzi";
   const drugi: Profil = wiodacy === "seniorzy" ? "mlodzi" : "seniorzy";
   const warianty = [
     ...triadaWariantow(wiodacy, d, obwiednia, w, cfg, udzialUslug),
     ...triadaWariantow(drugi, d, obwiednia, w, cfg, udzialUslug),
   ];
-
-  // Uwarunkowania przeniesione z P1: bramki środowiskowe/formalne, sygnały, braki.
-  const bramki = liczBramki(d);
-  const sygnaly = liczSygnaly(d, bramki.szczegoly, KONFIG_SCORING);
-  const braki = liczBraki(d, bramki.szczegoly);
-  const kluczoweLiczby = liczKluczoweLiczby(d, KONFIG_SCORING);
 
   return {
     dzialkaId: d.id,
@@ -279,5 +280,6 @@ export function uruchomPoziom2(
     sygnaly,
     braki,
     kluczoweLiczby,
+    ocenaM2,
   };
 }

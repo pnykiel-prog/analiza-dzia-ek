@@ -430,6 +430,31 @@ export interface Obwiednia {
   prowenancja?: RozstrzygnieteWskazniki;
 }
 
+// ── Ocena M2 per profil (sześć kanałów A–F, wg mapa_wejscia_wyjscia_M2.md) ──────
+
+/** Werdykt M2 dla jednego profilu — domknięcie popytu warunkami M2. */
+export interface WerdyktProfiluM2 {
+  profil: Profil;
+  popytM1: number; // wejściowy popyt z M1 (0–100)
+  dostepnoscA: number; // mnożnik kanału A (0..1)
+  modyfikatorC: number; // mnożnik kanału C (0..~1.2)
+  popytRealizowalny: number; // popytM1 × A × C (0–100)
+  przydatnoscEkonomiczna: number; // kanał B (0–100)
+  score: number; // syntetyczny wynik profilu (0–100)
+  werdykt: Werdykt; // pasmo score
+  obsluzalny: boolean; // kanał A — czy profil nieprzekroczył progu (false = zdyskwalifikowany)
+  dopuszczalny: boolean; // kanał E — bramki bezwzględne (false = odrzucony)
+  powody: string[]; // dyskwalifikacje/odrzucenia i istotne modyfikatory
+}
+
+/** Synteza M2: werdykt per profil + rekomendacja + dopuszczalność. */
+export interface OcenaM2 {
+  werdykty: Record<Profil, WerdyktProfiluM2>;
+  dopuszczalnosc: StatusBramki; // kanał E zbiorczo
+  rekomendacja: Profil | "brak"; // najlepszy z dopuszczalnych/obsługiwalnych; „brak" gdy żaden
+  powodBrak?: string; // uzasadnienie „BRAK — lokalizacja nieodpowiednia"
+}
+
 export interface WynikPoziom2 {
   dzialkaId: string;
   obwiednia: Obwiednia;
@@ -440,6 +465,8 @@ export interface WynikPoziom2 {
   sygnaly: Sygnal[];
   braki: BrakDanych[];
   kluczoweLiczby: KluczoweLiczby;
+  /** Domknięcie systemowe: werdykt M2 per profil (kanały A–F) + rekomendacja. */
+  ocenaM2: OcenaM2;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
