@@ -122,6 +122,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
     warstwy: "plany",
     infoFormat: "application/json",
   },
+  // ZAPARKOWANE — źródła WMS niedostępne (timeout/HTTP/WAF Incapsula); nie wchodzą do analizy.
   wmsObecnosc: [
     // Adresy/warstwy startowe — DO POTWIERDZENIA przez GetCapabilities źródeł.
     // „Obecność obiektu w punkcie" → ustawia pole logiczne (bramka). Wyjątek WMS → „brak".
@@ -134,7 +135,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       pole: "natura2000",
       wersjaWms: "1.1.1",
       infoFormat: "application/json",
-      aktywny: true,
+      aktywny: false,
     },
     {
       klucz: "GDOS_OCHRONA",
@@ -145,7 +146,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       pole: "ochronaWykluczajaca",
       wersjaWms: "1.1.1",
       infoFormat: "application/json",
-      aktywny: true,
+      aktywny: false,
     },
     {
       klucz: "ISOK_POWODZ",
@@ -156,7 +157,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       pole: "ryzykoPowodzioweSzczegolne",
       wersjaWms: "1.1.1",
       infoFormat: "application/json",
-      aktywny: true,
+      aktywny: false,
     },
     {
       klucz: "PIG_SOPO",
@@ -167,7 +168,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       pole: "osuwisko",
       wersjaWms: "1.1.1",
       infoFormat: "application/json",
-      aktywny: true,
+      aktywny: false,
     },
     {
       klucz: "NID_ZABYTKI",
@@ -178,7 +179,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       pole: "strefaKonserwatorska",
       wersjaWms: "1.1.1",
       infoFormat: "application/json",
-      aktywny: true,
+      aktywny: false,
     },
   ],
   overpass: {
