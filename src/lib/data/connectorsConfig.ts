@@ -67,6 +67,8 @@ export interface KonfiguracjaKonektorow {
   overpass: { aktywny: boolean; endpointy: string[]; promienM: number };
   /** Kanał A (M2) — numeryczne odległości do usług z OSM/Overpass (wyścig mirrorów). */
   odleglosci: { aktywny: boolean; endpointy: string[]; promienM: number; timeoutMs: number };
+  /** Kanał A (M2) — routing pieszy (realna trasa) do k-najbliższych POI; klucz ORS z env. */
+  routingPieszy: { aktywny: boolean; endpointMatrix: string; timeoutMs: number; k: number };
   /** Katalog pozostałych źródeł (mapa architektury; włączane w M2/M3). */
   katalog: { klucz: string; zrodlo: string; endpoint: string; poziom: "P1" | "P2"; etap: "M1" | "M2" | "M3"; aktywny: boolean }[];
 }
@@ -197,6 +199,14 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
     promienM: 8500,
     // Wyścig mirrorów z jednym, krótkim limitem — worst-case ~timeoutMs (nie 3×).
     timeoutMs: 12000,
+  },
+  routingPieszy: {
+    // Realna trasa pieszą (spec §4: „inaczej bramki się mylą"). Wymaga klucza ORS
+    // w env ORS_API_KEY; bez klucza konektor degraduje do linii prostej (haversine).
+    aktywny: true,
+    endpointMatrix: "https://api.openrouteservice.org/v2/matrix/foot-walking",
+    timeoutMs: 8000,
+    k: 3, // k-najbliższych po linii prostej → routing tylko do nich (spec §5)
   },
   katalog: [
     { klucz: "ULDK", zrodlo: "ULDK (GUGiK)", endpoint: "https://uldk.gugik.gov.pl/", poziom: "P1", etap: "M1", aktywny: true },

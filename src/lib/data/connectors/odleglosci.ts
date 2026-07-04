@@ -54,7 +54,7 @@ export function haversineM(lat1: number, lon1: number, lat2: number, lon2: numbe
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
 }
 
-/** Najbliższa odległość [m, zaokr. do 10] każdego typu usługi wśród elementów. */
+/** Najbliższa odległość [m, zaokr. do 10] każdego typu usługi po linii prostej (fallback). */
 export function zbierzOdleglosci(elementy: ElementGeo[], lat: number, lon: number): Record<string, number> {
   const min: Record<string, number> = {};
   for (const el of elementy) {
@@ -66,6 +66,44 @@ export function zbierzOdleglosci(elementy: ElementGeo[], lat: number, lon: numbe
     const d = haversineM(lat, lon, elat, elon);
     if (min[key] == null || d < min[key]) min[key] = d;
   }
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(min)) out[k] = Math.round(v / 10) * 10;
+  return out;
+}
+
+export interface Kandydat {
+  usluga: string;
+  lat: number;
+  lon: number;
+  dLinia: number; // odległość po linii prostej [m] — do wyboru k-najbliższych i fallbacku
+}
+
+/** k-najbliższych POI (po linii prostej) każdego typu — kandydaci do routingu (spec §5). */
+export function kNajblizsze(elementy: ElementGeo[], lat: number, lon: number, k: number): Kandydat[] {
+  const wg: Record<string, Kandydat[]> = {};
+  for (const el of elementy) {
+    const usluga = klasyfikujUsluge(el.tags ?? {});
+    if (!usluga) continue;
+    const elat = el.lat ?? el.center?.lat;
+    const elon = el.lon ?? el.center?.lon;
+    if (elat == null || elon == null) continue;
+    (wg[usluga] ??= []).push({ usluga, lat: elat, lon: elon, dLinia: haversineM(lat, lon, elat, elon) });
+  }
+  const out: Kandydat[] = [];
+  for (const arr of Object.values(wg)) {
+    arr.sort((a, b) => a.dLinia - b.dLinia);
+    out.push(...arr.slice(0, Math.max(1, k)));
+  }
+  return out;
+}
+
+/** Redukcja: min odległość per usługa z dystansów trasy (fallback do linii, gdy null). */
+export function minZDystansow(kand: Kandydat[], dystanse: (number | null)[]): Record<string, number> {
+  const min: Record<string, number> = {};
+  kand.forEach((c, i) => {
+    const d = dystanse[i] ?? c.dLinia;
+    if (min[c.usluga] == null || d < min[c.usluga]) min[c.usluga] = d;
+  });
   const out: Record<string, number> = {};
   for (const [k, v] of Object.entries(min)) out[k] = Math.round(v / 10) * 10;
   return out;
@@ -114,6 +152,42 @@ async function pobierzOverpass(lat: number, lon: number): Promise<ElementGeo[] |
   }
 }
 
+const cfgR = KONFIG_KONEKTORY.routingPieszy;
+
+/**
+ * Realna trasa pieszą do kandydatów (ORS Matrix, jedno zapytanie). Zwraca dystanse [m]
+ * w kolejności `kand` (null gdy nieosiągalny) albo null, gdy brak klucza/awaria/wyłączony.
+ */
+async function routujMatrix(originLon: number, originLat: number, kand: Kandydat[]): Promise<(number | null)[] | null> {
+  const klucz = process.env.ORS_API_KEY;
+  if (!cfgR.aktywny || !klucz || kand.length === 0) return null;
+  const locations = [[originLon, originLat], ...kand.map((c) => [c.lon, c.lat])];
+  const destinations = kand.map((_, i) => i + 1);
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), cfgR.timeoutMs);
+  try {
+    const r = await fetch(cfgR.endpointMatrix, {
+      method: "POST",
+      signal: ctrl.signal,
+      headers: { Authorization: klucz, "Content-Type": "application/json", Accept: "application/json", "User-Agent": USER_AGENT },
+      body: JSON.stringify({ locations, sources: [0], destinations, metrics: ["distance"] }),
+    });
+    if (!r.ok) {
+      logDebug(`Routing ORS HTTP ${r.status}`);
+      return null;
+    }
+    const j = (await r.json()) as { distances?: (number | null)[][] };
+    const row = j.distances?.[0];
+    return Array.isArray(row) ? row.map((v) => (typeof v === "number" ? v : null)) : null;
+  } catch (e) {
+    logDebug(`Routing ORS błąd: ${String(e)}`);
+    return null;
+  } finally {
+    clearTimeout(t);
+    ctrl.abort();
+  }
+}
+
 /** Proxy dostępności (flagi M1) z odległości: usługa w progu pieszym → true. */
 function proxyZOdleglosci(odl: Record<string, number>): Partial<DaneDzialki> {
   const prog = KONFIG_M2.progPieszoM;
@@ -145,17 +219,25 @@ export const konektorOdleglosci: Konektor = {
     const elementy = await pobierzOverpass(lat, lon);
     if (elementy === null) return brakWyniku(this.klucz, this.zrodlo, czas, "Brak odpowiedzi Overpass (wszystkie instancje).");
 
-    const odleglosciM2 = zbierzOdleglosci(elementy, lat, lon);
-    if (Object.keys(odleglosciM2).length === 0) {
+    const liniaOdl = zbierzOdleglosci(elementy, lat, lon);
+    if (Object.keys(liniaOdl).length === 0) {
       return brakWyniku(this.klucz, this.zrodlo, czas, "Brak usług w buforze (odległości nieoznaczone — nie dyskwalifikuje).");
     }
+    // Realna trasa pieszą do k-najbliższych (spec §4/§5); brak klucza/awaria → linia prosta.
+    const kand = kNajblizsze(elementy, lat, lon, cfgR.k);
+    const trasy = await routujMatrix(lon, lat, kand);
+    const trasowane = trasy ? minZDystansow(kand, trasy) : null;
+    const odleglosciM2 = trasowane ?? liniaOdl;
+    const metoda = trasowane ? "trasa pieszą (ORS)" : "linia prosta (haversine)";
+    logDebug(`Odległości: ${metoda} → ${JSON.stringify(odleglosciM2)}`);
+
     const dane: Partial<DaneDzialki> = { odleglosciM2, ...proxyZOdleglosci(odleglosciM2) };
     const meta: MetaPola[] = (Object.keys(dane) as (keyof DaneDzialki)[]).map((pole) => ({
       pole,
-      zrodlo: this.zrodlo,
+      zrodlo: `${this.zrodlo} · ${metoda}`,
       czas,
-      // Linia prosta (nie trasa pieszą) → umiarkowana pewność.
-      pewnosc: pole === "odleglosciM2" ? 60 : 55,
+      // Trasa pieszą → wyższa pewność; linia prosta → umiarkowana.
+      pewnosc: trasowane ? (pole === "odleglosciM2" ? 80 : 70) : pole === "odleglosciM2" ? 60 : 55,
       status: "ok",
       tryb: "A",
     }));
