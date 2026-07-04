@@ -179,6 +179,8 @@ function flagiRyzyka(d: DaneDzialki, obw: Obwiednia, w: WskaznikiUzyte, cfg: Kon
     flagi.push(`Spadek ${d.sredniSpadekPct}% — wymusza tarasowanie/podpiwniczenie (koszt).`);
   if (d.proporcjaBokow !== null && d.proporcjaBokow > 2.5)
     flagi.push("Wąska/skośna działka — obniżona efektywność rzutu.");
+  if (w.intensywnosc > 1.5)
+    flagi.push(`Wysoka intensywność zabudowy (FAR ${w.intensywnosc.toFixed(2)} > 1,5) — gęsty model, zweryfikuj z planem.`);
   if (obw.zrodloWskaznikow === "sasiedztwo_fallback")
     flagi.push("Brak MPZP — obwiednia oszacowana z sąsiedztwa, niska pewność.");
   // Flagi z kaskady wskaźników (walidacja warstwy ręcznej, rozbieżności, legalne>fizyczne).

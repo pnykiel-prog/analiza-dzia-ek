@@ -29,6 +29,24 @@ test("kanał A: brak odległości → NIE dyskwalifikuje (unknown ≠ far)", () 
   assert.equal(a.mnoznik, 1);
 });
 
+test("kanał A: progi PER USŁUGA — sklep 2800 m nie dyskwalifikuje seniora (próg 3000), przystanek 2600 tak (próg 2500)", () => {
+  // Sklep senior: dyskw 3000 → 2800 nie bramkuje (dawny wspólny próg 2500 błędnie by zbramkował).
+  const sklep = dostepnoscA({ ...baza, odleglosciM2: { sklep: 2800 } } as DaneDzialki, "seniorzy");
+  assert.equal(sklep.obsluzalny, true);
+  assert.ok(sklep.mnoznik > 0.3 && sklep.mnoznik < 0.5, `sklep 2800 → mnożnik ${sklep.mnoznik}`);
+  // Przystanek senior: dyskw 2500 → 2600 bramkuje (usługa wrażliwsza).
+  const przyst = dostepnoscA({ ...baza, odleglosciM2: { przystanek: 2600 } } as DaneDzialki, "seniorzy");
+  assert.equal(przyst.obsluzalny, false);
+  assert.equal(przyst.mnoznik, 0);
+});
+
+test("kanał A: gradient 1,0 → 0,3 — na środku między komfortem a dyskwalifikacją f≈0,65", () => {
+  // Przystanek senior: komfort 300, dyskw 2500 → środek 1400 m: 1 − 0,7×0,5 = 0,65.
+  const a = dostepnoscA({ ...baza, odleglosciM2: { przystanek: 1400 } } as DaneDzialki, "seniorzy");
+  assert.equal(a.obsluzalny, true);
+  assert.ok(Math.abs(a.mnoznik - 0.65) < 0.02, `środek → ${a.mnoznik} (oczekiwane ≈0,65)`);
+});
+
 test("kanał B: daleka sieć + spadek → niższa przydatność ekonomiczna (skaluje, nie dyskwalifikuje)", () => {
   const blisko = przydatnoscEkonomicznaB({ ...baza, odlegloscDoSieciM: 30, sredniSpadekPct: 2 } as DaneDzialki);
   const daleko = przydatnoscEkonomicznaB({ ...baza, odlegloscDoSieciM: 1200, sredniSpadekPct: 15 } as DaneDzialki);
