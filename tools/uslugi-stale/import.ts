@@ -21,7 +21,7 @@
 import { writeFileSync, renameSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
-import { geokoduj, zapiszCacheGeokodowania } from "./geocode";
+import { geokoduj, zapiszCacheGeokodowania, statystykiGeokodera } from "./geocode";
 
 const KATALOG = dirname(fileURLToPath(import.meta.url));
 const DOMYSLNY_OUT = resolve(KATALOG, "../../src/lib/data/uslugi_stale.json");
@@ -50,9 +50,12 @@ const GEOKODUJ = !flaga("--no-geocode");
 const DATA = new Date().toISOString().slice(0, 10);
 
 const bezWspolrzednych: { zrodlo: string; nazwa: string; adres: string }[] = [];
+let przetworzono = 0; // liczba PRÓB (nie tylko udanych) — do limitu testowego
+const limitOsiagniety = () => przetworzono >= LIMIT;
 
 /** Dodaje rekord: jeśli brak współrzędnych — geokoduje adres (lub loguje i pomija). */
 async function dodaj(out: Rekord[], r: Omit<Rekord, "lat" | "lon"> & { lat?: number; lon?: number }): Promise<void> {
+  przetworzono++;
   let { lat, lon } = r;
   if ((lat == null || lon == null) && GEOKODUJ && r.adres) {
     const w = await geokoduj(r.adres);
@@ -89,13 +92,13 @@ const NAGLOWKI_RSPO = {
 async function importRspo(out: Rekord[]): Promise<void> {
   let url: string | null = "https://api-rspo.men.gov.pl/api/placowki/?page=1";
   let n = 0;
-  while (url && out.length < LIMIT + n) {
+  while (url && !limitOsiagniety()) {
     const r = await fetch(url, { headers: NAGLOWKI_RSPO });
     if (!r.ok) { console.error(`RSPO HTTP ${r.status} — przerywam RSPO`); break; }
     const j: any = await r.json();
     const czlonkowie: any[] = j["hydra:member"] ?? j.member ?? [];
     for (const m of czlonkowie) {
-      if (out.length >= LIMIT) return;
+      if (limitOsiagniety()) return;
       const kat = kategoriaZNazwy(m?.typ?.nazwa ?? m?.nazwa ?? "");
       if (!kat) continue;
       const w = wspZRspo(m);
@@ -129,7 +132,7 @@ const pole = (row: Record<string, string>, ...frazy: string[]): string => {
 async function importCsv(out: Rekord[], sciezka: string, kategoria: Kategoria, zrodlo: "RPWDL" | "RA"): Promise<void> {
   const wiersze = parsujCsv(readFileSync(sciezka, "utf8"));
   for (const row of wiersze) {
-    if (out.length >= LIMIT) return;
+    if (limitOsiagniety()) return;
     const nazwa = pole(row, "nazwa", "firma", "podmiot");
     const miejsc = pole(row, "miejscowo", "miasto");
     const ulica = pole(row, "ulica", "adres");
@@ -151,7 +154,7 @@ const ZRODLO_KAT: Record<Kategoria, "RSPO" | "RPWDL" | "RA"> = { szkola: "RSPO",
 async function importClean(out: Rekord[], sciezka: string): Promise<void> {
   const wiersze = parsujCsv(readFileSync(sciezka, "utf8"));
   for (const row of wiersze) {
-    if (out.length >= LIMIT) return;
+    if (limitOsiagniety()) return;
     const kat = pole(row, "kategoria") as Kategoria;
     if (!["szkola", "przedszkole", "poz", "apteka"].includes(kat)) continue;
     const nazwa = pole(row, "nazwa");
@@ -202,6 +205,10 @@ async function main() {
   console.error(`ZAPISANO ${rekordy.length} rekordów → ${OUT}`);
   console.error(`  szkoły ${meta.liczby.szkola} · przedszkola ${meta.liczby.przedszkole} · POZ ${meta.liczby.poz} · apteki ${meta.liczby.apteka}`);
   console.error(`  bez współrzędnych (pominięte, do poprawy): ${bezWspolrzednych.length}`);
+  if (GEOKODUJ) {
+    const g = statystykiGeokodera();
+    console.error(`  GEOKODER: ${g.udane} udanych / ${g.bledy} błędów` + (g.udane === 0 && g.bledy > 0 ? "  ← 0 trafień: patrz linie [geokoder] BŁĄD wyżej" : ""));
+  }
   if (bezWspolrzednych.length) writeFileSync(join(KATALOG, "bez_wspolrzednych.log.json"), JSON.stringify(bezWspolrzednych, null, 2));
 }
 
