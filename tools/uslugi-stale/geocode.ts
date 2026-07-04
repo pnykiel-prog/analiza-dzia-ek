@@ -29,6 +29,7 @@ const NAGLOWKI = {
 
 // Diagnostyka: przy pierwszych błędach wypisz powód, przy pierwszym sukcesie — surowa odpowiedź.
 let diagBledy = 0, diagSukces = false, diagUdane = 0, diagPokazanoRaw = false;
+let odOstatniegoZapisu = 0; // co N nowych trafień zrzucamy cache na dysk (odporność na przerwanie)
 
 /** Statystyki geokodera do podsumowania (udane vs błędy). */
 export function statystykiGeokodera(): { udane: number; bledy: number } {
@@ -108,7 +109,10 @@ export async function geokoduj(adres: string): Promise<Wsp> {
           diagSukces = true;
           console.error(`  [geokoder] OK — „${adres}" → „${zapytanie}" → lat=${w[1].toFixed(5)} lon=${w[0].toFixed(5)} (Polska: lat 49–55, lon 14–24)`);
         }
-        return (cache[klucz] = w);
+        cache[klucz] = w;
+        // Zrzut cache co 250 nowych trafień — gdyby długi bieg przerwano, kolejny wznowi.
+        if (++odOstatniegoZapisu >= 250) { odOstatniegoZapisu = 0; zapiszCacheGeokodowania(); console.error(`  [geokoder] …${diagUdane} zgeokodowanych (cache zapisany)`); }
+        return w;
       }
     }
     zaloguj("brak wyniku UUG (0 obiektów)");
