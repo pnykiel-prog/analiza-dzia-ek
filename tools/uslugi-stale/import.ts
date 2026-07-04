@@ -83,23 +83,46 @@ function wspZRspo(m: any): [number, number] | null {
   if (m?.latitude && m?.longitude) return [Number(m.latitude), Number(m.longitude)];
   return null;
 }
-// Nagłówki „jak przeglądarka" — RSPO (za zaporą) odrzuca zapytania bez User-Agent (HTTP 403).
+// Nagłówki „jak przeglądarka" — RSPO odrzuca zapytania bez User-Agent.
 const NAGLOWKI_RSPO = {
-  Accept: "application/ld+json",
+  Accept: "application/json",
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
   "Accept-Language": "pl-PL,pl;q=0.9",
 };
+// Stary host api-rspo.men.gov.pl został wyłączony (2.03.2026). Próbujemy kolejno nowych hostów.
+const RSPO_HOSTY = ["https://api.rspo.gov.pl", "https://api-rspo.mein.gov.pl", "https://api-rspo.men.gov.pl"];
+
+/** Znajduje działający host RSPO (pierwsza strona zwraca 200 + rekordy). */
+async function znajdzHostRspo(): Promise<string | null> {
+  for (const host of RSPO_HOSTY) {
+    try {
+      const r = await fetch(`${host}/api/placowki/?page=1`, { headers: NAGLOWKI_RSPO });
+      if (r.ok) {
+        const j: any = await r.json().catch(() => null);
+        const czl: any[] = j?.["hydra:member"] ?? j?.member ?? (Array.isArray(j) ? j : []);
+        if (czl.length) { console.error(`RSPO: host ${host} działa (${czl.length} rekordów na stronie)`); return host; }
+        console.error(`RSPO: host ${host} 200, ale 0 rekordów — próbuję dalej`);
+      } else {
+        console.error(`RSPO: host ${host} → HTTP ${r.status}`);
+      }
+    } catch (e: any) { console.error(`RSPO: host ${host} → ${String(e?.message ?? e).slice(0, 80)}`); }
+  }
+  return null;
+}
 async function importRspo(out: Rekord[]): Promise<void> {
-  let url: string | null = "https://api-rspo.men.gov.pl/api/placowki/?page=1";
-  let n = 0;
-  while (url && !limitOsiagniety()) {
-    const r = await fetch(url, { headers: NAGLOWKI_RSPO });
-    if (!r.ok) { console.error(`RSPO HTTP ${r.status} — przerywam RSPO`); break; }
+  const host = await znajdzHostRspo();
+  if (!host) { console.error("RSPO: żaden host nie odpowiada — pomijam (patrz instrukcja pobrania pliku RSPO)."); return; }
+  let pokazanoRaw = false;
+  for (let page = 1; !limitOsiagniety(); page++) {
+    const r = await fetch(`${host}/api/placowki/?page=${page}`, { headers: NAGLOWKI_RSPO });
+    if (!r.ok) { console.error(`RSPO HTTP ${r.status} na stronie ${page} — koniec`); break; }
     const j: any = await r.json();
-    const czlonkowie: any[] = j["hydra:member"] ?? j.member ?? [];
+    const czlonkowie: any[] = j["hydra:member"] ?? j.member ?? (Array.isArray(j) ? j : []);
+    if (!czlonkowie.length) break; // koniec paginacji
+    if (!pokazanoRaw) { pokazanoRaw = true; console.error(`RSPO: surowy rekord: ${JSON.stringify(czlonkowie[0]).slice(0, 260)}`); }
     for (const m of czlonkowie) {
       if (limitOsiagniety()) return;
-      const kat = kategoriaZNazwy(m?.typ?.nazwa ?? m?.nazwa ?? "");
+      const kat = kategoriaZNazwy(m?.typ?.nazwa ?? m?.typ ?? m?.nazwa ?? "");
       if (!kat) continue;
       const w = wspZRspo(m);
       const adres = [ [m.ulica, m.numerBudynku].filter(Boolean).join(" "), [m.kodPocztowy, m.miejscowosc].filter(Boolean).join(" ") ].filter(Boolean).join(", ");
@@ -109,10 +132,7 @@ async function importRspo(out: Rekord[]): Promise<void> {
         zrodlo: "RSPO", data_importu: DATA, lat: w?.[0], lon: w?.[1],
       });
     }
-    n = out.length;
-    const next = j["hydra:view"]?.["hydra:next"];
-    url = next ? new URL(next, "https://api-rspo.men.gov.pl").toString() : null;
-    console.error(`RSPO: ${out.length} rekordów…`);
+    console.error(`RSPO: strona ${page}, ${out.length} rekordów…`);
   }
 }
 
