@@ -72,6 +72,10 @@ export interface DaneDzialki {
   mpzpZadeklarowany?: Maybe<boolean>;
   /** Ręcznie wprowadzona podstawa planistyczna (P1, S3): typ + symbol/funkcja. */
   podstawa?: PodstawaPlanistyczna;
+  /** M2: surowe wskaźniki wpisane ręcznie (kaskada P2 — wchodzą tylko gdy potwierdzone). */
+  wskaznikiReczne?: Maybe<WskaznikiReczne>;
+  /** M2: klient potwierdził, że wskaźniki ręczne to realne dane z MPZP/dokumentu urzędowego. */
+  wskaznikiPotwierdzone?: Maybe<boolean>;
   /** Metryka planu z KIMPZP (gmina wektorowa): symbol, przeznaczenie, uchwała, data. */
   mpzpMeta?: MetrykaPlanu | null;
   wskaznikiPlanistyczne: Maybe<WskaznikiPlanistyczne>;
@@ -270,6 +274,34 @@ export interface PodstawaPlanistyczna {
   zrodlo: "ręczne" | "prognoza" | "kimpzp";
 }
 
+/** Surowe wskaźniki wpisane ręcznie w P2 (przed rozstrzygnięciem kaskady). */
+export interface WskaznikiReczne {
+  intensywnosc?: number | null; // FAR
+  maxWysokoscM?: number | null; // wysokość legalna z wypisu
+  maxPowZabudowyPct?: number | null; // % zabudowy
+  minPbcPct?: number | null; // PBC
+}
+
+/** Źródło wartości wskaźnika (kaskada priorytetów). */
+export type ZrodloWskaznika = "auto" | "deklarowane" | "prognoza";
+
+/** Pojedynczy wskaźnik po rozstrzygnięciu kaskady — wartość + prowenancja + pewność. */
+export interface PoleWskaznika {
+  wartosc: number;
+  zrodlo: ZrodloWskaznika;
+  pewnosc: number; // 0–100 (auto wysoka, deklarowane średnia, prognoza niska)
+}
+
+/** Zestaw wskaźników rozstrzygnięty per pole (auto > ręczne potwierdzone > prognoza). */
+export interface RozstrzygnieteWskazniki {
+  kZabPct: PoleWskaznika; // % zabudowy (k_zab)
+  far: PoleWskaznika; // intensywność (FAR)
+  kondygnacje: PoleWskaznika; // maks. kondygnacje (limit — legalne > fizyczne)
+  pbcPct: PoleWskaznika; // PBC
+  pewnosc: number; // pewność kompletu = najsłabsze użyte źródło
+  flagi: string[]; // walidacja warstwy ręcznej + rozbieżności
+}
+
 /** Metryka planu miejscowego z KIMPZP (gmina wektorowa udostępnia atrybuty). */
 export interface MetrykaPlanu {
   symbol?: string; // symbol z planu, np. „11MWs"
@@ -394,6 +426,8 @@ export interface Obwiednia {
   maxKondygnacje: number;
   zrodloWskaznikow: "mpzp" | "plan_ogolny" | "sasiedztwo_fallback";
   pewnoscObwiedni: number; // 0–100 (niższa przy fallbacku)
+  /** Prowenancja per wskaźnik (kaskada auto/deklarowane/prognoza) — do UI i pewności. */
+  prowenancja?: RozstrzygnieteWskazniki;
 }
 
 export interface WynikPoziom2 {

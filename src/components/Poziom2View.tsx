@@ -1,4 +1,4 @@
-import type { BrakDanych, ProfilRekomendowany, Sygnal, WariantZabudowy, WynikPoziom2 } from "@/lib/types";
+import type { BrakDanych, PoleWskaznika, ProfilRekomendowany, Sygnal, WariantZabudowy, WynikPoziom2, ZrodloWskaznika } from "@/lib/types";
 import { Karta, Statystyka, Flagi } from "./ui";
 import { WskaznikPewnosci } from "./grunt";
 import { etykietaTypologii, liczba } from "@/lib/format";
@@ -8,6 +8,24 @@ const ZRODLO_OBWIEDNI: Record<string, string> = {
   plan_ogolny: "Plan ogólny / OUZ",
   sasiedztwo_fallback: "Fallback z sąsiedztwa (brak MPZP)",
 };
+
+// Prowenancja wskaźnika (kaskada): etykieta + kolor znacznika źródła.
+const ZRODLO_WSK: Record<ZrodloWskaznika, { txt: string; kl: string }> = {
+  auto: { txt: "auto", kl: "bg-grunt-green-bg text-grunt-green" },
+  deklarowane: { txt: "wypis", kl: "bg-grunt-amber-bg text-grunt-amber-text" },
+  prognoza: { txt: "prognoza", kl: "bg-grunt-neutral-bg text-grunt-text-muted" },
+};
+
+function ChipWskaznika({ e, p, suf = "" }: { e: string; p: PoleWskaznika; suf?: string }) {
+  const z = ZRODLO_WSK[p.zrodlo];
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-md border border-grunt-border px-2 py-1 text-[11px]">
+      <span className="text-grunt-text-muted2">{e}:</span>
+      <span className="mono font-medium text-grunt-text">{p.wartosc}{suf}</span>
+      <span className={`badge ${z.kl} text-[10px]`}>{z.txt}</span>
+    </span>
+  );
+}
 
 // Kolory segmentów mix metraży (skala chart, monochromatyczna).
 const KOLORY_MIX = ["bg-grunt-ink", "bg-grunt-chart-4", "bg-grunt-chart-5", "bg-grunt-chart-3"];
@@ -96,6 +114,21 @@ export function Poziom2View({
         <div className="text-[11px] text-grunt-text-muted2 mt-3">
           Źródło wskaźników: <strong className="text-grunt-text">{ZRODLO_OBWIEDNI[o.zrodloWskaznikow]}</strong>
         </div>
+        {o.prowenancja && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            <ChipWskaznika e="% zabudowy" p={o.prowenancja.kZabPct} suf="%" />
+            <ChipWskaznika e="Intensywność" p={o.prowenancja.far} />
+            <ChipWskaznika e="Kondygnacje" p={o.prowenancja.kondygnacje} />
+            <ChipWskaznika e="PBC" p={o.prowenancja.pbcPct} suf="%" />
+          </div>
+        )}
+        {o.prowenancja && o.prowenancja.flagi.length > 0 && (
+          <ul className="mt-2 space-y-1">
+            {o.prowenancja.flagi.map((f, i) => (
+              <li key={i} className="text-[11px] text-grunt-amber-text bg-grunt-amber-bg border border-grunt-amber/25 rounded px-2 py-1">⚑ {f}</li>
+            ))}
+          </ul>
+        )}
       </Karta>
 
       <Karta tytul="Rekomendowane warianty zabudowy" podtytul="Typologia → program pod profil → wynik. Wybór przechodzi do modelu finansowego.">
