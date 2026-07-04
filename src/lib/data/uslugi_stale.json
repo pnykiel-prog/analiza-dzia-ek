@@ -1,0 +1,19 @@
+{
+  "meta": {
+    "opis": "SEED statycznej warstwy usług (kanał A). Do zastąpienia rocznym importem RSPO/RPWDL/RA + geokoder GUGiK (patrz tools/uslugi-stale/README.md).",
+    "data_importu": "2026-01-01",
+    "zrodla": ["RSPO", "RPWDL", "RA"],
+    "uwaga": "Dane przykładowe (kilka rekordów wokół Warszawy i Lesznowoli) — NIE kompletny rejestr."
+  },
+  "rekordy": [
+    { "id": "RSPO:demo-szk-1", "kategoria": "szkola", "nazwa": "Szkoła Podstawowa nr 1", "adres": "Warszawa, ul. Przykładowa 1", "lat": 52.2312, "lon": 21.0055, "teryt_gmina": "146501_1", "zrodlo": "RSPO", "data_importu": "2026-01-01" },
+    { "id": "RSPO:demo-szk-2", "kategoria": "szkola", "nazwa": "Szkoła Podstawowa nr 2", "adres": "Warszawa, ul. Testowa 5", "lat": 52.2255, "lon": 21.0180, "teryt_gmina": "146501_1", "zrodlo": "RSPO", "data_importu": "2026-01-01" },
+    { "id": "RSPO:demo-szk-3", "kategoria": "szkola", "nazwa": "Szkoła Podstawowa w Lesznowoli", "adres": "Lesznowola, ul. Szkolna 8", "lat": 52.0905, "lon": 20.9520, "teryt_gmina": "146509_8", "zrodlo": "RSPO", "data_importu": "2026-01-01" },
+    { "id": "RSPO:demo-prz-1", "kategoria": "przedszkole", "nazwa": "Przedszkole nr 10", "adres": "Warszawa, ul. Przykładowa 3", "lat": 52.2298, "lon": 21.0095, "teryt_gmina": "146501_1", "zrodlo": "RSPO", "data_importu": "2026-01-01" },
+    { "id": "RSPO:demo-prz-2", "kategoria": "przedszkole", "nazwa": "Przedszkole Słoneczko", "adres": "Lesznowola, ul. Kwiatowa 2", "lat": 52.0930, "lon": 20.9560, "teryt_gmina": "146509_8", "zrodlo": "RSPO", "data_importu": "2026-01-01" },
+    { "id": "RPWDL:demo-poz-1", "kategoria": "poz", "nazwa": "Przychodnia POZ Centrum", "adres": "Warszawa, ul. Zdrowa 12", "lat": 52.2340, "lon": 21.0130, "teryt_gmina": "146501_1", "zrodlo": "RPWDL", "data_importu": "2026-01-01" },
+    { "id": "RPWDL:demo-poz-2", "kategoria": "poz", "nazwa": "Ośrodek Zdrowia Lesznowola", "adres": "Lesznowola, ul. Zdrowia 4", "lat": 52.0888, "lon": 20.9495, "teryt_gmina": "146509_8", "zrodlo": "RPWDL", "data_importu": "2026-01-01" },
+    { "id": "RA:demo-apt-1", "kategoria": "apteka", "nazwa": "Apteka Pod Orłem", "adres": "Warszawa, ul. Leczna 7", "lat": 52.2280, "lon": 21.0110, "teryt_gmina": "146501_1", "zrodlo": "RA", "data_importu": "2026-01-01" },
+    { "id": "RA:demo-apt-2", "kategoria": "apteka", "nazwa": "Apteka Zdrowie", "adres": "Lesznowola, ul. Główna 15", "lat": 52.0912, "lon": 20.9540, "teryt_gmina": "146509_8", "zrodlo": "RA", "data_importu": "2026-01-01" }
+  ]
+}

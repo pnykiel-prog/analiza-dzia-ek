@@ -1,16 +1,15 @@
 /**
- * Konektor odległości do usług (M2, kanał A) — OSM/Overpass → numeryczne odległości.
+ * Konektor odległości do usług (M2, kanał A) — DWA źródła połączone:
+ *  - szkoły/przedszkola/POZ/apteki → STATYCZNA warstwa z rejestrów (RSPO/RPWDL/RA),
+ *    lokalna, deterministyczna, bez egresu (spec „statyczne warstwy usług");
+ *  - przystanek/sklep → OSM/Overpass na żywo (brak rejestru / szybka rotacja).
  *
- * Wypełnia `odleglosciM2` (metry, najbliższy obiekt każdego typu w buforze) — wejście
- * bramki obsługiwalności kanału A (spec §4). Dodatkowo wyprowadza proxy dostępności
- * (przystanek/usługi/POZ/szkoły) dla flag M1 z progu pieszego — dzięki temu stary
- * konektor `overpass` pozostaje uśpiony (jedno zapytanie zamiast dwóch).
+ * Kandydaci z obu źródeł → k-najbliższych → realna trasa pieszą (ORS Matrix) albo
+ * linia prosta (haversine) → `odleglosciM2` (wejście bramki kanału A). Warstwa
+ * statyczna działa NAWET gdy Overpass jest niedostępny — kluczowe dla produkcji.
  *
- * Ograniczenie: odległość liczona po linii prostej (haversine), nie realną trasą pieszą —
- * stąd obniżona pewność. Trasa pieszą (OSRM/ORS) dołożymy jako wzbogacenie.
- *
- * Anty-pętla: WYŚCIG mirrorów (Promise.any) z jednym krótkim limitem — worst-case ~timeoutMs,
- * a nie suma po wszystkich instancjach. Brak odpowiedzi → „brak" (nie dyskwalifikuje).
+ * Anty-pętla: wyścig mirrorów Overpass pod jednym limitem. Brak punktu/odpowiedzi
+ * → „brak" dla danej usługi (nie dyskwalifikuje; reguła kolizji „równorzędna").
  *
  * Funkcje klasyfikujące/liczące są czyste (testowane offline).
  */
@@ -22,6 +21,12 @@ import { KONFIG_KONEKTORY } from "../connectorsConfig";
 import { KONFIG_M2 } from "../../config";
 import { logDebug, skrot } from "../debug";
 import { USER_AGENT } from "./net";
+import type { Kandydat } from "./geoUslugi";
+import { haversineM, minZDystansow } from "./geoUslugi";
+import { kandydaciStale } from "../uslugiStale";
+
+export type { Kandydat } from "./geoUslugi";
+export { haversineM, minZDystansow } from "./geoUslugi";
 
 export interface ElementGeo {
   tags?: Record<string, string>;
@@ -31,6 +36,10 @@ export interface ElementGeo {
 }
 
 const cfg = KONFIG_KONEKTORY.odleglosci;
+const cfgR = KONFIG_KONEKTORY.routingPieszy;
+
+/** Kategorie brane z OSM na żywo (reszta ze statycznej warstwy). */
+const KATEGORIE_OSM = ["przystanek", "sklep"];
 
 /** Klasyfikuje element OSM do klucza usługi z KONFIG_M2 (lub null, gdy nieistotny). */
 export function klasyfikujUsluge(tags: Record<string, string>): string | null {
@@ -42,16 +51,6 @@ export function klasyfikujUsluge(tags: Record<string, string>): string | null {
   if (a === "kindergarten" || a === "childcare") return "przedszkole";
   if (["supermarket", "convenience", "grocery", "general"].includes(tags.shop ?? "")) return "sklep";
   return null;
-}
-
-/** Odległość po elipsoidzie (haversine) w metrach. */
-export function haversineM(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371000;
-  const rad = Math.PI / 180;
-  const dLat = (lat2 - lat1) * rad;
-  const dLon = (lon2 - lon1) * rad;
-  const s = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
 }
 
 /** Najbliższa odległość [m, zaokr. do 10] każdego typu usługi po linii prostej (fallback). */
@@ -69,13 +68,6 @@ export function zbierzOdleglosci(elementy: ElementGeo[], lat: number, lon: numbe
   const out: Record<string, number> = {};
   for (const [k, v] of Object.entries(min)) out[k] = Math.round(v / 10) * 10;
   return out;
-}
-
-export interface Kandydat {
-  usluga: string;
-  lat: number;
-  lon: number;
-  dLinia: number; // odległość po linii prostej [m] — do wyboru k-najbliższych i fallbacku
 }
 
 /** k-najbliższych POI (po linii prostej) każdego typu — kandydaci do routingu (spec §5). */
@@ -97,18 +89,7 @@ export function kNajblizsze(elementy: ElementGeo[], lat: number, lon: number, k:
   return out;
 }
 
-/** Redukcja: min odległość per usługa z dystansów trasy (fallback do linii, gdy null). */
-export function minZDystansow(kand: Kandydat[], dystanse: (number | null)[]): Record<string, number> {
-  const min: Record<string, number> = {};
-  kand.forEach((c, i) => {
-    const d = dystanse[i] ?? c.dLinia;
-    if (min[c.usluga] == null || d < min[c.usluga]) min[c.usluga] = d;
-  });
-  const out: Record<string, number> = {};
-  for (const [k, v] of Object.entries(min)) out[k] = Math.round(v / 10) * 10;
-  return out;
-}
-
+// Overpass pyta TYLKO o przystanek/sklep — reszta ze statycznej warstwy.
 function zapytanie(lat: number, lon: number, r: number): string {
   return `[out:json][timeout:25];
 (
@@ -116,7 +97,6 @@ function zapytanie(lat: number, lon: number, r: number): string {
   nwr(around:${r},${lat},${lon})[highway=bus_stop];
   nwr(around:${r},${lat},${lon})[public_transport];
   nwr(around:${r},${lat},${lon})[railway~"^(station|halt|tram_stop)$"];
-  nwr(around:${r},${lat},${lon})[amenity~"^(pharmacy|clinic|doctors|school|kindergarten|childcare)$"];
 );
 out tags center 500;`;
 }
@@ -131,7 +111,7 @@ async function pobierzZInstancji(endpoint: string, lat: number, lon: number, syg
   });
   if (!r.ok) throw new Error(`HTTP ${r.status} (${endpoint})`);
   const txt = await r.text();
-  logDebug(`Odległości ← ${endpoint} ${skrot(txt, 200)}`);
+  logDebug(`Odległości OSM ← ${endpoint} ${skrot(txt, 200)}`);
   const j = JSON.parse(txt) as { elements?: ElementGeo[] };
   return Array.isArray(j.elements) ? j.elements : [];
 }
@@ -141,18 +121,16 @@ async function pobierzOverpass(lat: number, lon: number): Promise<ElementGeo[] |
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), cfg.timeoutMs);
   try {
-    logDebug(`Odległości → wyścig ${cfg.endpointy.length} instancji (r=${cfg.promienM}, ${lat.toFixed(4)},${lon.toFixed(4)})`);
+    logDebug(`Odległości OSM → wyścig ${cfg.endpointy.length} instancji (r=${cfg.promienM}, ${lat.toFixed(4)},${lon.toFixed(4)})`);
     return await Promise.any(cfg.endpointy.map((e) => pobierzZInstancji(e, lat, lon, ctrl.signal)));
   } catch (e) {
-    logDebug(`Odległości — brak odpowiedzi (${String(e)})`);
+    logDebug(`Odległości OSM — brak odpowiedzi (${String(e)})`);
     return null;
   } finally {
     clearTimeout(t);
     ctrl.abort();
   }
 }
-
-const cfgR = KONFIG_KONEKTORY.routingPieszy;
 
 /**
  * Realna trasa pieszą do kandydatów (ORS Matrix, jedno zapytanie). Zwraca dystanse [m]
@@ -208,35 +186,39 @@ function proxyZOdleglosci(odl: Record<string, number>): Partial<DaneDzialki> {
 }
 
 export const konektorOdleglosci: Konektor = {
-  klucz: "OSM_ODLEGLOSCI",
-  zrodlo: "OSM / Overpass (odległości)",
+  klucz: "ODLEGLOSCI_USLUG",
+  zrodlo: "Odległości usług (warstwa stała RSPO/RPWDL/RA + OSM)",
   poziom: "P2",
   aktywny: cfg.aktywny,
   async pobierz(teren: Teren): Promise<WynikKonektora> {
     const czas = new Date().toISOString();
     if (!teren.centroid4326) return brakWyniku(this.klucz, this.zrodlo, czas, "Brak centroidu WGS84 (brak geometrii).");
     const [lon, lat] = teren.centroid4326;
-    const elementy = await pobierzOverpass(lat, lon);
-    if (elementy === null) return brakWyniku(this.klucz, this.zrodlo, czas, "Brak odpowiedzi Overpass (wszystkie instancje).");
 
-    const liniaOdl = zbierzOdleglosci(elementy, lat, lon);
-    if (Object.keys(liniaOdl).length === 0) {
-      return brakWyniku(this.klucz, this.zrodlo, czas, "Brak usług w buforze (odległości nieoznaczone — nie dyskwalifikuje).");
+    // 1) Warstwa statyczna (offline): szkoły/przedszkola/POZ/apteki.
+    const kandStale = kandydaciStale(lat, lon, cfgR.k);
+    // 2) OSM na żywo: przystanek/sklep (może być null przy blokadzie — statyka i tak działa).
+    const elementy = await pobierzOverpass(lat, lon);
+    const kandOsm = elementy ? kNajblizsze(elementy, lat, lon, cfgR.k).filter((k) => KATEGORIE_OSM.includes(k.usluga)) : [];
+
+    const kand = [...kandStale, ...kandOsm];
+    if (kand.length === 0) {
+      return brakWyniku(this.klucz, this.zrodlo, czas, "Brak usług (statyka + OSM) w zasięgu — nieoznaczone, nie dyskwalifikuje.");
     }
-    // Realna trasa pieszą do k-najbliższych (spec §4/§5); brak klucza/awaria → linia prosta.
-    const kand = kNajblizsze(elementy, lat, lon, cfgR.k);
+
+    // Realna trasa pieszą do kandydatów (spec §5); brak klucza/awaria → linia prosta.
     const trasy = await routujMatrix(lon, lat, kand);
     const trasowane = trasy ? minZDystansow(kand, trasy) : null;
-    const odleglosciM2 = trasowane ?? liniaOdl;
+    const odleglosciM2 = trasowane ?? minZDystansow(kand, kand.map(() => null));
     const metoda = trasowane ? "trasa pieszą (ORS)" : "linia prosta (haversine)";
-    logDebug(`Odległości: ${metoda} → ${JSON.stringify(odleglosciM2)}`);
+    const zrodloOpis = kandOsm.length ? "warstwa stała + OSM" : "warstwa stała";
+    logDebug(`Odległości (${zrodloOpis}, ${metoda}) → ${JSON.stringify(odleglosciM2)}`);
 
     const dane: Partial<DaneDzialki> = { odleglosciM2, ...proxyZOdleglosci(odleglosciM2) };
     const meta: MetaPola[] = (Object.keys(dane) as (keyof DaneDzialki)[]).map((pole) => ({
       pole,
-      zrodlo: `${this.zrodlo} · ${metoda}`,
+      zrodlo: `${zrodloOpis} · ${metoda}`,
       czas,
-      // Trasa pieszą → wyższa pewność; linia prosta → umiarkowana.
       pewnosc: trasowane ? (pole === "odleglosciM2" ? 80 : 70) : pole === "odleglosciM2" ? 60 : 55,
       status: "ok",
       tryb: "A",
