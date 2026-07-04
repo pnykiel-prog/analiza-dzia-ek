@@ -11,6 +11,8 @@ import { konektorKIMPZP } from "./kimpzp";
 import { konektoryWms } from "./wms";
 import { konektorOverpass } from "./overpass";
 import { konektorOdleglosci } from "./odleglosci";
+import { konektorSpadek } from "./spadek";
+import { konektorAglomeracja } from "./aglomeracja";
 import { konektorWartoscOdtworzeniowa } from "./wartosc";
 import { konektorRynek } from "./rynek";
 
@@ -20,6 +22,8 @@ const REJESTR: Konektor[] = [
   ...konektoryWms,
   konektorOverpass,
   konektorOdleglosci,
+  konektorSpadek,
+  konektorAglomeracja,
   konektorWartoscOdtworzeniowa,
   konektorRynek,
 ];
