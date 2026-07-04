@@ -43,6 +43,7 @@ interface Rekord {
 const args = process.argv.slice(2);
 const flaga = (n: string) => args.includes(n);
 const wartosc = (n: string) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : undefined; };
+const wartosci = (n: string) => args.map((a, i) => (a === n ? args[i + 1] : null)).filter((v): v is string => !!v);
 const OUT = wartosc("--out") ?? DOMYSLNY_OUT;
 const LIMIT = wartosc("--limit") ? Number(wartosc("--limit")) : Infinity;
 const GEOKODUJ = !flaga("--no-geocode");
@@ -138,14 +139,36 @@ async function importCsv(out: Rekord[], sciezka: string, kategoria: Kategoria, z
   }
 }
 
+const ZRODLO_KAT: Record<Kategoria, "RSPO" | "RPWDL" | "RA"> = { szkola: "RSPO", przedszkole: "RSPO", poz: "RPWDL", apteka: "RA" };
+
+/** Czysty plik CSV z kolumnami: kategoria,nazwa,adres,teryt_gmina[,lat,lon]. Geokoduje braki. */
+async function importClean(out: Rekord[], sciezka: string): Promise<void> {
+  const wiersze = parsujCsv(readFileSync(sciezka, "utf8"));
+  for (const row of wiersze) {
+    if (out.length >= LIMIT) return;
+    const kat = pole(row, "kategoria") as Kategoria;
+    if (!["szkola", "przedszkole", "poz", "apteka"].includes(kat)) continue;
+    const nazwa = pole(row, "nazwa");
+    const adres = pole(row, "adres");
+    const teryt = pole(row, "teryt");
+    const latRaw = pole(row, "lat", "szeroko");
+    const lonRaw = pole(row, "lon", "dlugo", "długo");
+    const lat = latRaw ? Number(latRaw.replace(",", ".")) : undefined;
+    const lon = lonRaw ? Number(lonRaw.replace(",", ".")) : undefined;
+    await dodaj(out, { id: `${ZRODLO_KAT[kat]}:${pole(row, "id") || `${kat}:${adres}`}`, kategoria: kat, nazwa, adres, teryt_gmina: teryt, zrodlo: ZRODLO_KAT[kat], data_importu: DATA, lat: Number.isFinite(lat) ? lat : undefined, lon: Number.isFinite(lon) ? lon : undefined });
+  }
+}
+
 // ── Główny przebieg ──────────────────────────────────────────────────────────
 async function main() {
-  if (!flaga("--rspo") && !wartosc("--rpwdl") && !wartosc("--ra")) {
-    console.error("Brak źródeł. Podaj co najmniej jedno:\n  --rspo                 (szkoły + przedszkola, API)\n  --rpwdl <plik.csv>     (POZ)\n  --ra <plik.csv>        (apteki)\nOpcje: --out <plik> --limit <n> --no-geocode\nBez źródeł nie nadpisuję pliku (ochrona seedu).");
+  const csvy = wartosci("--csv");
+  if (!flaga("--rspo") && !wartosc("--rpwdl") && !wartosc("--ra") && csvy.length === 0) {
+    console.error("Brak źródeł. Podaj co najmniej jedno:\n  --rspo                 (szkoły + przedszkola, API — mają współrzędne)\n  --csv <plik.csv>       (czysty plik: kategoria,nazwa,adres,teryt_gmina — geokoduje; można wiele --csv)\n  --rpwdl <plik.csv>     (POZ, mapowanie heurystyczne)\n  --ra <plik.csv>        (apteki, mapowanie heurystyczne)\nOpcje: --out <plik> --limit <n> --no-geocode\nBez źródeł nie nadpisuję pliku (ochrona seedu).");
     process.exit(2);
   }
   const out: Rekord[] = [];
   if (flaga("--rspo")) { console.error("→ RSPO (szkoły + przedszkola)…"); await importRspo(out); }
+  for (const c of csvy) { console.error(`→ CSV ${c}…`); await importClean(out, c); }
   const rpwdl = wartosc("--rpwdl"); if (rpwdl) { console.error(`→ RPWDL POZ z ${rpwdl}…`); await importCsv(out, rpwdl, "poz", "RPWDL"); }
   const ra = wartosc("--ra"); if (ra) { console.error(`→ RA apteki z ${ra}…`); await importCsv(out, ra, "apteka", "RA"); }
   if (GEOKODUJ) zapiszCacheGeokodowania();
