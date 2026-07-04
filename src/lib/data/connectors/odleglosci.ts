@@ -195,8 +195,9 @@ export const konektorOdleglosci: Konektor = {
     if (!teren.centroid4326) return brakWyniku(this.klucz, this.zrodlo, czas, "Brak centroidu WGS84 (brak geometrii).");
     const [lon, lat] = teren.centroid4326;
 
-    // 1) Warstwa statyczna (offline): szkoły/przedszkola/POZ/apteki.
-    const kandStale = kandydaciStale(lat, lon, cfgR.k);
+    // 1) Warstwa statyczna (offline): szkoły/przedszkola/POZ/apteki — tylko w buforze
+    //    (punkty poza `promienM` = luka pokrycia, pomijane; kategoria pytana ręcznie).
+    const kandStale = kandydaciStale(lat, lon, cfgR.k, undefined, cfg.promienM);
     // 2) OSM na żywo: przystanek/sklep (może być null przy blokadzie — statyka i tak działa).
     const elementy = await pobierzOverpass(lat, lon);
     const kandOsm = elementy ? kNajblizsze(elementy, lat, lon, cfgR.k).filter((k) => KATEGORIE_OSM.includes(k.usluga)) : [];

@@ -33,3 +33,13 @@ test("kandydaciStale: seed wokół Warszawy zwraca komplet 4 kategorii", () => {
   const kat = new Set(k.map((c) => c.usluga));
   for (const c of KATEGORIE_STALE) assert.ok(kat.has(c), `brak kategorii ${c}`);
 });
+
+test("kandydaciStale: punkt poza buforem POMIJANY (luka, nie absurdalna odległość)", () => {
+  const dane: UslugaStala[] = [
+    { id: "s1", kategoria: "szkola", nazwa: "Bliska", adres: "", lat: 52.001, lon: 21.0, teryt_gmina: "", zrodlo: "RSPO", data_importu: "" },
+    { id: "a1", kategoria: "apteka", nazwa: "Daleka 250 km", adres: "", lat: 50.0, lon: 19.0, teryt_gmina: "", zrodlo: "RA", data_importu: "" },
+  ];
+  const k = kandydaciStale(52.0, 21.0, 3, dane, 8500); // bufor 8,5 km
+  assert.ok(k.some((c) => c.usluga === "szkola")); // ~111 m — w zasięgu
+  assert.ok(!k.some((c) => c.usluga === "apteka")); // ~250 km — luka, pomijana (bez 236 km)
+});
