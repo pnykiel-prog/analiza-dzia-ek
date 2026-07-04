@@ -367,6 +367,34 @@ export const KONFIG_FINANSE: KonfiguracjaFinanse = {
   },
 };
 
+// ── Poziom 2 (wersja uproszczona): proste pytania do klienta ──────────────────
+
+/** Definicja jednej odległości pieszo pytanej w M2 (pre-wypełniana z OSM). */
+export interface OdlegloscM2 {
+  klucz: string; // klucz w DaneDzialki.odleglosciM2
+  etykieta: string;
+  profil: "mlodzi" | "seniorzy" | "oba"; // dla kogo liczy się w mnożniku popytu
+}
+
+export interface KonfiguracjaM2 {
+  /** Zestaw odległości pieszo (można rozszerzać). */
+  odleglosciPieszo: OdlegloscM2[];
+  /** Próg „w zasięgu pieszym" [m] — poniżej traktujemy usługę jako dostępną. */
+  progPieszoM: number;
+}
+
+export const KONFIG_M2: KonfiguracjaM2 = {
+  odleglosciPieszo: [
+    { klucz: "przystanek", etykieta: "Przystanek komunikacji", profil: "oba" },
+    { klucz: "sklep", etykieta: "Sklep spożywczy", profil: "oba" },
+    { klucz: "apteka", etykieta: "Apteka", profil: "seniorzy" },
+    { klucz: "poz", etykieta: "Przychodnia (POZ)", profil: "seniorzy" },
+    { klucz: "szkola", etykieta: "Szkoła", profil: "mlodzi" },
+    { klucz: "przedszkole", etykieta: "Przedszkole / żłobek", profil: "mlodzi" },
+  ],
+  progPieszoM: 800,
+};
+
 /** Migawka całej konfiguracji (do API / edytora). */
 export interface Konfiguracja {
   scoring: KonfiguracjaScoring;
