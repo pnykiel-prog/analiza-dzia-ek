@@ -80,11 +80,17 @@ function wspZRspo(m: any): [number, number] | null {
   if (m?.latitude && m?.longitude) return [Number(m.latitude), Number(m.longitude)];
   return null;
 }
+// Nagłówki „jak przeglądarka" — RSPO (za zaporą) odrzuca zapytania bez User-Agent (HTTP 403).
+const NAGLOWKI_RSPO = {
+  Accept: "application/ld+json",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+  "Accept-Language": "pl-PL,pl;q=0.9",
+};
 async function importRspo(out: Rekord[]): Promise<void> {
   let url: string | null = "https://api-rspo.men.gov.pl/api/placowki/?page=1";
   let n = 0;
   while (url && out.length < LIMIT + n) {
-    const r = await fetch(url, { headers: { Accept: "application/ld+json" } });
+    const r = await fetch(url, { headers: NAGLOWKI_RSPO });
     if (!r.ok) { console.error(`RSPO HTTP ${r.status} — przerywam RSPO`); break; }
     const j: any = await r.json();
     const czlonkowie: any[] = j["hydra:member"] ?? j.member ?? [];
