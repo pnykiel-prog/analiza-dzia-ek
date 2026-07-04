@@ -376,11 +376,28 @@ export interface OdlegloscM2 {
   profil: "mlodzi" | "seniorzy" | "oba"; // dla kogo liczy się w mnożniku popytu
 }
 
+/** Kanał A — obsługiwalność per profil: komfort (mnożnik=1) i próg dyskwalifikacji. */
+export interface ObsluzalnoscProfil {
+  komfortM: number; // do tej odległości usługa „pod ręką" (mnożnik 1,0)
+  dyskwalifikacjaM: number; // powyżej — profil nieobsługiwalny (bramka A)
+  poi: string[]; // które POI liczą się dla profilu
+}
+
 export interface KonfiguracjaM2 {
   /** Zestaw odległości pieszo (można rozszerzać). */
   odleglosciPieszo: OdlegloscM2[];
   /** Próg „w zasięgu pieszym" [m] — poniżej traktujemy usługę jako dostępną. */
   progPieszoM: number;
+  /** Kanał A — bramka obsługiwalności per profil (dostępność usług/transportu). */
+  obsluzalnosc: Record<"mlodzi" | "seniorzy", ObsluzalnoscProfil>;
+  /** Kanał B — koszt uzbrojenia (odległość do sieci → przydatność ekonomiczna). */
+  kosztUzbrojenia: { odlegloscKomfortM: number; odlegloscDrogaM: number; karaSpadekPct: number };
+  /** Kanał C — modyfikatory popytu (aglomeracja, potencjał, pustostany). */
+  modyfikatorPopytu: {
+    dojazdKomfortMin: number;
+    dojazdMaxMin: number;
+    wagaAglomeracji: Record<"mlodzi" | "seniorzy", number>; // ile dojazd waży per profil
+  };
 }
 
 export const KONFIG_M2: KonfiguracjaM2 = {
@@ -393,6 +410,18 @@ export const KONFIG_M2: KonfiguracjaM2 = {
     { klucz: "przedszkole", etykieta: "Przedszkole / żłobek", profil: "mlodzi" },
   ],
   progPieszoM: 800,
+  obsluzalnosc: {
+    // Seniorzy: usługi muszą być blisko (pieszo); dyskwalifikacja ~2,5 km.
+    seniorzy: { komfortM: 800, dyskwalifikacjaM: 2500, poi: ["poz", "apteka", "sklep", "przystanek"] },
+    // Młodzi: bardziej mobilni; dyskwalifikacja ~6 km.
+    mlodzi: { komfortM: 1200, dyskwalifikacjaM: 6000, poi: ["przystanek", "sklep", "szkola", "przedszkole"] },
+  },
+  kosztUzbrojenia: { odlegloscKomfortM: 50, odlegloscDrogaM: 500, karaSpadekPct: 8 },
+  modyfikatorPopytu: {
+    dojazdKomfortMin: 30,
+    dojazdMaxMin: 90,
+    wagaAglomeracji: { mlodzi: 0.35, seniorzy: 0.12 },
+  },
 };
 
 /** Migawka całej konfiguracji (do API / edytora). */

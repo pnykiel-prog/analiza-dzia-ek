@@ -1,7 +1,7 @@
-import type { BrakDanych, PoleWskaznika, Profil, ProfilRekomendowany, Sygnal, WariantZabudowy, WynikPoziom2, ZrodloWskaznika } from "@/lib/types";
+import type { BrakDanych, OcenaM2, PoleWskaznika, Profil, ProfilRekomendowany, Sygnal, WariantZabudowy, Werdykt, WerdyktProfiluM2, WynikPoziom2, ZrodloWskaznika } from "@/lib/types";
 import { Karta, Statystyka, Flagi } from "./ui";
 import { WskaznikPewnosci } from "./grunt";
-import { etykietaTypologii, liczba } from "@/lib/format";
+import { etykietaTypologii, liczba, statusSlowny } from "@/lib/format";
 
 const ZRODLO_OBWIEDNI: Record<string, string> = {
   mpzp: "MPZP (twarde wskaźniki)",
@@ -20,6 +20,82 @@ const ETYK_PROFIL: Record<Profil, string> = {
   mlodzi: "Dla młodych — budownictwo społeczne",
   seniorzy: "Dla seniorów — wspomagane",
 };
+
+const KOLOR_WERD: Record<Werdykt, string> = {
+  zielony: "text-grunt-green",
+  zolty: "text-grunt-amber",
+  czerwony: "text-grunt-red",
+};
+
+/** Werdykt M2 per profil (domknięcie kanałów A–F) + rekomendacja / „BRAK". */
+function WerdyktM2Karta({ ocena }: { ocena: OcenaM2 }) {
+  const brak = ocena.rekomendacja === "brak";
+  return (
+    <Karta
+      tytul="Werdykt Poziomu 2 — przydatność pod budownictwo społeczne"
+      podtytul="Popyt realizowalny = popyt z M1 × dostępność usług (A) × modyfikatory (C); przydatność ekonomiczna (B) skaluje; bramki (E) dopuszczają."
+      prawy={
+        brak ? (
+          <span className="badge bg-grunt-red-bg text-grunt-red">BRAK — lokalizacja nieodpowiednia</span>
+        ) : (
+          <span className="badge bg-grunt-ink text-white">Rekomendacja: {ocena.rekomendacja === "seniorzy" ? "seniorzy" : "młodzi"}</span>
+        )
+      }
+    >
+      {brak && ocena.powodBrak && (
+        <p className="text-[12px] text-grunt-red bg-grunt-red-bg/60 border border-grunt-red/25 rounded-md px-3 py-2 mb-3">{ocena.powodBrak}</p>
+      )}
+      <div className="grid md:grid-cols-2 gap-4">
+        {(["mlodzi", "seniorzy"] as Profil[]).map((p) => (
+          <ProfilM2 key={p} w={ocena.werdykty[p]} rekomendowany={ocena.rekomendacja === p} />
+        ))}
+      </div>
+    </Karta>
+  );
+}
+
+function ProfilM2({ w, rekomendowany }: { w: WerdyktProfiluM2; rekomendowany: boolean }) {
+  const wyklu = !w.obsluzalny || !w.dopuszczalny;
+  return (
+    <div className={`rounded-card border p-4 ${rekomendowany ? "border-grunt-ink shadow-raised" : "border-grunt-border"}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[13px] font-semibold text-grunt-text">{ETYK_PROFIL[w.profil]}</span>
+        {rekomendowany && <span className="badge bg-grunt-ink text-white text-[10px]">★ REKOMENDOWANY</span>}
+      </div>
+      <div className="flex items-end justify-between mt-2">
+        <span className={`text-[18px] font-semibold ${wyklu ? "text-grunt-red" : KOLOR_WERD[w.werdykt]}`}>
+          {wyklu ? (!w.dopuszczalny ? "Niedopuszczalny" : "Nieobsługiwalny") : statusSlowny[w.werdykt]}
+        </span>
+        <span className="mono text-[26px] font-semibold leading-none text-grunt-text">
+          {w.score}
+          <span className="text-[13px] text-grunt-text-faint2">/100</span>
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 mt-3 text-[11px]">
+        <MiniM2 e="Popyt realizowalny" v={`${w.popytRealizowalny}/100`} />
+        <MiniM2 e="Przydatność ekon. (B)" v={`${w.przydatnoscEkonomiczna}/100`} />
+        <MiniM2 e="Dostępność usług (A)" v={`× ${w.dostepnoscA.toFixed(2)}`} />
+        <MiniM2 e="Modyfikator popytu (C)" v={`× ${w.modyfikatorC.toFixed(2)}`} />
+      </div>
+      {w.powody.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {w.powody.slice(0, 4).map((r, i) => (
+            <li key={i} className="text-[11px] text-grunt-text-muted2">• {r}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function MiniM2({ e, v }: { e: string; v: string }) {
+  return (
+    <div className="bg-grunt-surface-3 rounded px-2 py-1">
+      <div className="text-grunt-text-muted2">{e}</div>
+      <div className="mono font-medium text-grunt-text">{v}</div>
+    </div>
+  );
+}
 
 /** Grupuje warianty po profilu, zachowując globalny indeks (do oznaczenia rekomendowanego). */
 function grupujProfile(warianty: WariantZabudowy[]): { profil: Profil; warianty: { w: WariantZabudowy; gi: number }[] }[] {
@@ -69,6 +145,8 @@ export function Poziom2View({
 
   return (
     <>
+      <WerdyktM2Karta ocena={p2.ocenaM2} />
+
       {(sygnaly || braki) && (
         <div className={`grid gap-4 items-start ${braki ? "md:grid-cols-2" : ""}`}>
           {sygnaly && (
