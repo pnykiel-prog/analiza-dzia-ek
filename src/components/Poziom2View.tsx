@@ -1,4 +1,4 @@
-import type { BrakDanych, PoleWskaznika, ProfilRekomendowany, Sygnal, WariantZabudowy, WynikPoziom2, ZrodloWskaznika } from "@/lib/types";
+import type { BrakDanych, PoleWskaznika, Profil, ProfilRekomendowany, Sygnal, WariantZabudowy, WynikPoziom2, ZrodloWskaznika } from "@/lib/types";
 import { Karta, Statystyka, Flagi } from "./ui";
 import { WskaznikPewnosci } from "./grunt";
 import { etykietaTypologii, liczba } from "@/lib/format";
@@ -15,6 +15,25 @@ const ZRODLO_WSK: Record<ZrodloWskaznika, { txt: string; kl: string }> = {
   deklarowane: { txt: "wypis", kl: "bg-grunt-amber-bg text-grunt-amber-text" },
   prognoza: { txt: "prognoza", kl: "bg-grunt-neutral-bg text-grunt-text-muted" },
 };
+
+const ETYK_PROFIL: Record<Profil, string> = {
+  mlodzi: "Dla młodych — budownictwo społeczne",
+  seniorzy: "Dla seniorów — wspomagane",
+};
+
+/** Grupuje warianty po profilu, zachowując globalny indeks (do oznaczenia rekomendowanego). */
+function grupujProfile(warianty: WariantZabudowy[]): { profil: Profil; warianty: { w: WariantZabudowy; gi: number }[] }[] {
+  const grupy: { profil: Profil; warianty: { w: WariantZabudowy; gi: number }[] }[] = [];
+  warianty.forEach((w, gi) => {
+    let g = grupy.find((x) => x.profil === w.profil);
+    if (!g) {
+      g = { profil: w.profil, warianty: [] };
+      grupy.push(g);
+    }
+    g.warianty.push({ w, gi });
+  });
+  return grupy;
+}
 
 function ChipWskaznika({ e, p, suf = "" }: { e: string; p: PoleWskaznika; suf?: string }) {
   const z = ZRODLO_WSK[p.zrodlo];
@@ -47,10 +66,6 @@ export function Poziom2View({
     0,
     p2.warianty.findIndex((w) => profilRek === "oba" || w.profil === profilRek)
   );
-  // Progi intensywności wg PUM (najniższy/najwyższy).
-  const pumy = p2.warianty.map((w) => w.pumM2);
-  const minPum = Math.min(...pumy);
-  const maxPum = Math.max(...pumy);
 
   return (
     <>
@@ -131,18 +146,36 @@ export function Poziom2View({
         )}
       </Karta>
 
-      <Karta tytul="Rekomendowane warianty zabudowy" podtytul="Typologia → program pod profil → wynik. Wybór przechodzi do modelu finansowego.">
-        <div className="grid gap-4 lg:grid-cols-3">
-          {p2.warianty.map((w, i) => (
-            <KartaWariantu
-              key={i}
-              w={w}
-              rekomendowany={i === idxRek}
-              intensywnosc={w.pumM2 === minPum ? "niska" : w.pumM2 === maxPum ? "maks" : "srednia"}
-              kolejność={i}
-            />
-          ))}
-        </div>
+      <Karta
+        tytul="Warianty zabudowy — dwa kierunki do porównania"
+        podtytul="Senioralny i społeczny dla młodych × skala (optymalny / maksymalny / kameralny). Wybór przechodzi do modelu finansowego."
+      >
+        {grupujProfile(p2.warianty).map((g) => {
+          const pumy = g.warianty.map((x) => x.w.pumM2);
+          const gMin = Math.min(...pumy);
+          const gMax = Math.max(...pumy);
+          const kierunekRek = p2.warianty[idxRek]?.profil;
+          return (
+            <div key={g.profil} className="mb-6 last:mb-0">
+              <div className="text-[12px] font-semibold text-grunt-text mb-2 flex items-center gap-2">
+                <span className={`w-2.5 h-2.5 rounded-full ${g.profil === "seniorzy" ? "bg-grunt-senior" : "bg-grunt-young"}`} />
+                {ETYK_PROFIL[g.profil]}
+                {g.profil === kierunekRek && <span className="badge bg-grunt-ink text-white text-[10px]">rekomendowany kierunek</span>}
+              </div>
+              <div className="grid gap-4 lg:grid-cols-3">
+                {g.warianty.map((x, li) => (
+                  <KartaWariantu
+                    key={x.gi}
+                    w={x.w}
+                    rekomendowany={x.gi === idxRek}
+                    intensywnosc={x.w.pumM2 === gMin ? "niska" : x.w.pumM2 === gMax ? "maks" : "srednia"}
+                    kolejność={li}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </Karta>
 
       {p2.flagiRyzyka.length > 0 && (
