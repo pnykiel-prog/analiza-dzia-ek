@@ -41,21 +41,14 @@ export function RaportView({ wynik, data }: { wynik: WynikAnalizy; data?: string
         </div>
       </SekcjaRap>
 
-      {/* 02 Pojemność zabudowy vs popyt (Poziom 1) */}
-      <SekcjaRap numer="02" tytul="Pojemność zabudowy i popyt (Poziom 1)">
-        <div className="grid grid-cols-2 gap-4 text-[12px]">
-          <div>
-            <div className="text-[10px] uppercase tracking-wide text-grunt-text-faint mb-1">Pojemność (prognoza potencjału)</div>
-            <div className="text-grunt-text font-medium">
-              {p1.podstawa.typ === "PROGNOZA" ? "Prognoza potencjału" : p1.podstawa.typ}{p1.podstawa.symbol ? ` · ${p1.podstawa.symbol}` : ""} · pewność {p1.prognoza.pewnosc}%
-            </div>
-            <div className="mt-2 text-grunt-text-muted2">Pojemność (szac. mieszkań): <span className="mono text-grunt-text">M {liczba(p1.pojemnosc.szacLiczbaMieszkanMlodzi)} / S {liczba(p1.pojemnosc.szacLiczbaMieszkanSeniorzy)}</span></div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wide text-grunt-text-faint mb-1">Dopasowanie popyt ↔ pojemność</div>
-            <div className="text-grunt-text-muted2">Młodzi: <span className="mono text-grunt-text">{p1.dopasowanie.mlodzi.score}/100</span> · popyt {p1.dopasowanie.mlodzi.popyt}</div>
-            <div className="text-grunt-text-muted2">Seniorzy: <span className="mono text-grunt-text">{p1.dopasowanie.seniorzy.score}/100</span> · popyt {p1.dopasowanie.seniorzy.popyt}</div>
-          </div>
+      {/* 02 Popyt i dopasowanie (Poziom 1) — bez orientacyjnej prognozy pojemności
+          (PUM/mieszkań); pojemność wyznacza Poziom 2. */}
+      <SekcjaRap numer="02" tytul="Popyt i dopasowanie (Poziom 1)">
+        <div className="text-[12px]">
+          <div className="text-[10px] uppercase tracking-wide text-grunt-text-faint mb-1">Dopasowanie popyt ↔ pojemność</div>
+          <div className="text-grunt-text-muted2">Młodzi: <span className="mono text-grunt-text">{p1.dopasowanie.mlodzi.score}/100</span> · popyt {p1.dopasowanie.mlodzi.popyt}</div>
+          <div className="text-grunt-text-muted2">Seniorzy: <span className="mono text-grunt-text">{p1.dopasowanie.seniorzy.score}/100</span> · popyt {p1.dopasowanie.seniorzy.popyt}</div>
+          <p className="mt-2 text-[10px] text-grunt-text-faint">Model pojemności (PUM, kondygnacje, liczba mieszkań) — Poziom 2.</p>
         </div>
       </SekcjaRap>
 

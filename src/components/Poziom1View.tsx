@@ -3,19 +3,6 @@ import { Karta, Statystyka } from "./ui";
 import { WskaznikPewnosci } from "./grunt";
 import { liczba, statusSlowny } from "@/lib/format";
 
-const ETYK_PODSTAWA: Record<string, string> = {
-  PROGNOZA: "Prognoza potencjału",
-  MPZP: "MPZP (plan miejscowy)",
-  WZ: "Decyzja o warunkach zabudowy (WZ)",
-  PnB: "Pozwolenie na budowę (PnB)",
-  BRAK: "Brak podstawy planistycznej",
-};
-const ETYK_MPZP: Record<string, string> = {
-  jest: "MPZP obowiązuje — do potwierdzenia w planie",
-  brak: "brak MPZP",
-  nieznane: "obecność MPZP nieznana",
-};
-
 const ETYK_WERDYKT: Record<KluczWerdyktu, string> = {
   spolecznyMlodzi: "Społeczny — młodzi",
   spolecznySeniorzy: "Społeczny — seniorzy",
@@ -37,11 +24,11 @@ const KROPKA: Record<Werdykt, string> = {
 /**
  * Widok Poziomu 1 (wersja pełna): SIATKA 4 WERDYKTÓW dwóch natur —
  * społeczne (ocena projektu vs pojemność) i komunalne (skala potrzeby w gminie
- * per mieszkaniec). Plus atrakcyjność migracyjna, kwalifikacje i prognoza pojemności.
+ * per mieszkaniec). Plus atrakcyjność migracyjna i kwalifikacje dochodowe.
+ * Prognoza pojemności (PUM/kondygnacje/liczba mieszkań) NIE jest pokazywana na M1 —
+ * orientacyjny model bywał zbyt nietrafiony; pojemność wyznacza Poziom 2.
  */
 export function Poziom1View({ p1, pelny = true, pokazRekomendacje = true }: { p1: WynikPoziom1; pelny?: boolean; pokazRekomendacje?: boolean }) {
-  const poj = p1.pojemnosc;
-  const prog = p1.prognoza;
   const ocena = p1.ocenaPopytu;
   const w = ocena.werdykty;
   const rek = w[ocena.rekomendowanyKierunek];
@@ -131,29 +118,9 @@ export function Poziom1View({ p1, pelny = true, pokazRekomendacje = true }: { p1
         </Karta>
       )}
 
-      {/* Pojemność zabudowy — PROGNOZA */}
-      <Karta
-        tytul="Pojemność zabudowy — prognoza potencjału"
-        podtytul="Orientacyjny potencjał z kształtu działki (ULDK), zabudowy sąsiedztwa i spadku terenu"
-        prawy={
-          <span className="badge bg-grunt-surface-3 text-grunt-text-muted">
-            {ETYK_PODSTAWA[p1.podstawa.typ] ?? "Prognoza potencjału"} · {ETYK_MPZP[prog.flagaMpzp]}
-          </span>
-        }
-      >
-        {poj.pumM2 === null ? (
-          <p className="text-[12px] text-grunt-text-muted2">Pojemność nieoznaczona — brak powierzchni działki.</p>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Statystyka etykieta="Powierzchnia działki" wartosc={liczba(p1.powierzchniaM2, " m²")} />
-            <Statystyka etykieta="Szac. pokrycie" wartosc={`${Math.round(prog.szacowanePokrycie * 100)}%`} />
-            <Statystyka etykieta="Szac. kondygnacje" wartosc={liczba(prog.szacowaneKondygnacje)} />
-            <Statystyka etykieta="PUM (szac.)" wartosc={liczba(poj.pumM2, " m²")} akcent />
-            <Statystyka etykieta="Szac. mieszkań (M / S)" wartosc={`${liczba(poj.szacLiczbaMieszkanMlodzi)} / ${liczba(poj.szacLiczbaMieszkanSeniorzy)}`} />
-            <Statystyka etykieta="Pewność prognozy" wartosc={`${prog.pewnosc}%`} />
-          </div>
-        )}
-      </Karta>
+      {/* Prognoza pojemności (PUM / kondygnacje / liczba mieszkań) świadomie pominięta na M1 —
+          orientacyjny model dawał zbyt nietrafione wartości. Pojemność liczona jest na Poziomie 2
+          (obwiednia + warianty), gdzie wchodzą potwierdzone wskaźniki. */}
     </>
   );
 }
