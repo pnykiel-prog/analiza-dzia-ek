@@ -376,20 +376,25 @@ export interface OdlegloscM2 {
   profil: "mlodzi" | "seniorzy" | "oba"; // dla kogo liczy się w mnożniku popytu
 }
 
-/** Kanał A — obsługiwalność per profil: komfort (mnożnik=1) i próg dyskwalifikacji. */
-export interface ObsluzalnoscProfil {
-  komfortM: number; // do tej odległości usługa „pod ręką" (mnożnik 1,0)
-  dyskwalifikacjaM: number; // powyżej — profil nieobsługiwalny (bramka A)
-  poi: string[]; // które POI liczą się dla profilu
+/** Kanał A — progi dostępności (komfort, dyskwalifikacja) danej usługi dla profilu. */
+export interface ProgUslugi {
+  komfortM: number; // do tej odległości usługa „pod ręką" (f_usługi = 1,0)
+  dyskwalifikacjaM: number; // od tej odległości — profil zdyskwalifikowany (bramka A, weakest-link)
 }
 
 export interface KonfiguracjaM2 {
   /** Zestaw odległości pieszo (można rozszerzać). */
   odleglosciPieszo: OdlegloscM2[];
-  /** Próg „w zasięgu pieszym" [m] — poniżej traktujemy usługę jako dostępną. */
+  /** Próg „w zasięgu pieszym" [m] — poniżej traktujemy usługę jako dostępną (flagi M1). */
   progPieszoM: number;
-  /** Kanał A — bramka obsługiwalności per profil (dostępność usług/transportu). */
-  obsluzalnosc: Record<"mlodzi" | "seniorzy", ObsluzalnoscProfil>;
+  /**
+   * Kanał A — progi (komfort, dyskwalifikacja) PER USŁUGA i profil (spec §4).
+   * Brak wpisu profilu przy usłudze = usługa nie liczy się dla tego profilu.
+   * Seniorzy wyraźnie wrażliwsi (niższe progi) — walkability i transport krytyczne.
+   */
+  progiUslug: Record<string, Partial<Record<"mlodzi" | "seniorzy", ProgUslugi>>>;
+  /** Kanał A — dolna wartość gradientu f_usługi na granicy dyskwalifikacji (spec §4: 1,0 → 0,3). */
+  minFaktorUslugi: number;
   /** Kanał B — koszt uzbrojenia (odległość do sieci → przydatność ekonomiczna). */
   kosztUzbrojenia: { odlegloscKomfortM: number; odlegloscDrogaM: number; karaSpadekPct: number };
   /** Kanał C — modyfikatory popytu (aglomeracja, potencjał, pustostany). */
@@ -410,12 +415,16 @@ export const KONFIG_M2: KonfiguracjaM2 = {
     { klucz: "przedszkole", etykieta: "Przedszkole / żłobek", profil: "mlodzi" },
   ],
   progPieszoM: 800,
-  obsluzalnosc: {
-    // Seniorzy: usługi muszą być blisko (pieszo); dyskwalifikacja ~2,5 km.
-    seniorzy: { komfortM: 800, dyskwalifikacjaM: 2500, poi: ["poz", "apteka", "sklep", "przystanek"] },
-    // Młodzi: bardziej mobilni; dyskwalifikacja ~6 km.
-    mlodzi: { komfortM: 1200, dyskwalifikacjaM: 6000, poi: ["przystanek", "sklep", "szkola", "przedszkole"] },
+  // Progi startowe wg spec §4 [m]: komfort / dyskwalifikacja.
+  progiUslug: {
+    przystanek: { seniorzy: { komfortM: 300, dyskwalifikacjaM: 2500 }, mlodzi: { komfortM: 500, dyskwalifikacjaM: 6000 } },
+    poz: { seniorzy: { komfortM: 500, dyskwalifikacjaM: 5000 } },
+    apteka: { seniorzy: { komfortM: 400, dyskwalifikacjaM: 3500 } },
+    sklep: { seniorzy: { komfortM: 400, dyskwalifikacjaM: 3000 }, mlodzi: { komfortM: 600, dyskwalifikacjaM: 4000 } },
+    szkola: { mlodzi: { komfortM: 1000, dyskwalifikacjaM: 8000 } },
+    przedszkole: { mlodzi: { komfortM: 1000, dyskwalifikacjaM: 8000 } },
   },
+  minFaktorUslugi: 0.3,
   kosztUzbrojenia: { odlegloscKomfortM: 50, odlegloscDrogaM: 500, karaSpadekPct: 8 },
   modyfikatorPopytu: {
     dojazdKomfortMin: 30,

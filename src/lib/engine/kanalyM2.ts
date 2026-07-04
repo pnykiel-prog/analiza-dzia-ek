@@ -13,32 +13,41 @@
  */
 
 import type { DaneDzialki, OcenaM2, Profil, StatusBramki, Werdykt, WerdyktProfiluM2, WynikPoziom1 } from "../types";
-import type { KonfiguracjaM2 } from "../config";
+import type { KonfiguracjaM2, ProgUslugi } from "../config";
 import { KONFIG_M2 } from "../config";
 import { clamp, clamp01 } from "./utils";
 
 const pasmo = (s: number): Werdykt => (s >= 65 ? "zielony" : s >= 40 ? "zolty" : "czerwony");
 
-/** Kanał A — obsługiwalność per profil: mnożnik dostępności + bramka (za daleko = dyskwalifikacja). */
+/** Etykieta usługi z konfiguracji (fallback do klucza). */
+function etykietaUslugi(klucz: string, cfg: KonfiguracjaM2): string {
+  return cfg.odleglosciPieszo.find((o) => o.klucz === klucz)?.etykieta ?? klucz;
+}
+
+/**
+ * Kanał A — obsługiwalność per profil (spec §4): każda krytyczna usługa ma WŁASNE
+ * progi (komfort, dyskwalifikacja). f_usługi = 1,0 (≤ komfort) → `minFaktorUslugi`
+ * (liniowo do dyskwalifikacji); ≥ dyskwalifikacja = BRAMKA (weakest-link → mnożnik 0).
+ * Braki NIE dyskwalifikują (unknown ≠ far) — schodzą tylko na pewność (F).
+ */
 export function dostepnoscA(d: DaneDzialki, profil: Profil, cfg: KonfiguracjaM2 = KONFIG_M2): { mnoznik: number; obsluzalny: boolean; powody: string[] } {
-  const o = cfg.obsluzalnosc[profil];
   const powody: string[] = [];
-  const dyst = o.poi
-    .map((k) => ({ k, m: d.odleglosciM2?.[k] }))
-    .filter((x): x is { k: string; m: number } => x.m != null && x.m >= 0);
+  const dyst = Object.entries(cfg.progiUslug)
+    .map(([k, p]) => ({ k, prog: p[profil], m: d.odleglosciM2?.[k] }))
+    .filter((x): x is { k: string; prog: ProgUslugi; m: number } => x.prog != null && x.m != null && x.m >= 0);
   if (dyst.length === 0) {
-    // Brak odległości → nie dyskwalifikujemy (unknown ≠ far); mnożnik neutralny, sprawa dla pewności (F).
     return { mnoznik: 1, obsluzalny: true, powody: [] };
   }
+  const g = cfg.minFaktorUslugi;
   let obsluzalny = true;
-  const faktory = dyst.map(({ k, m }) => {
-    if (m >= o.dyskwalifikacjaM) {
+  const faktory = dyst.map(({ k, prog, m }) => {
+    if (m >= prog.dyskwalifikacjaM) {
       obsluzalny = false;
-      powody.push(`${k}: ${m} m ≥ próg ${o.dyskwalifikacjaM} m — poza zasięgiem profilu.`);
+      powody.push(`${etykietaUslugi(k, cfg)}: ${m} m ≥ próg ${prog.dyskwalifikacjaM} m — dyskwalifikuje profil ${profil === "seniorzy" ? "senioralny" : "dla młodych"}.`);
       return 0;
     }
-    if (m <= o.komfortM) return 1;
-    return 1 - 0.5 * ((m - o.komfortM) / (o.dyskwalifikacjaM - o.komfortM)); // 1 → 0,5 liniowo
+    if (m <= prog.komfortM) return 1;
+    return 1 - (1 - g) * ((m - prog.komfortM) / (prog.dyskwalifikacjaM - prog.komfortM)); // 1,0 → g liniowo
   });
   const mnoznik = obsluzalny ? faktory.reduce((a, b) => a + b, 0) / faktory.length : 0;
   return { mnoznik: Math.round(mnoznik * 100) / 100, obsluzalny, powody };
