@@ -1,178 +1,107 @@
-# GRUNT — Zestawienie kompletu danych Poziomu 2 (M2)
+# GRUNT — dane Poziomu 2 (M2), wersja uproszczona
 
-Katalog danych M2 wzorem `dane-m1.md`: dla każdego pola — **źródło (auto)**,
-**status pozyskania**, **manual_fallback**, **rola**. M2 pogłębia ocenę działki
-z M1 o wszystko, co decyduje o powodzeniu inwestycji **poza finansami** (to M3).
+**Ta wersja zastępuje poprzednią (audyt braków).** M2 **nie pokazuje** listy „czego
+nie pobrano". Co się da — pobiera automatycznie w tle. Klientowi zadaje **tylko
+kilka prostych pytań** o rzeczy, których auto nie ustaliło i które klient realnie
+zna. Cel: klient bez zniechęcenia przechodzi do Poziomu 3.
 
-Cecha kluczowa M2 (wg `wytyczne_claude_code_poziom2_1.md`): klient **widzi, co
-pobrano automatycznie, a czego brakuje**, i może ręcznie uzupełnić braki lub je
-pominąć — dopiero potem uruchamia analizę. Pominięcie nigdy nie blokuje.
-
-Źródła prawdy w kodzie (docelowo):
-- `src/lib/engine/poziom2.ts` — model zabudowy (obwiednia → warianty),
-- `src/lib/engine/uwarunkowania.ts` — bramki, sygnały, braki, kluczowe liczby,
-- `src/lib/data/connectors/*` — konektory M2 (WMS środowiskowe, GESUT, OSM/Overpass, EGiB, KIMPZP-wskaźniki),
-- `src/lib/types.ts` — `DaneDzialki` (sekcje C–J to pola M2), `WskaznikiPlanistyczne`,
-- (nowe) silnik uzgodnienia danych + model statusu pól (M2a).
+Źródła prawdy w kodzie:
+- `src/components/PytaniaM2.tsx` — krótki formularz (jedyna interakcja ręczna),
+- `src/lib/config.ts` — `KONFIG_M2` (zestaw odległości pieszo + próg pieszy),
+- `src/app/nowa/page.tsx` — `przeliczZOdpowiedzi` (mapowanie odpowiedzi → `DaneDzialki`),
+- `src/lib/engine/poziom2.ts` + `uwarunkowania.ts` — model zabudowy, bramki, sygnały (bez audytu braków),
+- `src/lib/types.ts` — `DaneDzialki` (pola M2: `odleglosciM2`, `wysokoscOkolicyPieter`, `wskaznikiPlanistyczne`).
 
 ---
 
-## 0. Wejście z M1 (nie liczyć ponownie)
+## 0. Zasada nadrzędna
 
-M1 oddaje i M2 **przejmuje** (nie przelicza): `prognoza` (pow. zabudowy,
-kondygnacje, PUM, mieszkania), `pojemnosc`, **4 werdykty popytowe +
-atrakcyjność migracyjna**, `profilRekomendowany` (steruje wariantami zabudowy),
-bramka funkcji, pewność/flagi. Szczegóły wyjścia M1 → `docs/dane-m1.md` §3.
-
----
-
-## 1. Przepływ M2: pobierz → pokaż co masz → uzupełnij braki → analizuj
-
-```
-E1  Wejście z M1
-E2  AUTO: jedno przejście po konektorach M2 (każdy: jedna próba + timeout) → mapa statusu pól
-E3  EKRAN UZGODNIENIA DANYCH (3 sekcje: A pozyskane · B do uzupełnienia · C niedostępne)
-E4  Klient uzupełnia lub pomija (może pominąć wszystko)
-E5  ANALIZA M2 (renderuje się po uzgodnieniu; „Przelicz" po dalszych uzupełnieniach)
-```
-
-Determinizm dziedziczony z M1: jedno przejście pobrania, każdy konektor **jedna
-próba + timeout + degradacja**, bez ponawiania i rekurencji; stan zawsze terminalny.
+„Skoro czegoś nie ma — program pyta i dostaje odpowiedź", ale **tylko o to, co
+klient zna**, i **jako proste pytanie**, nie jako lista braków. Dane, których klient
+nie wyprodukuje (statystyka, środowisko), **nie są pytaniami** — pobierane są
+automatycznie albo cicho obniżają pewność. **Żadnej sekcji „czego nie pobrano"**
+na ekranie klienckim (w raporcie PDF braki zostają jako ślad rzetelności).
 
 ---
 
-## 2. Model statusu pola (rdzeń „automatycznego rozpoznania braków")
+## 1. Wejście z M1 (nie pytać ponownie)
 
-Po E2 każde pole M2 ma:
+M1 oddaje: `prognoza`/`pojemność`, 4 werdykty + atrakcyjność, `profilRekomendowany`,
+**podstawę planistyczną z KIMPZP** (flaga + ewentualne wskaźniki), bramkę funkcji.
+M2 tego **nie pyta ponownie**.
 
-| Atrybut | Wartości | Znaczenie |
+---
+
+## 2. Co M2 robi automatycznie (w tle, bez pytań)
+
+Każdy konektor: jedna próba + timeout; brak → **nie** pokazujemy jako „brak".
+
+| Blok | Źródło (auto) | Uwaga |
 |---|---|---|
-| **status** | `pozyskane` · `brak` · `pominiete` | auto OK / nie pobrano lub błąd / klient kliknął Pomiń |
-| **manual_fallback** | `on` · `off` · `gate` | pole ręczne + Pomiń / brak pola (tylko niższa pewność) / pole ręczne bramkowe (można **dodać** ograniczenie, nie **znieść** bez dokumentu) |
-| **zrodlo** | np. `KIMPZP`, `GESUT`, `OSM`, `ręczne` | prowenancja |
-| **pewnosc** | 0–100 | znacznik pewności |
-| **rola** | `bramka` · `wskaznik` · `koszt` | jak pole wpływa na wynik |
-
-Mapa statusu wprost dzieli pola na **pozyskane** i **do uzupełnienia** — to jest
-„rozpoznanie, których danych brakuje".
-
----
-
-## 3. Ekran uzgodnienia danych (E3) — trzy sekcje
-
-- **A. Pozyskano automatycznie** — pole, wartość, źródło, pewność. Pola `A±` edytowalne (override + ślad audytowy); reszta tylko do odczytu.
-- **B. Do uzupełnienia ręcznego** — pola `status=brak` i `manual_fallback ∈ {on, gate}`. Każde: etykieta, pole, **podpowiedź skąd wziąć** („z wypisu z MPZP", „warunki od gestora", „operat"), **[Pomiń]**. Pola `gate` z ostrzeżeniem (wymóg źródła — nie znosi bramki deklaracją).
-- **C. Niedostępne automatycznie** — pola `status=brak` i `manual_fallback=off` (demografia, statystyka). Informacyjnie, bez pola; obniżają pewność.
-
-Przycisk **„Uruchom analizę M2"** aktywny zawsze. Po uzupełnieniu → **„Przelicz"** z diffem.
+| Demografia / potencjał rozwoju | GUS BDL | rozszerzenie danych z M1 |
+| Środowisko / bramki | GDOŚ, ISOK, PIG, NID (WMS) | **gdy MPZP dopuszcza mieszkaniówkę → wstępnie rozstrzygnięte, nie eksponujemy**; liczą się głównie bez planu |
+| Uzbrojenie: odległość do sieci | GESUT / BDOT | → **koszt uzbrojenia proxy** auto; bez pytań o warunki/koszt przyłączenia |
+| Odległości do usług | OSM / Overpass | pre-wypełniają pola z §3, jeśli się uda |
+| Wysokość zabudowy w okolicy | BDOT | pre-wypełnia pytanie z §3.3 |
+| Dostęp do drogi | BDOT / EGiB | pre-wypełnia pytanie z §3.1 |
+| Spadek terenu | NMT | z M1 |
 
 ---
 
-## 4. Katalog danych M2 (pole → źródło → manual_fallback → rola → status w kodzie)
+## 3. Proste pytania do klienta (`PytaniaM2`) — jedyna interakcja ręczna
 
-Legenda statusu w kodzie: ✅ konektor gotowy · 🟡 częściowo/proxy · ⚪ szew (pole w `DaneDzialki`, konektor do zrobienia).
+Wszystkie opcjonalne (puste = nieznane, dalej zawsze można). **Bez sekcji „pomiń/braki".**
 
-### Wskaźniki planistyczne (uściślają model zabudowy i pojemność — §5)
-
-| Pole (`DaneDzialki`) | Źródło (auto) | manual_fallback | Rola | Kod |
-|---|---|---|---|---|
-| `wskaznikiPlanistyczne` (intensywność, maks. wys./kond., % zabudowy, PBC, parking, % usług) | MPZP/plan ogólny (KIMPZP wektor, POG) | `on` | wskaźnik | ⚪ (KIMPZP daje `mpzpMeta`: maks. wys./intensywność — do zmapowania) |
-
-### Fizyka terenu
-
-| Pole | Źródło (auto) | manual_fallback | Rola | Kod |
-|---|---|---|---|---|
-| `sredniSpadekPct` | NMT (WMS/GUGiK) | `on` | koszt + dostępność (seniorzy) | ⚪ |
-| `ryzykoPowodzioweSzczegolne` | ISOK / Wody Polskie (WMS) | `gate` | bramka | ⚪ |
-| `osuwisko` | PIG SOPO (WMS) | `gate` | bramka/flaga | ⚪ |
-| `terenGorniczy` | PIG MIDAS (WMS) | `gate` | bramka/flaga | ⚪ |
-
-### Uzbrojenie
-
-| Pole | Źródło (auto) | manual_fallback | Rola | Kod |
-|---|---|---|---|---|
-| `odlegloscDoSieciM` (+ typy sieci) | GESUT/KIUT, BDOT (WMS) | `on` | inwentaryzacja + proxy kosztu | ⚪ |
-| `odlegloscDoZabudowyM` | BDOT | `on` | proxy „w tkance" | ⚪ |
-| warunki i koszt przyłączenia | — (od gestora) | `on` | koszt (dane twarde) | ⚪ (tylko ręczne) |
-
-### Dostęp i dostępność komunikacyjna
-
-| Pole | Źródło (auto) | manual_fallback | Rola | Kod |
-|---|---|---|---|---|
-| `dostepDrogaPubliczna` | BDOT/EGiB/OSM | `gate` | bramka | ⚪ |
-| `czasDojazdAglomeracjaMin`, węzły | OSM/routing | `off`→proxy | mnożnik popytu (młodzi) | ⚪ |
-| `przystanekZCzestotliwoscia` | OSM/GTFS | `on` | mnożnik popytu | 🟡 (Overpass POI) |
-
-### Infrastruktura społeczna (mnożniki popytu per profil)
-
-| Pole | Źródło (auto) | manual_fallback | Rola | Kod |
-|---|---|---|---|---|
-| `pozWZasiegu` (POZ, apteki) | RPWDL / Overpass | `on` | mnożnik (seniorzy) | 🟡 (Overpass) |
-| `uslugiPodstawowePieszo` | Overpass | `on` | mnożnik (seniorzy) | 🟡 (Overpass) |
-| `zlobkiSzkolyWZasiegu` | RSPO / Overpass | `on` | mnożnik (młodzi) | 🟡 (Overpass) |
-
-### Środowisko i ochrona
-
-| Pole | Źródło (auto) | manual_fallback | Rola | Kod |
-|---|---|---|---|---|
-| `natura2000` | GDOŚ (WMS) | `gate` | bramka/flaga | ⚪ |
-| `ochronaWykluczajaca` (rezerwat/PN) | GDOŚ (WMS) | `gate` | bramka | ⚪ |
-| `strefaKonserwatorska` (zabytki) | NID (WMS) | `gate` | flaga (ograniczenia) | ⚪ |
-
-### Grunt i prawo
-
-| Pole | Źródło (auto) | manual_fallback | Rola | Kod |
-|---|---|---|---|---|
-| `klasaUzytku`, `gruntLesny`, `gruntRolnyKlasaIdoIII` | EGiB | `gate` | bramka (ochrona gruntów) | ⚪ |
-| własność, KW, obciążenia | — (KW/akt) | `on` | wykonalność + wejście do ankiety (wniesienie gruntu) | ⚪ (tylko ręczne) |
-
-### Potencjał rozwoju lokalizacji
-
-| Pole | Źródło (auto) | manual_fallback | Rola | Kod |
-|---|---|---|---|---|
-| `pustostanyPct`, dynamika budownictwa | GUS BDL | `off` | rozwój lokalizacji | ⚪ |
-| pracodawcy, inwestycje, ZPI/LzG | BIP/kontekst | `on` | pull + dźwignie współpracy | ⚪ (tylko ręczne) |
-
-Wszystko przez **backend/proxy** (CORS); każdy konektor: jedna próba + timeout.
+1. **Dostęp do drogi publicznej?** — tak / nie / nie wiem *(tylko gdy auto nie rozstrzygnęło)*.
+2. **Odległości pieszo [m]** — pre-wypełnione z OSM jeśli się udało; zestaw w `KONFIG_M2.odleglosciPieszo`
+   (przystanek, sklep, apteka, POZ, szkoła, przedszkole — można rozszerzać).
+3. **Wysokość zabudowy w okolicy [piętra]** — *(tylko gdy auto z BDOT nie pobrało)*.
+4. **[opcjonalne, zwijane] „Masz szczegóły planistyczne (wypis z MPZP)?"**
+   — domyślnie **NIE** (używamy danych z M1); **TAK** → pola: intensywność, maks. wysokość,
+   % zabudowy, PBC → uściśla model zabudowy z wyższą pewnością.
 
 ---
 
-## 5. Rozszerzone dane planistyczne (MPZP) — auto gdzie pokryte, inaczej ręcznie
+## 4. Co USUNIĘTE z M2 (i dlaczego)
 
-M1 używał KIMPZP jako **bramki** (jest/brak) + adnotacji. M2 **pozyskuje realne
-wskaźniki**:
-- plan wektorowy / plan ogólny udostępnia wskaźniki → **auto** (`pozyskane`, sekcja A);
-- plan rastrowy / brak danych → **pole ręczne** (`on`, sekcja B) z podpowiedzią „z wypisu z MPZP" + Pomiń.
-
-Skutek: model zabudowy i pojemność z M1 (szacunek z sąsiedztwa) są w M2
-**uściślane realnymi wskaźnikami planu** — z wyższą pewnością. Gdy klient je
-pominie, zostaje szacunek z M1 z flagą „potencjał orientacyjny".
-
-> Uwaga (diagnoza pokrycia KIMPZP): dla ~6 dużych miast serwis nie działa
-> (Kraków, Gdańsk, Lublin, Bielsko-Biała, Opole, Sosnowiec) → tam wskaźniki
-> planu trafiają do sekcji B (ręcznie). Warszawa: `mpzpMeta` z parametrami
-> (maks. wys./intensywność) auto.
+- **Księga wieczysta / własność** → pytanie jest w **ankiecie finansowej** (własna czy kupowana). Nie dublować.
+- **Geotechnika / nośność** → zbyt szczegółowe na etapie wniosku.
+- **Warunki i koszt przyłączenia** → nieznane na tym etapie; koszt uzbrojenia liczymy **proxy auto**.
+- **Pytania środowiskowe do klienta** (Natura 2000, parki, konserwator) → klient ich nie zna; robimy **auto** lub pomijamy przy istniejącym MPZP.
+- **Sekcja „czego nie pobrano" / audyt braków** → usunięte z ekranu klienckiego.
 
 ---
 
-## 6. Analiza M2 (renderuje się po uzgodnieniu) — per profil (młodzi/seniorzy)
+## 5. Mapowanie odpowiedzi → `DaneDzialki` (`przeliczZOdpowiedzi`)
 
-1. **Domknięcie popytu usługami:** `popyt_realizowalny = popyt_z_M1 × mnożnik_usług_i_dostępności(profil)`.
-2. **Koszt uzbrojenia (proxy):** odległość do sieci × stawki; drogie uzbrojenie obniża przydatność. (Pełny montaż = M3.)
-3. **Bramki:** powódź, osuwisko/górnicze, Natura 2000/konserwator, dostęp do drogi, rola I–III/las → pass / warunkowo / fail. `gate` nie znosi się deklaracją bez dokumentu.
-4. **Dostępność i potencjał rozwoju** — wymiary oceny.
-5. **Teren** (spadek → koszt + dostępność bez barier).
-6. **Rekomendacja modelu zabudowy** — z wskaźników planu (§5) lub szacunku M1; sterowana `profilRekomendowany`; 1–3 warianty (typologia, liczba mieszkań, mix, parking, powierzchnie wspólne) → wejście do M3.
-7. **Werdykt profesjonalny per profil** + lista braków (pominięte/`on` niepobrane) + pewność.
+- droga → `dostepDrogaPubliczna`,
+- odległości [m] → `odleglosciM2` + wyprowadzenie „w zasięgu pieszym" (≤ `KONFIG_M2.progPieszoM`):
+  przystanek → `przystanekZCzestotliwoscia`; sklep/apteka → `uslugiPodstawowePieszo`;
+  POZ → `pozWZasiegu`; szkoła/przedszkole → `zlobkiSzkolyWZasiegu`
+  (brak danej nie nadpisuje na `false` — zostaje wartość z auto/M1),
+- wysokość okolicy → `wysokoscOkolicyPieter`,
+- planistyka (jeśli podana) → `wskaznikiPlanistyczne` (inaczej z M1).
 
 ---
 
-## 7. Pewność i pominięcia
+## 6. Analiza M2 (po odpowiedziach) — per profil (młodzi / seniorzy)
 
-- `pominiete`/`brak` → obniża pewność, flaga „do weryfikacji"; **nigdy nie blokuje**.
-- Bramki `gate` niepotwierdzone → „do sprawdzenia", nie „wykluczone" ani „czyste".
-- Wartość ręczna → źródło `ręczne`, pewność „user-sourced", ślad audytowy.
-- Panel jakości priorytetyzuje pominięte/`on` wg wpływu na werdykt + „Przelicz" z diffem.
+1. **Domknięcie popytu usługami**: `popyt_realizowalny = popyt_z_M1 × mnożnik_usług_i_dostępności(profil)` — z odległości (auto/wpisane).
+2. **Koszt uzbrojenia (proxy, auto)** — obniża przydatność przy dużej odległości do sieci.
+3. **Bramki środowiskowe (auto)** — deprioryzowane gdy MPZP dopuszcza mieszkaniówkę; bez planu liczą się normalnie.
+4. **Dostęp do drogi** (bramka), **dostępność/aglomeracja**, **potencjał rozwoju**, **teren (spadek)**.
+5. **Model zabudowy** — uściślony wskaźnikami z §3.4 gdy podane; inaczej z M1; warianty wg `profilRekomendowany`.
+6. **Werdykt per profil** + pewność. **Bez listy braków** — niższa pewność wynika cicho z pustych pól.
+
+---
+
+## 7. Pewność (bez straszenia brakami)
+
+Puste pola i nieudane auto → **cicho** obniżają pewność (wewnętrzna flaga „do
+weryfikacji"). Klient **nie widzi** listy braków. Bramki niepotwierdzone → status
+wewnętrzny „do sprawdzenia", nie „wykluczone". Opcjonalny panel jakości może
+zachęcić do dopisania odległości, które najbardziej podniosą pewność — jako
+zachęta, nie audyt.
 
 ---
 
@@ -180,42 +109,43 @@ pominie, zostaje szacunek z M1 z flagą „potencjał orientacyjny".
 
 ```
 {
-  z_M1: { prognoza, pojemnosc, werdykty, atrakcyjnosc, profilRekomendowany },
-  dane_M2: { <pole>: { wartosc, status, zrodlo, pewnosc, manual_fallback } },
-  popyt_realizowalny: { mlodzi, seniorzy },      // po mnożniku usług
-  koszt_uzbrojenia_proxy, dostepnosc, potencjal_rozwoju, teren,
-  bramki: { powodz, osuwisko, natura2000, droga, rola_las },
+  z_M1: { prognoza, pojemnosc, werdykty, atrakcyjnosc, profilRekomendowany, planistyka_M1 },
+  odleglosci: { przystanek?, sklep?, apteka?, poz?, szkola?, przedszkole? },   // auto lub wpisane [m]
+  wysokosc_okolicy_pieter?,
+  dostep_do_drogi?,
+  planistyka_szczegoly?: { intensywnosc, maks_wys, pct_zabudowy, pbc },        // tylko gdy klient podał
+  auto: { srodowisko_bramki, koszt_uzbrojenia_proxy, dostepnosc, potencjal, teren },
+  popyt_realizowalny: { mlodzi, seniorzy },
   model_zabudowy: { warianty: [...] },
-  wlasnosc: { kw?, obciazenia? },                 // do ankiety
   werdykt_M2: { mlodzi, seniorzy },
-  braki: [ <pola do uzupełnienia> ],
   pewnosc
 }
 ```
+Własność/grunt **nie** jest tu zbierana — wchodzi dopiero w ankiecie finansowej.
 
 ---
 
 ## 9. Kolejność wdrożenia (kryteria akceptacji)
 
-- **M2a — silnik uzgodnienia danych.** Jedno przejście pobrania + mapa statusu + ekran E3 (3 sekcje, Pomiń przy `on`/`gate`) + analiza z dowolnym podzbiorem.
-  *Akceptacja:* klient widzi co pozyskano/czego brak; może wszystko pominąć i dostać analizę; pola `off` bez opcji ręcznej.
-- **M2b — konektory auto.** GESUT, NMT, OSM/Overpass, GDOŚ/ISOK/PIG/NID, EGiB, KIMPZP-wskaźniki. *Akceptacja:* bramki działają; usługi domykają popyt; koszt uzbrojenia liczony; każde źródło jedna próba.
-- **M2c — model zabudowy + werdykt profesjonalny.** Uściślenie pojemności wskaźnikami planu; warianty wg `profilRekomendowany`; werdykt per profil + braki + pewność.
-- **M2d — panel jakości + „Przelicz" + eksport.**
+- **M2a — auto w tle + proste pytania** *(zrobione)*. Krótki formularz (§3) bez audytu braków.
+  *Akceptacja:* klient widzi najwyżej kilka prostych pytań — nie listę braków; może zostawić puste i przejść do M3.
+- **M2b — konektory auto**. GUS BDL, środowisko WMS, GESUT/BDOT (uzbrojenie+droga), OSM (usługi), BDOT (wysokość), NMT (spadek). Każdy po jednej próbie.
+  *Akceptacja:* pola z §3 pre-wypełniane, gdy auto się uda; środowisko liczone w tle, nie jako pytanie.
+- **M2c — analiza + model zabudowy**. Mnożnik usług z odległości, koszt uzbrojenia proxy, bramki, model (uściślony wskaźnikami gdy podane), werdykt per profil.
+  *Akceptacja:* analiza rusza z dowolnym podzbiorem odpowiedzi; puste pola obniżają pewność cicho.
 
 ---
 
-## 10. Mapa modułów (repo, stack TypeScript/Next — adaptacja Python z wytycznych §11)
+## 10. Mapa modułów (repo, stack TypeScript/Next)
 
 | Wytyczne (Python) | GRUNT (TypeScript) | Zawartość |
 |---|---|---|
 | `docs/dane-m2.md` | `docs/dane-m2.md` | ten katalog |
-| `level2/schemas.py` | `src/lib/types.ts` (rozszerzenie: `PoleM2`, `StatusPolaM2`, `WynikUzgodnienia`) | model statusu pól + wynik M2 (§8) |
-| `level2/reconcile.py` | `src/lib/engine/uzgodnienieM2.ts` | przejście pobrania + mapa statusu (rdzeń „rozpoznania braków") |
-| `level2/connectors/` | `src/lib/data/connectors/{nmt,isok,pig,gdos,nid,gesut,egib,kimpzpWskazniki}.ts` | każdy: jedna próba + timeout, mock/live |
-| `level2/services.py` | `src/lib/engine/uslugiM2.ts` | mnożnik usług/dostępności (domknięcie popytu) |
-| `level2/infrastructure.py` | `src/lib/engine/uzbrojenieM2.ts` | koszt uzbrojenia proxy + bramka drogi |
-| `level2/gates.py` | `src/lib/engine/uwarunkowania.ts` (rozszerzenie) | bramki środowiskowe/gruntowe |
-| `level2/building_model.py` | `src/lib/engine/poziom2.ts` (rozszerzenie) | rekomendacja zabudowy (wskaźniki planu / szacunek M1) |
-| `level2/pipeline.py` | `src/lib/engine/poziom2.ts` (orkiestracja E1–E5) | przepływ terminalny |
-| frontend E3 | `src/components/UzgodnienieM2.tsx` + `/nowa` | ekran uzgodnienia (3 sekcje + Pomiń) → analiza |
+| `level2/autofetch.py` | konektory M2 (M2b) + resolver | przejście pobrania w tle, pre-wypełnianie odległości |
+| `level2/questions.py` | `src/components/PytaniaM2.tsx` | krótki formularz, wszystkie pola opcjonalne |
+| `level2/services.py` | `src/lib/engine/*` (M2c) | mnożnik usług z odległości |
+| `level2/infrastructure.py` | `src/lib/engine/*` (M2c) | koszt uzbrojenia proxy + bramka drogi |
+| `level2/gates.py` | `src/lib/engine/uwarunkowania.ts` | bramki (deprioryzacja gdy MPZP) |
+| `level2/building_model.py` | `src/lib/engine/poziom2.ts` | model zabudowy (wskaźniki opcjonalne / szacunek M1) |
+| `level2/pipeline.py` | `src/app/nowa/page.tsx` orkiestracja | auto → pytania → analiza, terminalny |
+| frontend audytu braków | **usunięte** | zostaje krótki formularz + wynik |

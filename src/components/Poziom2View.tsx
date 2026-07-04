@@ -37,7 +37,7 @@ export function Poziom2View({
   return (
     <>
       {(sygnaly || braki) && (
-        <div className="grid md:grid-cols-2 gap-4 items-start">
+        <div className={`grid gap-4 items-start ${braki ? "md:grid-cols-2" : ""}`}>
           {sygnaly && (
             <Karta tytul="Flagi i sygnały">
               {sygnaly.length === 0 ? (

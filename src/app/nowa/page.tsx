@@ -3,14 +3,14 @@
 import { useState, useEffect } from "react";
 import type { DaneDzialki, WynikAnalizy, WynikPoziom1, KluczWerdyktu } from "@/lib/types";
 import type { ProfilFinansowy } from "@/lib/finanse/typy";
-import { domyslnaKonfiguracja, type Konfiguracja } from "@/lib/config";
+import { domyslnaKonfiguracja, KONFIG_M2, type Konfiguracja } from "@/lib/config";
 import { WOJEWODZTWA } from "@/lib/wojewodztwa";
 import type { PozycjaDzialki } from "@/lib/teryt";
 import { OPIS_TRYBU, trybRynkowy, type Tryb } from "@/lib/fieldModes";
 import { Karta } from "@/components/ui";
 import { Poziom1View } from "@/components/Poziom1View";
 import { Poziom2View } from "@/components/Poziom2View";
-import { UzgodnienieM2 } from "@/components/UzgodnienieM2";
+import { PytaniaM2, type OdpowiedziM2 } from "@/components/PytaniaM2";
 import { Poziom3View } from "@/components/Poziom3View";
 import { AnkietaFinansowa } from "@/components/AnkietaFinansowa";
 import { Stepper, BannerBramki, Chip } from "@/components/grunt";
@@ -205,53 +205,52 @@ export default function NowaAnalizaPage() {
     }
   }
 
-  // ── Przejście do P2: inicjalizacja pól z danych auto / fallbacku ───────────
+  // ── Przejście do P2: bez inicjalizacji audytu — auto już pobrane, pytamy krótko ─
   function wejdzP2() {
     if (!dane) return;
-    const init: Record<string, string> = {
-      statusPlanistyczny: dane.statusPlanistyczny,
-      w_intensywnosc: s(dane.wskaznikiPlanistyczne?.intensywnosc),
-      w_maxKondygnacje: s(dane.wskaznikiPlanistyczne?.maxKondygnacje),
-      w_maxPowZabudowyPct: s(dane.wskaznikiPlanistyczne?.maxPowZabudowyPct),
-      w_minPbcPct: s(dane.wskaznikiPlanistyczne?.minPbcPct),
-      w_normatywParkingowy: s(dane.wskaznikiPlanistyczne?.normatywParkingowy),
-      w_udzialUslugPct: s(dane.wskaznikiPlanistyczne?.udzialUslugPct),
-      pustostanyPct: s(dane.pustostanyPct),
-      // Rynek — dynamiczny tryb: brak danych → fallback regionalny jako podpowiedź
-      czynszRynkowyM2: s(dane.czynszRynkowyM2 ?? mediana?.czynsz),
-      cenaNowychM2: s(dane.cenaNowychM2 ?? mediana?.cenaNowych),
-      // R — wąskie gardła (informacyjne)
-      wlasnoscKW: "",
-      warunkiPrzylaczenia: "",
-      geotechnika: "",
-    };
-    setP2(init);
-    setP2orig(init);
     setEkran("poziom2");
     setMaxKrok((m) => Math.max(m, 3));
   }
 
-  async function przeliczP2() {
+  // Odpowiedzi z prostego formularza M2 → łata DaneDzialki + przeliczenie.
+  async function przeliczZOdpowiedzi(o: OdpowiedziM2) {
     if (!dane) return;
     setLicze(true);
-    const maZab = p2.w_intensywnosc.trim() !== "";
+    const prog = KONFIG_M2.progPieszoM;
+    // Odległości: zapisz metry + wyprowadź „w zasięgu pieszym" (nie nadpisuj na false przy braku danej).
+    const odl = { ...(dane.odleglosciM2 ?? {}) };
+    for (const [k, v] of Object.entries(o.odleglosci)) if (v != null) odl[k] = v;
+    const wZasiegu = (klucz: string): boolean | null => {
+      const v = odl[klucz];
+      return v == null ? null : v <= prog;
+    };
+    const lubZasieg = (...klucze: string[]): boolean | null => {
+      const znane = klucze.map(wZasiegu).filter((x) => x !== null) as boolean[];
+      return znane.length === 0 ? null : znane.some(Boolean);
+    };
+
+    const wsk = o.planistyka;
     const noweDane: DaneDzialki = {
       ...dane,
-      statusPlanistyczny: p2.statusPlanistyczny as DaneDzialki["statusPlanistyczny"],
-      wskaznikiPlanistyczne: maZab
+      odleglosciM2: Object.keys(odl).length ? odl : dane.odleglosciM2,
+      dostepDrogaPubliczna: o.dostepDrogi ?? dane.dostepDrogaPubliczna,
+      wysokoscOkolicyPieter: o.wysokoscOkolicyPieter ?? dane.wysokoscOkolicyPieter,
+      przystanekZCzestotliwoscia: wZasiegu("przystanek") ?? dane.przystanekZCzestotliwoscia,
+      uslugiPodstawowePieszo: lubZasieg("sklep", "apteka") ?? dane.uslugiPodstawowePieszo,
+      pozWZasiegu: wZasiegu("poz") ?? dane.pozWZasiegu,
+      zlobkiSzkolyWZasiegu: lubZasieg("szkola", "przedszkole") ?? dane.zlobkiSzkolyWZasiegu,
+      // Planistyka: tylko gdy klient podał wypis (inaczej zostaje z M1).
+      wskaznikiPlanistyczne: wsk
         ? {
-            intensywnosc: n(p2.w_intensywnosc) ?? 1,
-            maxWysokoscM: dane.wskaznikiPlanistyczne?.maxWysokoscM ?? 12,
-            maxKondygnacje: n(p2.w_maxKondygnacje) ?? 4,
-            maxPowZabudowyPct: n(p2.w_maxPowZabudowyPct) ?? 35,
-            minPbcPct: n(p2.w_minPbcPct) ?? 30,
-            normatywParkingowy: n(p2.w_normatywParkingowy) ?? 0.8,
-            udzialUslugPct: n(p2.w_udzialUslugPct) ?? 15,
+            intensywnosc: wsk.intensywnosc ?? dane.wskaznikiPlanistyczne?.intensywnosc ?? 1,
+            maxWysokoscM: wsk.maxWysokoscM ?? dane.wskaznikiPlanistyczne?.maxWysokoscM ?? 12,
+            maxKondygnacje: dane.wskaznikiPlanistyczne?.maxKondygnacje ?? (wsk.maxWysokoscM ? Math.max(1, Math.floor(wsk.maxWysokoscM / 3)) : 4),
+            maxPowZabudowyPct: wsk.maxPowZabudowyPct ?? dane.wskaznikiPlanistyczne?.maxPowZabudowyPct ?? 35,
+            minPbcPct: wsk.minPbcPct ?? dane.wskaznikiPlanistyczne?.minPbcPct ?? 30,
+            normatywParkingowy: dane.wskaznikiPlanistyczne?.normatywParkingowy ?? 0.8,
+            udzialUslugPct: dane.wskaznikiPlanistyczne?.udzialUslugPct ?? 15,
           }
-        : null,
-      pustostanyPct: n(p2.pustostanyPct),
-      czynszRynkowyM2: n(p2.czynszRynkowyM2),
-      cenaNowychM2: n(p2.cenaNowychM2),
+        : dane.wskaznikiPlanistyczne,
     };
     setDane(noweDane);
     await przelicz(noweDane);
@@ -507,7 +506,7 @@ export default function NowaAnalizaPage() {
         </Karta>
       )}
 
-      {/* POZIOM 2 — ocena działki: mapa, dane, korekty, przelicz (jeden ekran) */}
+      {/* POZIOM 2 — mapa + kilka prostych pytań (bez audytu braków); analiza poniżej */}
       {ekran === "poziom2" && dane && (
         <div className="space-y-4">
           <div className="grid lg:grid-cols-[minmax(0,430px)_1fr] gap-4 items-start">
@@ -521,50 +520,7 @@ export default function NowaAnalizaPage() {
                 geo={meta?.ksztaltGeo ?? ""}
               />
             </div>
-            <KompletnoscOceny p2={p2} />
-          </div>
-          <Karta tytul="Poziom 2 — planistyka (A±)" podtytul="Uzupełnione automatycznie, profesjonalista koryguje wg wypisu (override)">
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <SelPole label="Status planistyczny" tryb="A±" k="statusPlanistyczny" p2={p2} setP2={setP2} orig={p2orig}
-                opcje={[["mpzp_mieszkaniowy","MPZP mieszkaniowy"],["plan_ogolny_sprzyjajacy","Plan ogólny sprzyjający"],["ouz","OUZ"],["sprzeczny","Sprzeczny (wykluczenie)"],["brak_danych","Brak danych"]]} />
-              <NumPole label="Intensywność zabudowy" tryb="A±" k="w_intensywnosc" p2={p2} setP2={setP2} orig={p2orig} krok="0.1" />
-              <NumPole label="Max kondygnacje" tryb="A±" k="w_maxKondygnacje" p2={p2} setP2={setP2} orig={p2orig} />
-              <NumPole label="Max pow. zabudowy" tryb="A±" k="w_maxPowZabudowyPct" p2={p2} setP2={setP2} orig={p2orig} sufiks="%" />
-              <NumPole label="Min pow. biol. czynna" tryb="A±" k="w_minPbcPct" p2={p2} setP2={setP2} orig={p2orig} sufiks="%" />
-              <NumPole label="Normatyw parkingowy" tryb="A±" k="w_normatywParkingowy" p2={p2} setP2={setP2} orig={p2orig} krok="0.1" sufiks="/lok." />
-              <NumPole label="Udział usług" tryb="A±" k="w_udzialUslugPct" p2={p2} setP2={setP2} orig={p2orig} sufiks="%" />
-            </div>
-          </Karta>
-
-          <Karta tytul="Poziom 2 — rynek (A± → R dynamicznie)" podtytul="Tryb zależy od liczby ofert N po drabinie przestrzennej (sek. 7)">
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <PoleRynkowe label="Czynsz rynkowy" k="czynszRynkowyM2" p2={p2} setP2={setP2} orig={p2orig} N={meta?.rynek.czynszN ?? 0} sufiks="zł/m²" />
-              <PoleRynkowe label="Cena nowych lokali" k="cenaNowychM2" p2={p2} setP2={setP2} orig={p2orig} N={meta?.rynek.cenaNowychN ?? 0} sufiks="zł/m²" />
-              <NumPole label="Pustostany" tryb="A±" k="pustostanyPct" p2={p2} setP2={setP2} orig={p2orig} sufiks="%" />
-            </div>
-          </Karta>
-
-          {/* E3: uzgodnienie danych M2 — pozyskane / do uzupełnienia (Pomiń) / niedostępne */}
-          <UzgodnienieM2 dane={dane} />
-
-          <Karta tytul="Poziom 2 — dane ręczne / wąskie gardła (R, R?)" podtytul="Brak API — wprowadzenie ręczne; nie wpływa na obliczenia na tym etapie, sygnalizuje braki">
-            <div className="grid sm:grid-cols-3 gap-3">
-              <TxtPole label="Własność / KW / obciążenia" tryb="R" k="wlasnoscKW" p2={p2} setP2={setP2} orig={p2orig} />
-              <TxtPole label="Warunki i koszt przyłączenia" tryb="R" k="warunkiPrzylaczenia" p2={p2} setP2={setP2} orig={p2orig} />
-              <TxtPole label="Geotechnika / nośność" tryb="R?" k="geotechnika" p2={p2} setP2={setP2} orig={p2orig} />
-            </div>
-          </Karta>
-
-          {korektyP2.length > 0 && (
-            <p className="text-xs text-violet-700 bg-violet-50 border border-violet-200 rounded-lg px-3 py-2">
-              ✎ Pola skorygowane ręcznie ({korektyP2.length}): {korektyP2.join(", ")} — wartości oryginalne zachowane (ślad audytowy).
-            </p>
-          )}
-
-          <div className="flex gap-3">
-            <button onClick={przeliczP2} disabled={licze} className="btn-primary" style={{ height: "var(--grunt-h-cta)" }}>
-              {licze ? "Liczę…" : "Przelicz Poziom 2 (uwzględnij korekty)"}
-            </button>
+            <PytaniaM2 dane={dane} onPrzelicz={przeliczZOdpowiedzi} licze={licze} />
           </div>
         </div>
       )}
@@ -632,7 +588,8 @@ export default function NowaAnalizaPage() {
           )}
           {ekran === "poziom2" && (
             <>
-              <Poziom2View p2={wynik.poziom2} profilRek={wynik.poziom1.profilRekomendowany} sygnaly={wynik.poziom2.sygnaly} braki={wynik.poziom2.braki} />
+              {/* Bez audytu braków na ekranie klienckim (wg wytycznych M2) — braki zostają w raporcie PDF. */}
+              <Poziom2View p2={wynik.poziom2} profilRek={wynik.poziom1.profilRekomendowany} sygnaly={wynik.poziom2.sygnaly} />
               <BannerBramki
                 tytul="Poziom 2 gotowy — czas na model finansowy"
                 opis="Najpierw ankieta finansowa (kto pyta i jak finansuje), potem montaż i domknięcie Poziomu 3."
