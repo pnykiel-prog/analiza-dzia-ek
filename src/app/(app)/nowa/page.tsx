@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import type { DaneDzialki, WynikAnalizy, WynikPoziom1, KluczWerdyktu } from "@/lib/types";
 import type { ProfilFinansowy } from "@/lib/finanse/typy";
 import { domyslnaKonfiguracja, KONFIG_M2, type Konfiguracja } from "@/lib/config";
@@ -13,7 +14,7 @@ import { Poziom2View } from "@/components/Poziom2View";
 import { PytaniaM2, type OdpowiedziM2 } from "@/components/PytaniaM2";
 import { Poziom3View } from "@/components/Poziom3View";
 import { AnkietaFinansowa } from "@/components/AnkietaFinansowa";
-import { Stepper, BannerBramki, Chip } from "@/components/grunt";
+import { Stepper, BannerBramki } from "@/components/grunt";
 import { SYMBOLE_MPZP, statusZeSymbolu } from "@/lib/mpzp";
 import { PodgladTerenu, type TrybMapy, type WarstwyMapy } from "@/components/GruntMap";
 import { RaportView } from "@/components/RaportView";
@@ -45,13 +46,6 @@ interface MetaRozw {
 
 const pustaPozycja = (): PozycjaDzialki => ({ wojewodztwo: "", powiat: "", gmina: "", obreb: "", numer: "" });
 
-/** Działki demonstracyjne (z mini-słownika; gminaTeryt zapewnia trafienie w provider demo). */
-const DZIALKI_DEMO: { label: string; p: PozycjaDzialki }[] = [
-  { label: "Lesznowola (wzorcowa, młodzi)", p: { wojewodztwo: "mazowieckie", powiat: "piaseczyński", gmina: "Lesznowola", obreb: "0012", numer: "123/4", gminaTeryt: "146509_8" } },
-  { label: "Kórnik (senioralna)", p: { wojewodztwo: "wielkopolskie", powiat: "poznański", gmina: "Kórnik", obreb: "0005", numer: "88/2", gminaTeryt: "300108_4" } },
-  { label: "Janów Podlaski (białe plamy)", p: { wojewodztwo: "lubelskie", powiat: "bialski", gmina: "Janów Podlaski", obreb: "0011", numer: "45", gminaTeryt: "061702_2" } },
-];
-
 /** Pobiera opcje kaskady z /api/teryt (ULDK z fallbackiem do mini-słownika). */
 async function pobierzOpcjeTeryt(params: Record<string, string>): Promise<{ teryt: string; nazwa: string }[]> {
   try {
@@ -78,7 +72,7 @@ export default function NowaAnalizaPage() {
   const [blad, setBlad] = useState<string | null>(null);
   const [licze, setLicze] = useState(false);
   const [recznaPow, setRecznaPow] = useState("");
-  const [trybWejscia, setTrybWejscia] = useState<"kaskada" | "id">("id");
+  const [trybWejscia, setTrybWejscia] = useState<"kaskada" | "id">("kaskada");
   // Obecność MPZP — opcjonalna adnotacja do prognozy potencjału (P1, S3).
   // Pojemność liczy PROGNOZA (kształt + sąsiedztwo); wskaźniki nie są wprowadzane ręcznie.
   const [podstawaTyp, setPodstawaTyp] = useState<"" | "MPZP" | "BRAK">("");
@@ -107,6 +101,11 @@ export default function NowaAnalizaPage() {
   }
   function usunPozycje(i: number) {
     setPozycje((ps) => (ps.length > 1 ? ps.filter((_, idx) => idx !== i) : ps));
+  }
+  // Jednostka administracyjna (TERYT) jest wspólna dla całego terenu inwestycji —
+  // zmiana pola administracyjnego nakłada je na wszystkie pozycje (per-działka zostaje tylko numer).
+  function patchAdminWszystkie(patch: Partial<PozycjaDzialki>) {
+    setPozycje((ps) => ps.map((p) => ({ ...p, ...patch })));
   }
 
   // Nakłada opcjonalną adnotację o obecności MPZP na dane (przed analizą P1).
@@ -372,112 +371,26 @@ export default function NowaAnalizaPage() {
         </div>
       )}
 
-      {/* EKRAN: WEJŚCIE — wyłącznie identyfikacja działki */}
-      {/* EKRAN: WEJŚCIE — dwa kafle: lewy treść o analizie, prawy formularz wprowadzania danych */}
+      {/* EKRAN STARTOWY (wejście) — pełnoekranowy ciemny hero + formularz „Wskaż działkę"
+          wg wytycznych wizualnych. Renderowany jako nakładka (fixed) przykrywająca chrome. */}
       {ekran === "wejscie" && (
-        <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] gap-5 items-start">
-          <PanelWprowadzenia />
-          <form onSubmit={analizujP1} className="space-y-4">
-          <Karta tytul="Poziom 1 — identyfikacja działek" podtytul="Jedyne widoczne pola do wprowadzenia. Z TERYT składany jest identyfikator ULDK.">
-            {/* Wybór trybu wejścia */}
-            <div className="mb-3 flex flex-wrap items-center gap-3">
-              <div className="inline-flex rounded-lg border border-slate-300 overflow-hidden text-sm">
-                <button type="button" onClick={() => setTrybWejscia("kaskada")} className={`px-3 py-1.5 ${trybWejscia === "kaskada" ? "bg-slate-900 text-white" : "bg-white text-slate-600"}`}>
-                  Kaskada TERYT
-                </button>
-                <button type="button" onClick={() => setTrybWejscia("id")} className={`px-3 py-1.5 ${trybWejscia === "id" ? "bg-slate-900 text-white" : "bg-white text-slate-600"}`}>
-                  Identyfikator ULDK
-                </button>
-              </div>
-              {trybWejscia === "kaskada" && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-slate-500">Przykłady:</span>
-                  {DZIALKI_DEMO.map((d) => (
-                    <button key={d.label} type="button" onClick={() => setPozycje([{ ...d.p }])} className="text-xs border border-slate-300 rounded px-2 py-1 hover:bg-slate-50">
-                      {d.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="space-y-3">
-              {pozycje.map((p, i) =>
-                trybWejscia === "id" ? (
-                  <IdWiersz key={i} i={i} p={p} onPatch={patchPozycje} onUsun={() => usunPozycje(i)} mozeUsunac={pozycje.length > 1} />
-                ) : (
-                  <PozycjaWiersz
-                    key={i}
-                    i={i}
-                    p={p}
-                    pierwsza={i === 0}
-                    onPatch={patchPozycje}
-                    onUsun={() => usunPozycje(i)}
-                    mozeUsunac={pozycje.length > 1}
-                  />
-                )
-              )}
-            </div>
-            <button type="button" onClick={dodajPozycje} className="mt-3 text-sm border border-slate-300 rounded px-3 py-1.5 hover:bg-slate-50">
-              ＋ Dodaj działkę
-            </button>
-            <p className="text-xs text-slate-400 mt-2">
-              Wiele działek tworzy jeden „teren inwestycji" (scalenie geometrii). Części administracyjne pierwszej działki
-              pre-wypełniają kolejne. Tylko numer jest wymagany dla każdej kolejnej pozycji.
-            </p>
-          </Karta>
-
-          {/* Co można zbudować — PROGNOZA potencjału (zastępuje ręczne wskaźniki MPZP/WZ/PnB) */}
-          <Karta
-            tytul="Co można zbudować — prognoza potencjału"
-            podtytul="Poziom 1 automatycznie szacuje orientacyjny potencjał zabudowy z kształtu i lokalizacji działki oraz zabudowy sąsiedztwa — bez ręcznego wprowadzania wskaźników MPZP/WZ/PnB. Poniższe pytanie jest opcjonalne i służy tylko adnotacji."
-          >
-            <div className="rounded-md bg-grunt-green-bg/60 border border-grunt-green/20 px-3 py-2 text-[12px] text-grunt-text-muted2">
-              <span className="font-semibold text-grunt-text">Prognoza automatyczna:</span> pojemność (pow. zabudowy, PUM,
-              liczba mieszkań) liczona z powierzchni i kształtu działki, typowej zabudowy w otoczeniu oraz spadku terenu.
-              Wynik jest <em>orientacyjny</em> i wymaga potwierdzenia w planie/decyzji na Poziomie 2.
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 mt-3">
-              <span className="text-[12px] text-grunt-text-muted2 mr-1">Czy dla działki obowiązuje MPZP?</span>
-              <Chip selected={podstawaTyp === ""} onClick={() => setPodstawaTyp("")}>Nie wiem</Chip>
-              <Chip selected={podstawaTyp === "MPZP"} onClick={() => setPodstawaTyp("MPZP")}>MPZP obowiązuje</Chip>
-              <Chip selected={podstawaTyp === "BRAK"} onClick={() => setPodstawaTyp("BRAK")}>Brak MPZP</Chip>
-            </div>
-
-            {podstawaTyp === "MPZP" && (
-              <label className="text-sm block mt-3 max-w-md">
-                <span className="text-[11px] font-medium text-grunt-text-muted2">Symbol przeznaczenia z MPZP (opcjonalnie)</span>
-                <select value={mpzpSymbol} onChange={(e) => setMpzpSymbol(e.target.value)} className="inp bg-white mt-1">
-                  <option value="">— nie podaję / nie wiem —</option>
-                  {SYMBOLE_MPZP.map((sm) => (
-                    <option key={sm.symbol} value={sm.symbol}>{sm.symbol} — {sm.opis}</option>
-                  ))}
-                </select>
-                {mpzpSymbol && (
-                  <span className={`text-[11px] mt-1 block ${statusZeSymbolu(mpzpSymbol).sprzeczne ? "text-grunt-red" : "text-grunt-green"}`}>
-                    {statusZeSymbolu(mpzpSymbol).sprzeczne
-                      ? "Przeznaczenie sprzeczne z funkcją mieszkaniową — działka nieprzydatna pod budownictwo społeczne."
-                      : "MPZP mieszkaniowy — zgodny z zabudową społeczną."}
-                  </span>
-                )}
-                <span className="text-[11px] text-grunt-text-faint2 mt-1 block">
-                  Symbol służy tylko wykryciu przeznaczenia sprzecznego z mieszkaniowym. Pojemność i tak liczy prognoza.
-                </span>
-              </label>
-            )}
-
-            {podstawaTyp === "MPZP" && (
-              <p className="text-[11px] text-grunt-amber-text2 mt-3 bg-grunt-amber-bg border border-grunt-amber/25 rounded-md px-3 py-2">
-                Obowiązuje MPZP — prognoza pozostaje orientacyjna i wymaga potwierdzenia wskaźnikami z planu (Poziom 2).
-              </p>
-            )}
-          </Karta>
-
-          <button type="submit" disabled={licze} className="btn-primary w-full" style={{ height: "var(--grunt-h-cta)" }}>
-            {licze ? "Pobieram dane i liczę…" : "Pobierz dane i analizuj (Poziom 1)"}
-          </button>
-          </form>
-        </div>
+        <EkranWejscia
+          trybWejscia={trybWejscia}
+          setTrybWejscia={setTrybWejscia}
+          pozycje={pozycje}
+          patchNumer={(i, numer) => patchPozycje(i, { numer })}
+          patchId={(i, idBezposredni) => patchPozycje(i, { idBezposredni })}
+          patchAdmin={patchAdminWszystkie}
+          dodajPozycje={dodajPozycje}
+          usunPozycje={usunPozycje}
+          analizuj={analizujP1}
+          licze={licze}
+          blad={blad}
+          dane={dane}
+          recznaPow={recznaPow}
+          setRecznaPow={setRecznaPow}
+          analizujZPowierzchnia={analizujZPowierzchnia}
+        />
       )}
 
       {/* POZIOM 1 — potwierdzenie wczytania: teren, mapa, źródła (jeden ekran) */}
@@ -485,31 +398,6 @@ export default function NowaAnalizaPage() {
         <PotwierdzenieDanych dane={dane} meta={meta} p1={wynik?.poziom1} />
       )}
 
-      {/* Działka spoza ULDK demo — brak geometrii, powierzchnia ręczna (na ekranie wejścia) */}
-      {ekran === "wejscie" && dane && dane.powierzchniaM2 === 0 && (
-        <Karta tytul="Działka spoza przykładowego ULDK — podaj powierzchnię" podtytul="Provider demonstracyjny obejmuje 3 działki; dla pozostałych geometria nie jest pobierana automatycznie">
-          <p className="text-sm text-slate-600 mb-3">
-            Nie pobrano geometrii dla podanego identyfikatora. Po podłączeniu realnego ULDK powierzchnia i kształt
-            uzupełnią się automatycznie. Na razie podaj powierzchnię ręcznie, aby uruchomić analizę — albo skorzystaj z
-            działek przykładowych powyżej.
-          </p>
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="text-sm">
-              <span className="text-xs text-slate-500">Powierzchnia (m²)</span>
-              <input
-                type="number"
-                value={recznaPow}
-                onChange={(e) => setRecznaPow(e.target.value)}
-                className="inp mt-0.5 w-40"
-                placeholder="np. 4000"
-              />
-            </label>
-            <button onClick={analizujZPowierzchnia} disabled={licze} className="btn-primary" style={{ height: "var(--grunt-h-cta)" }}>
-              {licze ? "Liczę…" : "Analizuj z podaną powierzchnią"}
-            </button>
-          </div>
-        </Karta>
-      )}
 
       {/* POZIOM 2 — mapa + kilka prostych pytań (bez audytu braków); analiza poniżej */}
       {ekran === "poziom2" && dane && (
@@ -684,181 +572,211 @@ function TrybBadge({ tryb }: { tryb: Tryb }) {
   return <span className={`badge ${o.klasa}`} title={o.opis}>{o.nazwa}</span>;
 }
 
-function Legenda() {
-  return (
-    <div className="flex flex-wrap gap-2 mt-3 text-xs">
-      {(["R", "R?", "A°", "A±", "A"] as Tryb[]).map((t) => (
-        <span key={t} className="flex items-center gap-1">
-          <TrybBadge tryb={t} /> <span className="text-slate-500">{OPIS_TRYBU[t].opis}</span>
-        </span>
-      ))}
-    </div>
-  );
-}
+/** Ekran startowy (wejście) — pełnoekranowy ciemny hero + formularz „Wskaż działkę". */
+function EkranWejscia({
+  trybWejscia, setTrybWejscia, pozycje, patchNumer, patchId, patchAdmin,
+  dodajPozycje, usunPozycje, analizuj, licze, blad, dane, recznaPow, setRecznaPow, analizujZPowierzchnia,
+}: {
+  trybWejscia: "kaskada" | "id";
+  setTrybWejscia: (t: "kaskada" | "id") => void;
+  pozycje: PozycjaDzialki[];
+  patchNumer: (i: number, numer: string) => void;
+  patchId: (i: number, id: string) => void;
+  patchAdmin: (patch: Partial<PozycjaDzialki>) => void;
+  dodajPozycje: () => void;
+  usunPozycje: (i: number) => void;
+  analizuj: (e: React.FormEvent) => void;
+  licze: boolean;
+  blad: string | null;
+  dane: DaneDzialki | null;
+  recznaPow: string;
+  setRecznaPow: (v: string) => void;
+  analizujZPowierzchnia: () => void;
+}) {
+  const p0 = pozycje[0];
+  type OT = { teryt: string; nazwa: string };
+  const [wojOpts, setWojOpts] = useState<OT[]>(WOJEWODZTWA.map((w) => ({ teryt: w.kod, nazwa: w.nazwa })));
+  const [powOpts, setPowOpts] = useState<OT[]>([]);
+  const [gmOpts, setGmOpts] = useState<OT[]>([]);
+  const [obrOpts, setObrOpts] = useState<OT[]>([]);
+  useEffect(() => { pobierzOpcjeTeryt({ poziom: "wojewodztwa" }).then((o) => o.length && setWojOpts(o)); }, []);
+  useEffect(() => { if (!p0.wojewodztwo) { setPowOpts([]); return; } pobierzOpcjeTeryt({ poziom: "powiaty", wojNazwa: p0.wojewodztwo }).then(setPowOpts); }, [p0.wojewodztwo]);
+  useEffect(() => { if (!p0.wojewodztwo || !p0.powiat) { setGmOpts([]); return; } pobierzOpcjeTeryt({ poziom: "gminy", wojNazwa: p0.wojewodztwo, powiatNazwa: p0.powiat }).then(setGmOpts); }, [p0.wojewodztwo, p0.powiat]);
+  useEffect(() => { if (!p0.wojewodztwo || !p0.powiat || !p0.gmina) { setObrOpts([]); return; } pobierzOpcjeTeryt({ poziom: "obreby", wojNazwa: p0.wojewodztwo, powiatNazwa: p0.powiat, gminaNazwa: p0.gmina }).then(setObrOpts); }, [p0.wojewodztwo, p0.powiat, p0.gmina]);
 
-/** Lewy kafel ekranu wejścia — treść o analizie (hero + poziomy + legenda + liczby). */
-function PanelWprowadzenia() {
-  return (
-    <div className="card p-6 lg:sticky" style={{ top: "var(--grunt-sticky-top)" }}>
-      <span className="badge bg-grunt-green-bg text-grunt-green">
-        <span className="w-2 h-2 rounded-full bg-grunt-green" /> Dla samorządów i inwestorów mieszkalnictwa społecznego
-      </span>
-      <h1 className="text-[27px] font-semibold text-grunt-text tracking-[-0.01em] mt-3 leading-[1.15]">
-        Oceń potencjał inwestycyjny działki <span className="text-grunt-young">w kilka minut</span>
-      </h1>
-      <p className="text-grunt-text-muted mt-3 text-[13px]">
-        Od numeru ewidencyjnego do modelu finansowego. GRUNT łączy dane publiczne, planistykę i reżimy finansowania
-        w jedno studium — z jawną pewnością każdego wyniku.
-      </p>
-      <p className="text-grunt-text-muted2 mt-3 text-[12px] leading-relaxed">
-        Trzy poziomy: <strong className="text-grunt-text">P1</strong> — szybki przesiew (popyt × pojemność),
-        <strong className="text-grunt-text"> P2</strong> — ocena działki i model zabudowy,
-        <strong className="text-grunt-text"> P3</strong> — model finansowy SIM (montaż, oś czasu, reżim „as-of", wymagana dotacja).
-      </p>
-      <div className="text-[11px] font-medium text-grunt-text-faint mt-4">Prowenancja danych</div>
-      <Legenda />
-      <div className="grid grid-cols-3 gap-3 mt-5 pt-4 border-t border-grunt-divider">
-        {[
-          ["3", "poziomy analizy"],
-          ["6+", "rejestrów publicznych"],
-          ["2027", "gotowe na nowy reżim"],
-        ].map(([v, e]) => (
-          <div key={e}>
-            <div className="text-[22px] font-semibold text-grunt-text leading-none">{v}</div>
-            <div className="text-[11px] text-grunt-text-muted2 mt-1">{e}</div>
-          </div>
-        ))}
+  const n = pozycje.length;
+  const slowoDzialka = n === 1 ? "działka" : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? "działki" : "działek";
+  const brakGeometrii = dane != null && dane.powierzchniaM2 === 0;
+
+  // Portal do <body>: nakładka jako bezpośrednie dziecko body — pewne pełne przykrycie
+  // chrome aplikacji (niezależnie od kontekstów pozycjonowania w drzewie).
+  const [zamontowano, setZamontowano] = useState(false);
+  useEffect(() => setZamontowano(true), []);
+  if (!zamontowano) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 overflow-y-auto text-white" style={{ background: "linear-gradient(155deg,#0B1524 0%,#0F2036 52%,#123049 100%)" }}>
+      {/* Dekoracja: wireframe działki + poświata */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute" style={{ top: -80, right: 40, width: 520, height: 420, background: "radial-gradient(50% 50% at 60% 40%, rgba(111,227,196,.10) 0%, rgba(111,227,196,0) 70%)" }} />
+        <svg className="absolute" style={{ top: 30, right: 120, opacity: 0.5 }} width="360" height="230" viewBox="0 0 360 230" fill="none">
+          <polygon points="40,150 150,40 320,70 300,210 90,200" stroke="#3FE0BE" strokeWidth="1.4" fill="rgba(63,224,190,.05)" />
+          <circle cx="150" cy="40" r="3" fill="#3FE0BE" /><circle cx="320" cy="70" r="3" fill="#3FE0BE" /><circle cx="300" cy="210" r="3" fill="#3FE0BE" />
+        </svg>
       </div>
-    </div>
+
+      {/* Pasek startowy: logo + użytkownik */}
+      <header className="relative flex items-center justify-between px-6 lg:px-10" style={{ height: 66 }}>
+        <div className="flex items-center gap-2.5">
+          <span className="grid place-items-center w-[34px] h-[34px] rounded-md bg-white/10">
+            <span className="block w-3 h-3 rounded-[3px] bg-grunt-mint" />
+          </span>
+          <span className="flex flex-col leading-none">
+            <span className="text-[17px] font-bold text-white" style={{ letterSpacing: "0.10em" }}>GRUNT</span>
+            <span className="text-[9.5px] uppercase mt-0.5 text-white/55" style={{ letterSpacing: "0.11em" }}>Studium potencjału działki</span>
+          </span>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <span className="grid place-items-center w-9 h-9 rounded-full text-[12px] font-semibold text-grunt-ink" style={{ background: "#3FE0BE" }}>ML</span>
+          <span className="hidden sm:flex flex-col leading-tight">
+            <span className="text-[13px] font-medium text-white">M. Lewandowska</span>
+            <span className="text-[11px] text-white/55">Gmina Lesznowola</span>
+          </span>
+        </div>
+      </header>
+
+      {/* Treść: dwa panele */}
+      <div className="relative mx-auto px-6 lg:px-10 pb-16" style={{ maxWidth: 1360 }}>
+        <div className="grid lg:grid-cols-[1fr_minmax(0,560px)] gap-10 lg:gap-14 items-center" style={{ minHeight: "calc(100vh - 140px)" }}>
+          {/* Lewy hero */}
+          <div>
+            <span className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[12.5px] font-medium" style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.12)", color: "#CBD8E8" }}>
+              <span className="w-2 h-2 rounded-full" style={{ background: "#3FE0BE" }} />
+              Nowa analiza działki
+            </span>
+            <h1 className="mt-6 font-semibold text-white" style={{ fontSize: 46, lineHeight: 1.08, letterSpacing: "-0.02em" }}>
+              Zacznij od jednej<br />działki. Resztę<br /><span style={{ color: "#3FE0BE" }}>policzymy za Ciebie.</span>
+            </h1>
+            <p className="mt-6 max-w-[460px] text-[15.5px] leading-relaxed" style={{ color: "#A9BBD2" }}>
+              Wpisz numer działki, a GRUNT zbierze dane publiczne, planistykę i reżimy finansowania — i przygotuje
+              kompletne studium potencjału inwestycyjnego pod mieszkalnictwo.
+            </p>
+            <div className="mt-8 space-y-4 max-w-[460px]">
+              <PunktWejscia ikona="check" tytul="Werdykt w kilka minut" opis="Czy działka nadaje się pod mieszkalnictwo — osobno dla młodych i seniorów." />
+              <PunktWejscia ikona="dot" tytul="Pełne studium działki" opis="Planistyka, uzbrojenie, środowisko i rynek — zebrane z rejestrów publicznych." />
+              <PunktWejscia ikona="sigma" tytul="Model finansowy" opis="Montaż finansowania i odpowiedź, czy inwestycja się spina w danym reżimie." />
+            </div>
+          </div>
+
+          {/* Prawy formularz */}
+          <form onSubmit={analizuj} className="rounded-[18px] bg-white text-grunt-text p-6 lg:p-7" style={{ boxShadow: "0 30px 70px rgba(6,14,26,.45)" }}>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-[18px] font-semibold text-grunt-text">Wskaż działkę</h2>
+              <div className="inline-flex p-0.5 rounded-[9px] text-[12.5px] font-medium" style={{ background: "#F1F4F8" }}>
+                <button type="button" onClick={() => setTrybWejscia("kaskada")} className="px-3 py-1.5 rounded-[7px]" style={trybWejscia === "kaskada" ? { background: "#fff", color: "#16263F", boxShadow: "0 1px 2px rgba(20,38,63,.08)" } : { color: "#6B7A92" }}>TERYT</button>
+                <button type="button" onClick={() => setTrybWejscia("id")} className="px-3 py-1.5 rounded-[7px]" style={trybWejscia === "id" ? { background: "#fff", color: "#16263F", boxShadow: "0 1px 2px rgba(20,38,63,.08)" } : { color: "#6B7A92" }}>Identyfikator działki</button>
+              </div>
+            </div>
+
+            {trybWejscia === "kaskada" ? (
+              <>
+                <p className="mt-3 text-[12.5px]" style={{ color: "#6B7A92" }}>Wybierz jednostkę administracyjną (TERYT), a następnie podaj numer działki w obrębie.</p>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <Lab label="Województwo">
+                    <select value={p0.wojewodztwo} onChange={(e) => patchAdmin({ wojewodztwo: e.target.value, powiat: "", gmina: "", obreb: "", gminaTeryt: undefined })} className="inp bg-white">
+                      <option value="">—</option>
+                      {wojOpts.map((w) => <option key={w.teryt} value={w.nazwa}>{w.nazwa}</option>)}
+                    </select>
+                  </Lab>
+                  <Lab label="Powiat">
+                    <input list="ew-pow" value={p0.powiat} onChange={(e) => patchAdmin({ powiat: e.target.value, gmina: "", obreb: "", gminaTeryt: undefined })} className="inp" />
+                    <datalist id="ew-pow">{powOpts.map((x) => <option key={x.teryt} value={x.nazwa} />)}</datalist>
+                  </Lab>
+                  <Lab label="Gmina">
+                    <input list="ew-gm" value={p0.gmina} onChange={(e) => { const opt = gmOpts.find((o) => o.nazwa === e.target.value); patchAdmin({ gmina: e.target.value, obreb: "", gminaTeryt: opt?.teryt }); }} className="inp" />
+                    <datalist id="ew-gm">{gmOpts.map((x) => <option key={x.teryt} value={x.nazwa} />)}</datalist>
+                  </Lab>
+                  <Lab label="Obręb">
+                    <input list="ew-ob" value={p0.obreb} onChange={(e) => patchAdmin({ obreb: e.target.value })} className="inp" placeholder="np. 0010" />
+                    <datalist id="ew-ob">{obrOpts.map((x) => <option key={x.teryt} value={x.teryt}>{x.nazwa}</option>)}</datalist>
+                  </Lab>
+                </div>
+
+                <div className="mt-5">
+                  <div className="text-[12px] font-medium" style={{ color: "#6B7A92" }}>Numery działek · {n} {slowoDzialka}</div>
+                  <div className="mt-2 space-y-2">
+                    {pozycje.map((p, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <span className="grid place-items-center w-8 h-9 rounded-[8px] mono text-[12px] shrink-0" style={{ background: "#F1F4F8", color: "#6B7A92" }}>{i + 1}</span>
+                        <input value={p.numer} onChange={(e) => patchNumer(i, e.target.value)} className="inp flex-1" placeholder="np. 142/7" />
+                        {pozycje.length > 1 && (
+                          <button type="button" onClick={() => usunPozycje(i)} className="text-[12px] px-2 py-2 rounded-[8px]" style={{ color: "#C0392B" }}>Usuń</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <button type="button" onClick={dodajPozycje} className="mt-2 text-[13px] rounded-[9px] px-3 py-2" style={{ border: "1px solid #DDE3EB", color: "#3A4D6B" }}>+ Dodaj działkę</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="mt-3 text-[12.5px]" style={{ color: "#6B7A92" }}>Podaj pełny identyfikator ULDK działki (TERYT_gminy.obręb.numer).</p>
+                <div className="mt-4 space-y-2">
+                  {pozycje.map((p, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="grid place-items-center w-8 h-9 rounded-[8px] mono text-[12px] shrink-0" style={{ background: "#F1F4F8", color: "#6B7A92" }}>{i + 1}</span>
+                      <input value={p.idBezposredni ?? ""} onChange={(e) => patchId(i, e.target.value)} className="inp flex-1 font-mono" placeholder="np. 160707_3.0006.51/2" />
+                      {pozycje.length > 1 && (
+                        <button type="button" onClick={() => usunPozycje(i)} className="text-[12px] px-2 py-2 rounded-[8px]" style={{ color: "#C0392B" }}>Usuń</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button type="button" onClick={dodajPozycje} className="mt-2 text-[13px] rounded-[9px] px-3 py-2" style={{ border: "1px solid #DDE3EB", color: "#3A4D6B" }}>+ Dodaj działkę</button>
+              </>
+            )}
+
+            {blad && <p className="mt-4 text-[13px] rounded-[9px] px-3 py-2" style={{ background: "#FBE7E4", color: "#C0392B", border: "1px solid rgba(192,57,43,.25)" }}>{blad}</p>}
+
+            {brakGeometrii && (
+              <div className="mt-4 rounded-[10px] px-3 py-3" style={{ background: "#FBF0DA", border: "1px solid rgba(181,121,11,.25)" }}>
+                <p className="text-[12.5px]" style={{ color: "#8A5C08" }}>Nie pobrano geometrii dla podanego identyfikatora. Podaj powierzchnię ręcznie, aby uruchomić analizę.</p>
+                <div className="mt-2 flex items-end gap-2">
+                  <input type="number" value={recznaPow} onChange={(e) => setRecznaPow(e.target.value)} className="inp w-40" placeholder="Powierzchnia (m²)" />
+                  <button type="button" onClick={analizujZPowierzchnia} disabled={licze} className="btn-secondary" style={{ height: "var(--grunt-h-input)" }}>{licze ? "Liczę…" : "Analizuj z powierzchnią"}</button>
+                </div>
+              </div>
+            )}
+
+            <button type="submit" disabled={licze} className="mt-5 w-full inline-flex items-center justify-center gap-2 rounded-[11px] bg-grunt-ink text-white text-[15px] font-semibold" style={{ height: 52 }}>
+              {licze ? "Pobieram dane i liczę…" : <>Analizuj działkę <span aria-hidden>→</span></>}
+            </button>
+            <p className="mt-3 flex items-center gap-2 text-[12px]" style={{ color: "#6B7A92" }}>
+              <span className="w-2 h-2 rounded-full" style={{ background: "#1C8A5A" }} />
+              Kilka przylegających działek scalimy w jeden teren inwestycji.
+            </p>
+          </form>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
-function IdWiersz({
-  i,
-  p,
-  onPatch,
-  onUsun,
-  mozeUsunac,
-}: {
-  i: number;
-  p: PozycjaDzialki;
-  onPatch: (i: number, patch: Partial<PozycjaDzialki>) => void;
-  onUsun: () => void;
-  mozeUsunac: boolean;
-}) {
+function PunktWejscia({ ikona, tytul, opis }: { ikona: "check" | "dot" | "sigma"; tytul: string; opis: string }) {
+  const glif: Record<string, React.ReactNode> = {
+    check: <path d="M5 12l4.5 4.5L19 7" />,
+    dot: <circle cx="12" cy="12" r="4.5" />,
+    sigma: <path d="M17 5H7l6 7-6 7h10" />,
+  };
   return (
-    <div className="flex items-end gap-2 border border-slate-100 rounded-lg p-3">
-      <label className="text-sm flex-1">
-        <span className="text-xs text-slate-500">Identyfikator działki (ULDK) *</span>
-        <input
-          value={p.idBezposredni ?? ""}
-          onChange={(e) => onPatch(i, { idBezposredni: e.target.value })}
-          className="inp mt-0.5 font-mono"
-          placeholder="np. 160707_3.0006.51/2  (TERYT_gminy.obręb.numer)"
-        />
-      </label>
-      {mozeUsunac && (
-        <button type="button" onClick={onUsun} className="text-xs text-red-600 border border-red-200 rounded px-2 py-2 hover:bg-red-50">
-          Usuń
-        </button>
-      )}
-    </div>
-  );
-}
-
-type OpcjaT = { teryt: string; nazwa: string };
-
-function PozycjaWiersz({
-  i,
-  p,
-  pierwsza,
-  onPatch,
-  onUsun,
-  mozeUsunac,
-}: {
-  i: number;
-  p: PozycjaDzialki;
-  pierwsza: boolean;
-  onPatch: (i: number, patch: Partial<PozycjaDzialki>) => void;
-  onUsun: () => void;
-  mozeUsunac: boolean;
-}) {
-  const [wojOpts, setWojOpts] = useState<OpcjaT[]>(WOJEWODZTWA.map((w) => ({ teryt: w.kod, nazwa: w.nazwa })));
-  const [powOpts, setPowOpts] = useState<OpcjaT[]>([]);
-  const [gmOpts, setGmOpts] = useState<OpcjaT[]>([]);
-  const [obrOpts, setObrOpts] = useState<OpcjaT[]>([]);
-
-  // Kaskada (podpowiedzi z mini-słownika). Dociąga po nazwie rodzica.
-  useEffect(() => {
-    pobierzOpcjeTeryt({ poziom: "wojewodztwa" }).then((o) => o.length && setWojOpts(o));
-  }, []);
-  useEffect(() => {
-    if (!p.wojewodztwo) return setPowOpts([]);
-    pobierzOpcjeTeryt({ poziom: "powiaty", wojNazwa: p.wojewodztwo }).then(setPowOpts);
-  }, [p.wojewodztwo]);
-  useEffect(() => {
-    if (!p.wojewodztwo || !p.powiat) return setGmOpts([]);
-    pobierzOpcjeTeryt({ poziom: "gminy", wojNazwa: p.wojewodztwo, powiatNazwa: p.powiat }).then(setGmOpts);
-  }, [p.wojewodztwo, p.powiat]);
-  useEffect(() => {
-    if (!p.wojewodztwo || !p.powiat || !p.gmina) return setObrOpts([]);
-    pobierzOpcjeTeryt({ poziom: "obreby", wojNazwa: p.wojewodztwo, powiatNazwa: p.powiat, gminaNazwa: p.gmina }).then(setObrOpts);
-  }, [p.wojewodztwo, p.powiat, p.gmina]);
-
-  return (
-    <div className="grid grid-cols-2 lg:grid-cols-6 gap-2 items-end border border-slate-100 rounded-lg p-3">
-      <Lab label="Województwo *">
-        <select
-          value={p.wojewodztwo}
-          onChange={(e) => onPatch(i, { wojewodztwo: e.target.value, powiat: "", gmina: "", obreb: "", gminaTeryt: undefined })}
-          className="inp bg-white"
-        >
-          <option value="">—</option>
-          {wojOpts.map((w) => (
-            <option key={w.teryt} value={w.nazwa}>{w.nazwa}</option>
-          ))}
-        </select>
-      </Lab>
-      <Lab label="Powiat">
-        <input
-          list={`pow-${i}`}
-          value={p.powiat}
-          onChange={(e) => onPatch(i, { powiat: e.target.value, gmina: "", obreb: "", gminaTeryt: undefined })}
-          className="inp"
-        />
-        <datalist id={`pow-${i}`}>{powOpts.map((x) => <option key={x.teryt} value={x.nazwa} />)}</datalist>
-      </Lab>
-      <Lab label="Gmina">
-        <input
-          list={`gm-${i}`}
-          value={p.gmina}
-          onChange={(e) => {
-            const opt = gmOpts.find((o) => o.nazwa === e.target.value);
-            onPatch(i, { gmina: e.target.value, obreb: "", gminaTeryt: opt?.teryt });
-          }}
-          className="inp"
-        />
-        <datalist id={`gm-${i}`}>{gmOpts.map((x) => <option key={x.teryt} value={x.nazwa} />)}</datalist>
-      </Lab>
-      <Lab label="Obręb">
-        <input
-          list={`ob-${i}`}
-          value={p.obreb}
-          onChange={(e) => onPatch(i, { obreb: e.target.value })}
-          className="inp"
-          placeholder="np. 0012"
-        />
-        <datalist id={`ob-${i}`}>{obrOpts.map((x) => <option key={x.teryt} value={x.teryt}>{x.nazwa}</option>)}</datalist>
-      </Lab>
-      <Lab label="Numer działki *">
-        <input value={p.numer} onChange={(e) => onPatch(i, { numer: e.target.value })} className="inp" placeholder="np. 123/4" />
-      </Lab>
+    <div className="flex gap-3.5">
+      <span className="grid place-items-center shrink-0 w-9 h-9 rounded-[9px]" style={{ background: "rgba(63,224,190,.12)", border: "1px solid rgba(63,224,190,.25)" }}>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#3FE0BE" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{glif[ikona]}</svg>
+      </span>
       <div>
-        {!pierwsza && mozeUsunac && (
-          <button type="button" onClick={onUsun} className="text-xs text-red-600 border border-red-200 rounded px-2 py-2 hover:bg-red-50 w-full">
-            Usuń
-          </button>
-        )}
+        <div className="text-[14.5px] font-semibold text-white">{tytul}</div>
+        <div className="text-[12.5px] mt-0.5 leading-relaxed" style={{ color: "#A9BBD2" }}>{opis}</div>
       </div>
     </div>
   );
