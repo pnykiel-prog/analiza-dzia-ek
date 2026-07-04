@@ -14,6 +14,7 @@ import type {
   MixMetrazy,
   Obwiednia,
   Profil,
+  RozstrzygnieteWskazniki,
   Typologia,
   WariantZabudowy,
   WynikPoziom1,
@@ -22,6 +23,7 @@ import type {
 import type { KonfiguracjaZabudowy } from "../config";
 import { KONFIG_ZABUDOWA, KONFIG_SCORING } from "../config";
 import { liczBramki, liczBraki, liczKluczoweLiczby, liczSygnaly } from "./uwarunkowania";
+import { kaskadaWskaznikow } from "./kaskadaWskaznikow";
 
 interface WskaznikiUzyte {
   intensywnosc: number;
@@ -31,35 +33,29 @@ interface WskaznikiUzyte {
   normatywParkingowy: number;
   zrodlo: Obwiednia["zrodloWskaznikow"];
   pewnosc: number;
+  prowenancja: RozstrzygnieteWskazniki; // per-pole źródło + pewność + flagi (kaskada)
 }
 
+/**
+ * Wskaźniki obwiedni z KASKADY źródeł (auto > ręczne potwierdzone > prognoza),
+ * rozstrzyganej per pole. Zastępuje dawne „wszystko z planu albo wszystko z fallbacku".
+ */
 function wyznaczWskazniki(d: DaneDzialki, cfg: KonfiguracjaZabudowy): WskaznikiUzyte {
-  if (d.wskaznikiPlanistyczne) {
-    const w = d.wskaznikiPlanistyczne;
-    return {
-      intensywnosc: w.intensywnosc,
-      maxKondygnacje: w.maxKondygnacje,
-      maxPowZabudowyPct: w.maxPowZabudowyPct,
-      minPbcPct: w.minPbcPct,
-      normatywParkingowy: w.normatywParkingowy,
-      zrodlo: d.statusPlanistyczny === "mpzp_mieszkaniowy" ? "mpzp" : "plan_ogolny",
-      pewnosc: d.statusPlanistyczny === "mpzp_mieszkaniowy" ? 95 : 80,
-    };
-  }
-  // Fallback "dobrego sąsiedztwa": wskaźniki z otoczenia. Gdy klient podał wysokość
-  // zabudowy w okolicy (piętra) — bierzemy ją jako liczbę kondygnacji i wyprowadzamy
-  // spójną intensywność (kondygnacje × % zabudowy), zamiast stałej z konfiguracji.
-  const f = cfg.fallbackSasiedztwo;
-  const kond = d.wysokoscOkolicyPieter != null && d.wysokoscOkolicyPieter > 0 ? Math.floor(d.wysokoscOkolicyPieter) : f.maxKondygnacje;
-  const intensywnosc = d.wysokoscOkolicyPieter != null && d.wysokoscOkolicyPieter > 0 ? kond * (f.maxPowZabudowyPct / 100) : f.intensywnosc;
+  const r = kaskadaWskaznikow(d, cfg);
+  const pola = [r.kZabPct, r.far, r.kondygnacje, r.pbcPct];
+  const wszystkoAuto = pola.every((p) => p.zrodlo === "auto");
+  const jakiesAuto = pola.some((p) => p.zrodlo === "auto");
+  const zrodlo: Obwiednia["zrodloWskaznikow"] =
+    wszystkoAuto && d.statusPlanistyczny === "mpzp_mieszkaniowy" ? "mpzp" : jakiesAuto ? "plan_ogolny" : "sasiedztwo_fallback";
   return {
-    intensywnosc,
-    maxKondygnacje: kond,
-    maxPowZabudowyPct: f.maxPowZabudowyPct,
-    minPbcPct: f.minPbcPct,
-    normatywParkingowy: cfg.normatywParkingowy.mlodzi,
-    zrodlo: "sasiedztwo_fallback",
-    pewnosc: 45,
+    intensywnosc: r.far.wartosc,
+    maxKondygnacje: r.kondygnacje.wartosc,
+    maxPowZabudowyPct: r.kZabPct.wartosc,
+    minPbcPct: r.pbcPct.wartosc,
+    normatywParkingowy: d.wskaznikiPlanistyczne?.normatywParkingowy ?? cfg.normatywParkingowy.mlodzi,
+    zrodlo,
+    pewnosc: r.pewnosc,
+    prowenancja: r,
   };
 }
 
@@ -80,6 +76,7 @@ function liczObwiednie(d: DaneDzialki, w: WskaznikiUzyte, cfg: KonfiguracjaZabud
     maxKondygnacje,
     zrodloWskaznikow: w.zrodlo,
     pewnoscObwiedni: w.pewnosc,
+    prowenancja: w.prowenancja,
   };
 }
 
@@ -183,6 +180,8 @@ function flagiRyzyka(d: DaneDzialki, obw: Obwiednia, w: WskaznikiUzyte, cfg: Kon
     flagi.push("Wąska/skośna działka — obniżona efektywność rzutu.");
   if (obw.zrodloWskaznikow === "sasiedztwo_fallback")
     flagi.push("Brak MPZP — obwiednia oszacowana z sąsiedztwa, niska pewność.");
+  // Flagi z kaskady wskaźników (walidacja warstwy ręcznej, rozbieżności, legalne>fizyczne).
+  for (const f of w.prowenancja.flagi) if (!flagi.includes(f)) flagi.push(f);
   return flagi;
 }
 

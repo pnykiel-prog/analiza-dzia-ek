@@ -16,6 +16,7 @@ export interface OdpowiedziM2 {
     maxPowZabudowyPct: number | null;
     minPbcPct: number | null;
   } | null;
+  planistykaPotwierdzona: boolean; // klient potwierdził: realne dane z MPZP/dokumentu
 }
 
 /**
@@ -46,6 +47,7 @@ export function PytaniaM2({
   });
   const [wys, setWys] = useState<string>(dane.wysokoscOkolicyPieter == null ? "" : String(dane.wysokoscOkolicyPieter));
   const [planOtwarte, setPlanOtwarte] = useState(false);
+  const [potwierdzona, setPotwierdzona] = useState(false);
   const [plan, setPlan] = useState<Record<string, string>>({ intensywnosc: "", maxWysokoscM: "", maxPowZabudowyPct: "", minPbcPct: "" });
 
   const num = (s: string): number | null => (s.trim() === "" ? null : Number(s));
@@ -66,6 +68,7 @@ export function PytaniaM2({
             minPbcPct: num(plan.minPbcPct),
           }
         : null,
+      planistykaPotwierdzona: Boolean(planPodane && potwierdzona),
     });
   }
 
@@ -147,6 +150,10 @@ export function PytaniaM2({
             <p className="text-[11px] text-grunt-text-faint2 mb-2">
               Domyślnie korzystamy z danych z Poziomu 1 (KIMPZP + prognoza). Podanie wskaźników z wypisu uściśla model zabudowy i podnosi pewność.
             </p>
+            <label className="flex items-center gap-2 mb-2 text-[12px] text-grunt-text-muted">
+              <input type="checkbox" checked={potwierdzona} onChange={(e) => setPotwierdzona(e.target.checked)} />
+              Potwierdzam: to realne dane z MPZP / dokumentu urzędowego (bez potwierdzenia model użyje prognozy).
+            </label>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {[
                 ["intensywnosc", "Intensywność zabudowy", "0.1"],

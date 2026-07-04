@@ -229,28 +229,8 @@ export default function NowaAnalizaPage() {
       return znane.length === 0 ? null : znane.some(Boolean);
     };
 
-    // Planistyka: tylko gdy klient podał wypis. Liczba kondygnacji z WYSOKOŚCI (12 m ≈ 4 kond.),
-    // a intensywność — spójna z kondygnacjami × % zabudowy, gdy nie podano jej wprost
-    // (inaczej niska/pomylona intensywność zaniżałaby wysokość budynku).
-    const wsk = o.planistyka;
-    const H_KOND = 3.2; // typowa wysokość kondygnacji [m]
-    let noweWsk = dane.wskaznikiPlanistyczne;
-    if (wsk) {
-      const pct = wsk.maxPowZabudowyPct ?? dane.wskaznikiPlanistyczne?.maxPowZabudowyPct ?? 35;
-      const kond = wsk.maxWysokoscM
-        ? Math.max(1, Math.round(wsk.maxWysokoscM / H_KOND))
-        : o.wysokoscOkolicyPieter ?? dane.wskaznikiPlanistyczne?.maxKondygnacje ?? 4;
-      const intensywnosc = wsk.intensywnosc ?? dane.wskaznikiPlanistyczne?.intensywnosc ?? (kond * pct) / 100;
-      noweWsk = {
-        intensywnosc,
-        maxWysokoscM: wsk.maxWysokoscM ?? dane.wskaznikiPlanistyczne?.maxWysokoscM ?? Math.round(kond * H_KOND),
-        maxKondygnacje: kond,
-        maxPowZabudowyPct: pct,
-        minPbcPct: wsk.minPbcPct ?? dane.wskaznikiPlanistyczne?.minPbcPct ?? 30,
-        normatywParkingowy: dane.wskaznikiPlanistyczne?.normatywParkingowy ?? 0.8,
-        udzialUslugPct: dane.wskaznikiPlanistyczne?.udzialUslugPct ?? 15,
-      };
-    }
+    // Planistyka ręczna → surowe wskaźniki do KASKADY. Wchodzą do modelu tylko gdy
+    // potwierdzone jako realne dane z MPZP (inaczej kaskada użyje prognozy/planu).
     const noweDane: DaneDzialki = {
       ...dane,
       odleglosciM2: Object.keys(odl).length ? odl : dane.odleglosciM2,
@@ -260,7 +240,15 @@ export default function NowaAnalizaPage() {
       uslugiPodstawowePieszo: lubZasieg("sklep", "apteka") ?? dane.uslugiPodstawowePieszo,
       pozWZasiegu: wZasiegu("poz") ?? dane.pozWZasiegu,
       zlobkiSzkolyWZasiegu: lubZasieg("szkola", "przedszkole") ?? dane.zlobkiSzkolyWZasiegu,
-      wskaznikiPlanistyczne: noweWsk,
+      wskaznikiReczne: o.planistyka
+        ? {
+            intensywnosc: o.planistyka.intensywnosc,
+            maxWysokoscM: o.planistyka.maxWysokoscM,
+            maxPowZabudowyPct: o.planistyka.maxPowZabudowyPct,
+            minPbcPct: o.planistyka.minPbcPct,
+          }
+        : dane.wskaznikiReczne,
+      wskaznikiPotwierdzone: o.planistykaPotwierdzona,
     };
     setDane(noweDane);
     await przelicz(noweDane);
