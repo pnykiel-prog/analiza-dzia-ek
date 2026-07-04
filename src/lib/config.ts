@@ -441,6 +441,31 @@ export const KONFIG_M2: KonfiguracjaM2 = {
   },
 };
 
+/** Kanał C — model bliskości aglomeracji (pierścienie skalowane klasą miasta). */
+export interface PierscienKlasy {
+  rdzenKm: number; // ≤ rdzeń → pełna siła bazowa (pierścień 0)
+  zasiegKm: number; // > zasięg → brak oddziaływania
+  silaBazowa: number; // siła w rdzeniu (0–100)
+  krokKm: number; // szerokość pierścienia (do wyświetlenia)
+}
+export interface KonfiguracjaAglomeracji {
+  pierscienie: Record<"A" | "B" | "C" | "D", PierscienKlasy>;
+  bonusDrugiOsrodek: number; // udział siły drugiego ośrodka w sygnale
+  amplitudaProfil: { mlodzi: number; seniorzy: number }; // rozpiętość modyfikatora wokół 1,0
+}
+
+export const KONFIG_AGLOMERACJA: KonfiguracjaAglomeracji = {
+  // Wartości startowe wg wytycznych „bliskość aglomeracji" §3 — kalibrowalne.
+  pierscienie: {
+    A: { rdzenKm: 20, zasiegKm: 60, silaBazowa: 100, krokKm: 10 },
+    B: { rdzenKm: 10, zasiegKm: 35, silaBazowa: 70, krokKm: 10 },
+    C: { rdzenKm: 8, zasiegKm: 20, silaBazowa: 45, krokKm: 8 },
+    D: { rdzenKm: 4, zasiegKm: 10, silaBazowa: 25, krokKm: 5 },
+  },
+  bonusDrugiOsrodek: 0.1,
+  amplitudaProfil: { mlodzi: 0.4, seniorzy: 0.15 },
+};
+
 /** Migawka całej konfiguracji (do API / edytora). */
 export interface Konfiguracja {
   scoring: KonfiguracjaScoring;
