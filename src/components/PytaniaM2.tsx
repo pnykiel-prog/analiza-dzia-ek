@@ -52,9 +52,16 @@ export function PytaniaM2({
 
   const num = (s: string): number | null => (s.trim() === "" ? null : Number(s));
 
+  // Odległości: rozdziel na ustalone automatycznie (nie pytamy) i brakujące (pytamy) — spec §7.
+  const odlAuto = KONFIG_M2.odleglosciPieszo
+    .map((o) => ({ ...o, m: dane.odleglosciM2?.[o.klucz] }))
+    .filter((o): o is typeof o & { m: number } => o.m != null);
+  const odlDoPytania = KONFIG_M2.odleglosciPieszo.filter((o) => dane.odleglosciM2?.[o.klucz] == null);
+
   function przelicz() {
+    // Wysyłamy tylko odległości, o które pytaliśmy (auto trzyma się w dane.odleglosciM2 z prowenancją).
     const odleglosci: Record<string, number | null> = {};
-    for (const o of KONFIG_M2.odleglosciPieszo) odleglosci[o.klucz] = num(odl[o.klucz] ?? "");
+    for (const o of odlDoPytania) odleglosci[o.klucz] = num(odl[o.klucz] ?? "");
     const planPodane = planOtwarte && (plan.intensywnosc || plan.maxWysokoscM || plan.maxPowZabudowyPct || plan.minPbcPct);
     onPrzelicz({
       dostepDrogi: droga === "" ? null : droga === "tak",
@@ -96,25 +103,51 @@ export function PytaniaM2({
         </div>
       )}
 
-      {/* 2. Odległości pieszo (metry) — pre-wypełnione z OSM, jeśli się udało */}
+      {/* 2. Odległości pieszo — auto pokazujemy jako ustalone; pytamy TYLKO o brakujące (spec §7). */}
       <div className="mb-4">
-        <div className="text-[13px] text-grunt-text mb-1.5">Odległości pieszo (w metrach)</div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {KONFIG_M2.odleglosciPieszo.map((o) => (
-            <label key={o.klucz} className="text-sm block">
-              <span className="text-xs text-grunt-text-muted">{o.etykieta}</span>
-              <input
-                type="number"
-                min="0"
-                step="10"
-                value={odl[o.klucz] ?? ""}
-                onChange={(e) => setOdl((s) => ({ ...s, [o.klucz]: e.target.value }))}
-                placeholder="m (opcjonalnie)"
-                className="inp mt-0.5"
-              />
-            </label>
-          ))}
-        </div>
+        <div className="text-[13px] text-grunt-text mb-1.5">Odległości pieszo do usług</div>
+
+        {odlAuto.length > 0 && (
+          <div className="mb-3 rounded-md bg-grunt-green-bg/50 border border-grunt-green/20 px-3 py-2">
+            <div className="text-[11px] font-medium text-grunt-green mb-1.5">
+              Ustalone automatycznie (OSM) — {odlAuto.length} z {KONFIG_M2.odleglosciPieszo.length}
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1">
+              {odlAuto.map((o) => (
+                <div key={o.klucz} className="flex items-baseline justify-between text-[12px]">
+                  <span className="text-grunt-text-muted2">{o.etykieta}</span>
+                  <span className="mono text-grunt-text">{o.m} m</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {odlDoPytania.length > 0 ? (
+          <>
+            <div className="text-[11px] text-grunt-text-muted2 mb-1.5">
+              {odlAuto.length > 0 ? "Uzupełnij pozostałe (opcjonalnie):" : "Podaj, jeśli znasz (opcjonalnie):"}
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {odlDoPytania.map((o) => (
+                <label key={o.klucz} className="text-sm block">
+                  <span className="text-xs text-grunt-text-muted">{o.etykieta}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="10"
+                    value={odl[o.klucz] ?? ""}
+                    onChange={(e) => setOdl((s) => ({ ...s, [o.klucz]: e.target.value }))}
+                    placeholder="m (opcjonalnie)"
+                    className="inp mt-0.5"
+                  />
+                </label>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="text-[12px] text-grunt-text-muted2">Wszystkie odległości ustalone automatycznie — nic nie musisz podawać.</div>
+        )}
       </div>
 
       {/* 3. Wysokość zabudowy w okolicy — tylko gdy auto (BDOT) nie pobrało */}
