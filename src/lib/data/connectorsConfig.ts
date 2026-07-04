@@ -65,6 +65,8 @@ export interface KonfiguracjaKonektorow {
     aktywny: boolean;
   }[];
   overpass: { aktywny: boolean; endpointy: string[]; promienM: number };
+  /** Kanał A (M2) — numeryczne odległości do usług z OSM/Overpass (wyścig mirrorów). */
+  odleglosci: { aktywny: boolean; endpointy: string[]; promienM: number; timeoutMs: number };
   /** Katalog pozostałych źródeł (mapa architektury; włączane w M2/M3). */
   katalog: { klucz: string; zrodlo: string; endpoint: string; poziom: "P1" | "P2"; etap: "M1" | "M2" | "M3"; aktywny: boolean }[];
 }
@@ -126,7 +128,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       pole: "natura2000",
       wersjaWms: "1.1.1",
       infoFormat: "application/json",
-      aktywny: false,
+      aktywny: true,
     },
     {
       klucz: "GDOS_OCHRONA",
@@ -137,7 +139,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       pole: "ochronaWykluczajaca",
       wersjaWms: "1.1.1",
       infoFormat: "application/json",
-      aktywny: false,
+      aktywny: true,
     },
     {
       klucz: "ISOK_POWODZ",
@@ -148,7 +150,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       pole: "ryzykoPowodzioweSzczegolne",
       wersjaWms: "1.1.1",
       infoFormat: "application/json",
-      aktywny: false,
+      aktywny: true,
     },
     {
       klucz: "PIG_SOPO",
@@ -159,7 +161,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       pole: "osuwisko",
       wersjaWms: "1.1.1",
       infoFormat: "application/json",
-      aktywny: false,
+      aktywny: true,
     },
     {
       klucz: "NID_ZABYTKI",
@@ -170,7 +172,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       pole: "strefaKonserwatorska",
       wersjaWms: "1.1.1",
       infoFormat: "application/json",
-      aktywny: false,
+      aktywny: true,
     },
   ],
   overpass: {
@@ -183,6 +185,18 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       "https://overpass.private.coffee/api/interpreter",
     ],
     promienM: 1500,
+  },
+  odleglosci: {
+    aktywny: true,
+    endpointy: [
+      "https://overpass-api.de/api/interpreter",
+      "https://overpass.kumi.systems/api/interpreter",
+      "https://overpass.private.coffee/api/interpreter",
+    ],
+    // Bufor ≥ najdalszy próg dyskwalifikacji (szkoła młodzi 8000 m) + margines.
+    promienM: 8500,
+    // Wyścig mirrorów z jednym, krótkim limitem — worst-case ~timeoutMs (nie 3×).
+    timeoutMs: 12000,
   },
   katalog: [
     { klucz: "ULDK", zrodlo: "ULDK (GUGiK)", endpoint: "https://uldk.gugik.gov.pl/", poziom: "P1", etap: "M1", aktywny: true },
