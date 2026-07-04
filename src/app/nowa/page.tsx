@@ -18,6 +18,7 @@ import { SYMBOLE_MPZP, statusZeSymbolu } from "@/lib/mpzp";
 import { PodgladTerenu, type TrybMapy, type WarstwyMapy } from "@/components/GruntMap";
 import { RaportView } from "@/components/RaportView";
 import { liczba, statusSlowny } from "@/lib/format";
+import { zapiszWynik } from "@/lib/archiwum";
 
 const ETYK_WERDYKT_KIER: Record<KluczWerdyktu, string> = {
   spolecznyMlodzi: "Społeczny — młodzi",
@@ -73,6 +74,7 @@ export default function NowaAnalizaPage() {
   const [meta, setMeta] = useState<MetaRozw | null>(null);
   const [mediana, setMediana] = useState<{ czynsz: number; cenaNowych: number; wartoscOdtworzeniowa: number } | null>(null);
   const [wynik, setWynik] = useState<WynikAnalizy | null>(null);
+  const [zapisanoDo, setZapisanoDo] = useState<string | null>(null);
   const [blad, setBlad] = useState<string | null>(null);
   const [licze, setLicze] = useState(false);
   const [recznaPow, setRecznaPow] = useState("");
@@ -350,7 +352,20 @@ export default function NowaAnalizaPage() {
       {/* EKRAN: RAPORT (studium) */}
       {ekran === "raport" && wynik && (
         <div className="space-y-4">
-          <div className="brak-druku flex justify-end">
+          <div className="brak-druku flex justify-end items-center gap-3">
+            {zapisanoDo && (
+              <span className="text-[12px] text-grunt-green">
+                ✓ Zapisano w archiwum ·{" "}
+                <a href="/archiwum" className="underline hover:text-grunt-ink">Przeanalizowane działki</a>
+              </span>
+            )}
+            <button
+              onClick={() => { zapiszWynik(wynik); setZapisanoDo(wynik.dane.id); }}
+              className="btn-secondary"
+              style={{ height: "var(--grunt-h-cta)" }}
+            >
+              {zapisanoDo === wynik.dane.id ? "Zaktualizuj w archiwum" : "Zapisz do archiwum"}
+            </button>
             <button onClick={() => window.print()} className="btn-primary" style={{ height: "var(--grunt-h-cta)" }}>↓ Pobierz PDF (drukuj)</button>
           </div>
           <RaportView wynik={wynik} data={new Date().toLocaleDateString("pl-PL")} />

@@ -62,6 +62,7 @@ function PasekGorny() {
 
         <nav className="flex items-center gap-5 text-[13px] text-grunt-text-3">
           <Link href="/nowa" className="hover:text-grunt-ink">Nowa analiza</Link>
+          <Link href="/archiwum" className="hover:text-grunt-ink">Przeanalizowane działki</Link>
           <Link href="/konfiguracja" className="hover:text-grunt-ink">Konfiguracja</Link>
           <Link href="/o-aplikacji" className="hover:text-grunt-ink">O aplikacji</Link>
         </nav>
