@@ -26,3 +26,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# importer warstwy usług — artefakt diagnostyczny (log rekordów bez współrzędnych)
+tools/uslugi-stale/bez_wspolrzednych.log.json
