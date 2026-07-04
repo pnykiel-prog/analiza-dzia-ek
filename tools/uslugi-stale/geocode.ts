@@ -1,16 +1,16 @@
 /**
- * Geokoder GUGiK (adres → współrzędne WGS84) z cache adres→współrzędne.
+ * Geokoder GUGiK UUG (adres → współrzędne WGS84) z cache adres→współrzędne.
  * Używany przez importer warstwy usług dla rekordów bez współrzędnych (RPWDL/RA).
  *
- * GUGiK UUG zwraca współrzędne w EPSG:2180 (PUWG1992) — konwertujemy przez
- * `pl1992ToWgs84` z aplikacji. Cache: nie geokoduj ponownie adresów niezmienionych
- * (roczny bieg geokoduje tylko nowe/zmienione). Nie przerywaj importu na błędzie.
+ * GUGiK UUG (GetAddress) wymaga adresu w postaci „Miejscowość, Ulica Numer"
+ * (miejscowość NAJPIERW, bez kodu pocztowego) — inaczej odpowiada type:city / 0.
+ * Z parametrem srid=4326 zwraca od razu WGS84, więc nie ma konwersji z EPSG:2180.
+ * Cache trzyma tylko udane geokodowania. Nie przerywa importu na błędzie.
  */
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { pl1992ToWgs84 } from "../../src/lib/geo";
 
 const KATALOG = dirname(fileURLToPath(import.meta.url));
 const PLIK_CACHE = join(KATALOG, "geocode_cache.json");
@@ -20,60 +20,101 @@ const cache: Record<string, Wsp> = existsSync(PLIK_CACHE) ? JSON.parse(readFileS
 
 const spij = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// Nagłówki „jak przeglądarka" — GUGiK (za zaporą) odrzuca zapytania bez User-Agent (HTTP 403),
-// tak samo jak RSPO. Bez tego geokodowały się 0 z N adresów.
+// Nagłówki „jak przeglądarka" — GUGiK (za zaporą) odrzuca zapytania bez User-Agent (HTTP 403).
 const NAGLOWKI = {
   Accept: "application/json",
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
   "Accept-Language": "pl-PL,pl;q=0.9",
 };
 
-// Diagnostyka: przy pierwszych błędach wypisz powód, przy pierwszym sukcesie — surowe współrzędne.
-let diagBledy = 0, diagSukces = false, diagUdane = 0;
+// Diagnostyka: przy pierwszych błędach wypisz powód, przy pierwszym sukcesie — surowa odpowiedź.
+let diagBledy = 0, diagSukces = false, diagUdane = 0, diagPokazanoRaw = false;
 
 /** Statystyki geokodera do podsumowania (udane vs błędy). */
 export function statystykiGeokodera(): { udane: number; bledy: number } {
   return { udane: diagUdane, bledy: diagBledy };
 }
 
+/**
+ * Kandydaci zapytań do UUG z naszego adresu „Ulica Numer, Kod Miejscowość":
+ *   1) „Miejscowość, Ulica Numer" (właściwa kolejność UUG, bez kodu),
+ *   2) sama „Miejscowość" (fallback — centroid miejscowości, gdy ulica nie trafia).
+ */
+function kandydaci(adres: string): string[] {
+  const parts = adres.split(",").map((s) => s.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    const ulicaNumer = parts[0];
+    const miejscowosc = parts.slice(1).join(", ").replace(/\b\d{2}-\d{3}\b/g, "").trim();
+    if (miejscowosc) {
+      const out = [`${miejscowosc}, ${ulicaNumer}`];
+      if (miejscowosc.toLowerCase() !== ulicaNumer.toLowerCase()) out.push(miejscowosc);
+      return out;
+    }
+  }
+  return [adres];
+}
+
+/** Wyciąga [lon, lat] (WGS84) z obiektu wyniku UUG — tolerancyjnie (WKT lub x/y). */
+function coordsZWyniku(res: any): Wsp {
+  for (const k of ["geometry_wkt", "geometry", "geom", "wkt"]) {
+    const v = res?.[k];
+    if (typeof v === "string") {
+      const m = v.match(/POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/i);
+      if (m) return [Number(m[1]), Number(m[2])]; // WKT: POINT(lon lat)
+    }
+  }
+  const x = Number(res?.x), y = Number(res?.y);
+  if (Number.isFinite(x) && Number.isFinite(y)) {
+    // srid=4326: rozpoznaj lon/lat po zakresie Polski (lon 14–25, lat 48–56).
+    if (x >= 14 && x <= 25 && y >= 48 && y <= 56) return [x, y];
+    if (y >= 14 && y <= 25 && x >= 48 && x <= 56) return [y, x];
+    return [x, y];
+  }
+  return null;
+}
+
+async function zapytajUug(adres: string): Promise<Wsp> {
+  const url = `https://services.gugik.gov.pl/uug/?request=GetAddress&srid=4326&address=${encodeURIComponent(adres)}`;
+  await spij(250);
+  const r = await fetch(url, { headers: NAGLOWKI });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const j: any = await r.json();
+  const res = j?.results?.["1"] ?? (j?.results ? Object.values(j.results)[0] : null);
+  if (res && !diagPokazanoRaw) {
+    diagPokazanoRaw = true;
+    console.error(`  [geokoder] surowy wynik UUG dla „${adres}": ${JSON.stringify(res).slice(0, 240)}`);
+  }
+  return res ? coordsZWyniku(res) : null;
+}
+
 /** Geokoduje adres → [lon, lat] WGS84 (lub null). Throttle 250 ms (limity GUGiK). */
 export async function geokoduj(adres: string): Promise<Wsp> {
   const klucz = adres.trim().toLowerCase().replace(/\s+/g, " ");
   if (!klucz) return null;
-  // Cache trzyma TYLKO udane geokodowania (współrzędne) — nieudanych nie zapisujemy,
-  // by systemowa awaria (np. brak User-Agent → 403) nie zatruła cache na stałe.
+  // Cache trzyma TYLKO udane geokodowania — nieudanych nie zapisujemy, by systemowa
+  // awaria (np. zły format zapytania) nie zatruła cache na stałe.
   if (klucz in cache) { diagUdane++; return cache[klucz]; }
 
-  const url = `https://services.gugik.gov.pl/uug/?request=GetAddress&address=${encodeURIComponent(adres)}`;
   const zaloguj = (powod: string, szczegol = "") => {
     if (diagBledy < 5) console.error(`  [geokoder] BŁĄD (${powod}) dla „${adres}"${szczegol ? ` — ${szczegol}` : ""}`);
     diagBledy++;
   };
   try {
-    await spij(250);
-    const r = await fetch(url, { headers: NAGLOWKI });
-    if (!r.ok) {
-      const tekst = await r.text().catch(() => "");
-      zaloguj(`HTTP ${r.status}`, tekst.slice(0, 120).replace(/\s+/g, " "));
-      return null; // nie zapisujemy nieudanych do cache
+    for (const zapytanie of kandydaci(adres)) {
+      const w = await zapytajUug(zapytanie);
+      if (w) {
+        diagUdane++;
+        if (!diagSukces) {
+          diagSukces = true;
+          console.error(`  [geokoder] OK — „${adres}" → „${zapytanie}" → lat=${w[1].toFixed(5)} lon=${w[0].toFixed(5)} (Polska: lat 49–55, lon 14–24)`);
+        }
+        return (cache[klucz] = w);
+      }
     }
-    const j: any = await r.json();
-    const res = j?.results?.["1"] ?? (j?.results ? Object.values(j.results)[0] : null);
-    // UUG: x = northing, y = easting (EPSG:2180).
-    const x = Number(res?.x), y = Number(res?.y);
-    if (!Number.isFinite(x) || !Number.isFinite(y)) {
-      zaloguj("brak współrzędnych w odpowiedzi", JSON.stringify(j).slice(0, 160));
-      return null; // nie zapisujemy nieudanych do cache
-    }
-    const [lon, lat] = pl1992ToWgs84(y, x);
-    diagUdane++;
-    if (!diagSukces) {
-      diagSukces = true;
-      console.error(`  [geokoder] OK — test: „${adres}" → x=${x} y=${y} → lat=${lat.toFixed(5)} lon=${lon.toFixed(5)} (powinno być w Polsce: lat 49–55, lon 14–24)`);
-    }
-    return (cache[klucz] = [lon, lat]);
+    zaloguj("brak wyniku UUG (0 obiektów)");
+    return null; // nie zapisujemy nieudanych do cache
   } catch (e: any) {
-    zaloguj("wyjątek", String(e?.message ?? e).slice(0, 120));
+    zaloguj("wyjątek/HTTP", String(e?.message ?? e).slice(0, 120));
     return null; // nie zapisujemy nieudanych do cache
   }
 }
