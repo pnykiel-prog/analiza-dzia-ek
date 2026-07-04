@@ -47,10 +47,14 @@ Wymaga internetu (RSPO API + geokoder GUGiK). Node 22+, bez dodatkowych zależno
 npx tsx tools/uslugi-stale/import.ts --rspo --limit 500 --out /tmp/uslugi_test.json
 
 # Pełny import (nadpisuje src/lib/data/uslugi_stale.json — atomowo):
-npx tsx tools/uslugi-stale/import.ts --rspo --rpwdl poz.csv --ra apteki.csv
+#   Gotowe wsady w wsad/ (kategoria,nazwa,adres,teryt_gmina — geokodowane przy imporcie):
+npx tsx tools/uslugi-stale/import.ts --rspo \
+  --csv tools/uslugi-stale/wsad/apteki.csv \
+  --csv tools/uslugi-stale/wsad/poz.csv
 #   --rspo             szkoły + przedszkola z RSPO API (mają współrzędne)
-#   --rpwdl <plik.csv> POZ z eksportu RPWDL (adresy → geokoder GUGiK)
-#   --ra <plik.csv>    apteki z eksportu Rejestru Aptek (adresy → geokoder GUGiK)
+#   --csv <plik.csv>   czysty wsad (kategoria,nazwa,adres,teryt_gmina) → geokoduje; można wiele --csv
+#   --rpwdl <plik.csv> POZ z surowego eksportu RPWDL (mapowanie heurystyczne)
+#   --ra <plik.csv>    apteki z surowego eksportu Rejestru Aptek (mapowanie heurystyczne)
 #   --no-geocode       pomiń geokodowanie (tylko rekordy z gotowymi współrzędnymi)
 #   --limit <n>        ogranicz liczbę rekordów (test)
 ```
