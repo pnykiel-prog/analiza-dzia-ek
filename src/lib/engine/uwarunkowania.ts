@@ -15,6 +15,7 @@ import type {
   WynikBramki,
 } from "../types";
 import type { KonfiguracjaScoring } from "../config";
+import { BRAMKI_SRODOWISKOWE_AKTYWNE } from "../config";
 
 // ── Bramki (Warstwa 0) ──────────────────────────────────────────────────────
 
@@ -54,15 +55,19 @@ export function liczBramki(d: DaneDzialki): { status: StatusBramki; flagi: strin
   );
   if (d.dostepDrogaPubliczna === false) flagi.push("Brak dostępu do drogi publicznej");
 
-  trojstan(
-    "Obszar szczególnego zagrożenia powodzią",
-    "ISOK / Hydroportal",
-    d.ryzykoPowodzioweSzczegolne,
-    "fail",
-    "Działka w obszarze szczególnego zagrożenia powodzią — wykluczenie.",
-    "Brak przeciwwskazań.",
-    objetePlanem
-  );
+  // Bramki środowiskowe (powódź, ochrona, Natura 2000, osuwiska/teren górniczy) — ZAPARKOWANE.
+  // Źródła WMS (GDOŚ/ISOK/PIG/NID) niedostępne, więc te dane nie wchodzą do analizy M1/M2.
+  if (BRAMKI_SRODOWISKOWE_AKTYWNE) {
+    trojstan(
+      "Obszar szczególnego zagrożenia powodzią",
+      "ISOK / Hydroportal",
+      d.ryzykoPowodzioweSzczegolne,
+      "fail",
+      "Działka w obszarze szczególnego zagrożenia powodzią — wykluczenie.",
+      "Brak przeciwwskazań.",
+      objetePlanem
+    );
+  }
 
   const gruntChroniony = objetePlanem
     ? false
@@ -78,39 +83,41 @@ export function liczBramki(d: DaneDzialki): { status: StatusBramki; flagi: strin
   );
   if (gruntChroniony) flagi.push("Wymagane odrolnienie/odlesienie");
 
-  trojstan(
-    "Rezerwat / park narodowy / wykluczająca forma ochrony",
-    "GDOŚ Geoserwis",
-    d.ochronaWykluczajaca,
-    "fail",
-    "Wykluczająca forma ochrony przyrody.",
-    "Brak przeciwwskazań.",
-    objetePlanem
-  );
+  if (BRAMKI_SRODOWISKOWE_AKTYWNE) {
+    trojstan(
+      "Rezerwat / park narodowy / wykluczająca forma ochrony",
+      "GDOŚ Geoserwis",
+      d.ochronaWykluczajaca,
+      "fail",
+      "Wykluczająca forma ochrony przyrody.",
+      "Brak przeciwwskazań.",
+      objetePlanem
+    );
 
-  trojstan(
-    "Natura 2000",
-    "GDOŚ Geoserwis",
-    d.natura2000,
-    "warunkowo",
-    "Obszar Natura 2000 — ograniczenia, wymagana ocena (flaga).",
-    "Brak przeciwwskazań.",
-    objetePlanem
-  );
-  if (d.natura2000 === true) flagi.push("Natura 2000");
+    trojstan(
+      "Natura 2000",
+      "GDOŚ Geoserwis",
+      d.natura2000,
+      "warunkowo",
+      "Obszar Natura 2000 — ograniczenia, wymagana ocena (flaga).",
+      "Brak przeciwwskazań.",
+      objetePlanem
+    );
+    if (d.natura2000 === true) flagi.push("Natura 2000");
 
-  const gorniczeOsuwisko =
-    d.terenGorniczy === null && d.osuwisko === null ? null : d.terenGorniczy === true || d.osuwisko === true;
-  trojstan(
-    "Teren górniczy / osuwisko (SOPO)",
-    "MIDAS / SOPO",
-    gorniczeOsuwisko,
-    "warunkowo",
-    "Teren górniczy lub osuwiskowy — ograniczenia posadowienia (flaga).",
-    "Brak przeciwwskazań.",
-    objetePlanem
-  );
-  if (gorniczeOsuwisko) flagi.push("Teren górniczy / osuwisko");
+    const gorniczeOsuwisko =
+      d.terenGorniczy === null && d.osuwisko === null ? null : d.terenGorniczy === true || d.osuwisko === true;
+    trojstan(
+      "Teren górniczy / osuwisko (SOPO)",
+      "MIDAS / SOPO",
+      gorniczeOsuwisko,
+      "warunkowo",
+      "Teren górniczy lub osuwiskowy — ograniczenia posadowienia (flaga).",
+      "Brak przeciwwskazań.",
+      objetePlanem
+    );
+    if (gorniczeOsuwisko) flagi.push("Teren górniczy / osuwisko");
+  }
 
   return { status: agregujBramki(szczegoly), flagi, szczegoly };
 }

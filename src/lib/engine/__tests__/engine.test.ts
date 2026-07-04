@@ -60,10 +60,10 @@ test("P2: pułap czynszu = wartość odtworzeniowa × 5% ÷ 12", () => {
   assert.ok(a.poziom2.kluczoweLiczby.pulapCzynszuSimM2! > 30 && a.poziom2.kluczoweLiczby.pulapCzynszuSimM2! < 35);
 });
 
-test("P2: białe plamy → Natura 2000 warunkowo w bramkach", () => {
-  const a = uruchomAnalize(bialePlamy);
-  assert.ok(a.poziom2.bramki.flagi.includes("Natura 2000"));
-  assert.equal(a.poziom2.bramki.status, "warunkowo"); // Natura 2000 → warunkowo (nie fail)
+test("P2: bramki środowiskowe ZAPARKOWANE — Natura 2000/powódź/ochrona/osuwisko nie wchodzą do bramek", () => {
+  const a = uruchomAnalize(bialePlamy); // fixture ma natura2000=true
+  assert.ok(!a.poziom2.bramki.flagi.includes("Natura 2000"));
+  assert.ok(!a.poziom2.bramki.szczegoly.some((s) => /Natura 2000|powodzi|ochrony|osuwisk|SOPO/i.test(s.nazwa)));
 });
 
 test("P2: obwiednia z MPZP ma wyższą pewność niż fallback z sąsiedztwa", () => {
@@ -124,10 +124,10 @@ test("P2: sygnały i realne białe plamy", () => {
   assert.ok(a.poziom2.sygnaly.some((s) => s.ton === "pozytyw"));
 
   const b = uruchomAnalize(bialePlamy);
-  // Brak czynszu → biała plama rynku najmu; Natura 2000 → sygnał ostrzegawczy.
+  // Brak czynszu → biała plama rynku najmu. Środowisko ZAPARKOWANE → brak sygnału z Natury 2000.
   assert.ok(b.poziom2.braki.length >= 1, `braki=${b.poziom2.braki.length}`);
   assert.ok(b.poziom2.braki.some((x) => x.tytul.toLowerCase().includes("najmu")));
-  assert.ok(b.poziom2.sygnaly.some((s) => s.ton === "ostrzezenie"));
+  assert.ok(!b.poziom2.sygnaly.some((s) => /natura/i.test(s.tekst)));
 });
 
 test("P3: trzy scenariusze, reżim domyślny B, oś czasu sensowna", () => {

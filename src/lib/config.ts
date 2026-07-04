@@ -13,6 +13,14 @@
 
 import type { Profil, Rezim } from "./types";
 
+/**
+ * Bramki środowiskowe (Natura 2000, powódź, wykluczająca ochrona, osuwiska/teren górniczy)
+ * — ZAPARKOWANE. Źródła WMS (GDOŚ Geoserwis, ISOK/Hydroportal, PIG-PIB SOPO, NID) są obecnie
+ * niedostępne (timeout/HTTP/WAF Incapsula), więc te dane NIE wchodzą do analizy M1 ani M2.
+ * Ustaw `true`, gdy źródła znów działają — logika bramek wróci bez innych zmian.
+ */
+export const BRAMKI_SRODOWISKOWE_AKTYWNE = false;
+
 // ── POZIOM 1: progi i wagi ──────────────────────────────────────────────────
 
 export interface KonfiguracjaScoring {
