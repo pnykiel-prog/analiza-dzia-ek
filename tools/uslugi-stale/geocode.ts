@@ -40,7 +40,9 @@ export function statystykiGeokodera(): { udane: number; bledy: number } {
 export async function geokoduj(adres: string): Promise<Wsp> {
   const klucz = adres.trim().toLowerCase().replace(/\s+/g, " ");
   if (!klucz) return null;
-  if (klucz in cache) return cache[klucz];
+  // Cache trzyma TYLKO udane geokodowania (współrzędne) — nieudanych nie zapisujemy,
+  // by systemowa awaria (np. brak User-Agent → 403) nie zatruła cache na stałe.
+  if (klucz in cache) { diagUdane++; return cache[klucz]; }
 
   const url = `https://services.gugik.gov.pl/uug/?request=GetAddress&address=${encodeURIComponent(adres)}`;
   const zaloguj = (powod: string, szczegol = "") => {
@@ -53,7 +55,7 @@ export async function geokoduj(adres: string): Promise<Wsp> {
     if (!r.ok) {
       const tekst = await r.text().catch(() => "");
       zaloguj(`HTTP ${r.status}`, tekst.slice(0, 120).replace(/\s+/g, " "));
-      return (cache[klucz] = null);
+      return null; // nie zapisujemy nieudanych do cache
     }
     const j: any = await r.json();
     const res = j?.results?.["1"] ?? (j?.results ? Object.values(j.results)[0] : null);
@@ -61,7 +63,7 @@ export async function geokoduj(adres: string): Promise<Wsp> {
     const x = Number(res?.x), y = Number(res?.y);
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
       zaloguj("brak współrzędnych w odpowiedzi", JSON.stringify(j).slice(0, 160));
-      return (cache[klucz] = null);
+      return null; // nie zapisujemy nieudanych do cache
     }
     const [lon, lat] = pl1992ToWgs84(y, x);
     diagUdane++;
@@ -72,7 +74,7 @@ export async function geokoduj(adres: string): Promise<Wsp> {
     return (cache[klucz] = [lon, lat]);
   } catch (e: any) {
     zaloguj("wyjątek", String(e?.message ?? e).slice(0, 120));
-    return (cache[klucz] = null);
+    return null; // nie zapisujemy nieudanych do cache
   }
 }
 
