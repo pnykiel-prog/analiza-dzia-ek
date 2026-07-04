@@ -29,7 +29,12 @@ const NAGLOWKI = {
 };
 
 // Diagnostyka: przy pierwszych błędach wypisz powód, przy pierwszym sukcesie — surowe współrzędne.
-let diagBledy = 0, diagSukces = false;
+let diagBledy = 0, diagSukces = false, diagUdane = 0;
+
+/** Statystyki geokodera do podsumowania (udane vs błędy). */
+export function statystykiGeokodera(): { udane: number; bledy: number } {
+  return { udane: diagUdane, bledy: diagBledy };
+}
 
 /** Geokoduje adres → [lon, lat] WGS84 (lub null). Throttle 250 ms (limity GUGiK). */
 export async function geokoduj(adres: string): Promise<Wsp> {
@@ -59,6 +64,7 @@ export async function geokoduj(adres: string): Promise<Wsp> {
       return (cache[klucz] = null);
     }
     const [lon, lat] = pl1992ToWgs84(y, x);
+    diagUdane++;
     if (!diagSukces) {
       diagSukces = true;
       console.error(`  [geokoder] OK — test: „${adres}" → x=${x} y=${y} → lat=${lat.toFixed(5)} lon=${lon.toFixed(5)} (powinno być w Polsce: lat 49–55, lon 14–24)`);
