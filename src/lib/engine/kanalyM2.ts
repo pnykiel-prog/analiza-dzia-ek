@@ -12,7 +12,7 @@
  * Funkcje czyste (testowalne offline).
  */
 
-import type { DaneDzialki, OcenaM2, Profil, StatusBramki, Werdykt, WerdyktProfiluM2, WynikPoziom1 } from "../types";
+import type { DaneDzialki, Dostepnosc, OcenaM2, Profil, StatusBramki, Werdykt, WerdyktProfiluM2, WynikPoziom1 } from "../types";
 import type { KonfiguracjaM2, ProgUslugi } from "../config";
 import { KONFIG_M2 } from "../config";
 import { clamp, clamp01 } from "./utils";
@@ -25,6 +25,43 @@ function etykietaUslugi(klucz: string, cfg: KonfiguracjaM2): string {
 }
 
 const clampBonus = (v: number) => Math.max(0, Math.min(1, v));
+
+/** Etykiety usług pieszo (kanał A) do panelu dostępności. */
+const ETYKIETY_USLUG: Record<string, string> = {
+  poz: "Przychodnia (POZ)",
+  apteka: "Apteka",
+  sklep: "Sklep spożywczy",
+  szkola: "Szkoła",
+  przedszkole: "Przedszkole / żłobek",
+};
+
+/**
+ * Buduje dane dostępności do PANELU TEKSTOWEGO (odległości + progi + status per usługa).
+ * status: `komfort` (≤ komfort), `gradient` (między), `bramka` (≥ dyskwalifikacja — dyskwalifikuje
+ * profil), `brak` (nieustalona — pytana ręcznie, niższa pewność; NIE dyskwalifikuje). Czysta funkcja.
+ */
+export function liczDostepnosc(d: DaneDzialki, cfg: KonfiguracjaM2 = KONFIG_M2): Dostepnosc {
+  const uslugi = Object.entries(cfg.progiUslug).map(([klucz, prog]) => {
+    const m = d.odleglosciM2?.[klucz] ?? null;
+    const profile = (["mlodzi", "seniorzy"] as Profil[]).filter((p) => prog[p]);
+    let status: "komfort" | "gradient" | "bramka" | "brak" = "brak";
+    if (m != null) {
+      status = "komfort";
+      for (const p of profile) {
+        const pr = prog[p]!;
+        if (m >= pr.dyskwalifikacjaM) { status = "bramka"; break; }
+        if (m > pr.komfortM) status = "gradient";
+      }
+    }
+    return { klucz, etykieta: ETYKIETY_USLUG[klucz] ?? klucz, m, profile, progi: prog, status };
+  });
+  const otoczenie = cfg.otoczenie.kategorie.map((klucz) => ({
+    klucz,
+    etykieta: cfg.otoczenie.etykiety[klucz] ?? klucz,
+    m: d.odleglosciM2?.[klucz] ?? null,
+  }));
+  return { uslugi, otoczenie };
+}
 
 /**
  * Transport zbiorowy — ŁAGODNY modyfikator jakości per profil (wytyczne panel_transport §2–§3).

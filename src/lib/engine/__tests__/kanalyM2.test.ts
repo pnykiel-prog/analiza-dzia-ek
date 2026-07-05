@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { dostepnoscA, przydatnoscEkonomicznaB, modyfikatorPopytuC, modyfikatorTransportu, ocenM2, flagiTransportu } from "../kanalyM2";
+import { dostepnoscA, przydatnoscEkonomicznaB, modyfikatorPopytuC, modyfikatorTransportu, ocenM2, flagiTransportu, liczDostepnosc } from "../kanalyM2";
 import { uruchomPoziom1 } from "../poziom1";
 import { DZIALKI_PRZYKLADOWE } from "../../data/sample";
 import type { DaneDzialki } from "../../types";
@@ -52,6 +52,17 @@ test("transport §6: usługi pieszo (POZ) bramkują niezależnie od transportu",
   // „Nie ma" transportu, ale brak POZ w zasięgu nadal chroni seniora (osobna bramka).
   const a = dostepnoscA({ ...baza, odleglosciM2: { poz: 6000 }, transport: { jest: false, przystanki: [] } } as DaneDzialki, "seniorzy");
   assert.equal(a.obsluzalny, false);
+});
+
+test("liczDostepnosc: status per usługa (komfort/gradient/bramka/brak) do panelu tekstowego", () => {
+  const d = liczDostepnosc({ ...baza, odleglosciM2: { poz: 300, apteka: 3600, sklep: 250, zielen: 200 } } as DaneDzialki);
+  const poz = d.uslugi.find((u) => u.klucz === "poz")!;
+  const apteka = d.uslugi.find((u) => u.klucz === "apteka")!;
+  const szkola = d.uslugi.find((u) => u.klucz === "szkola")!;
+  assert.equal(poz.status, "komfort"); // 300 ≤ 500
+  assert.equal(apteka.status, "bramka"); // 3600 ≥ 3500 → dyskwalifikuje
+  assert.equal(szkola.status, "brak"); // brak odległości → nieustalona
+  assert.ok(d.otoczenie.find((o) => o.klucz === "zielen")?.m === 200); // otoczenie w panelu
 });
 
 test("kanał B: daleka sieć + spadek → niższa przydatność ekonomiczna (skaluje, nie dyskwalifikuje)", () => {

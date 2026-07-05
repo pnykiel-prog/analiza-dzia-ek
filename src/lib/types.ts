@@ -485,6 +485,22 @@ export interface WerdyktProfiluM2 {
   powody: string[]; // dyskwalifikacje/odrzucenia i istotne modyfikatory
 }
 
+/** Pozycja dostępności usługi pieszo (kanał A) — do panelu tekstowego. */
+export interface DostepnoscUsluga {
+  klucz: string;
+  etykieta: string;
+  m: number | null; // odległość [m]; null = nieustalona (pytana ręcznie / niższa pewność)
+  profile: Profil[]; // dla których profili usługa jest krytyczna
+  progi: Partial<Record<Profil, { komfortM: number; dyskwalifikacjaM: number }>>;
+  status: "komfort" | "gradient" | "bramka" | "brak"; // agregat po profilach (najgorszy)
+}
+
+/** Dostępność do panelu M2: usługi pieszo (bramka A) + otoczenie (modyfikator). */
+export interface Dostepnosc {
+  uslugi: DostepnoscUsluga[];
+  otoczenie: { klucz: string; etykieta: string; m: number | null }[];
+}
+
 /** Synteza M2: werdykt per profil + rekomendacja + dopuszczalność. */
 export interface OcenaM2 {
   werdykty: Record<Profil, WerdyktProfiluM2>;
@@ -504,6 +520,8 @@ export interface WynikPoziom2 {
   sygnaly: Sygnal[];
   braki: BrakDanych[];
   kluczoweLiczby: KluczoweLiczby;
+  /** Odległości do usług pieszo + otoczenia (panel tekstowy dostępności). */
+  dostepnosc: Dostepnosc;
   /** Domknięcie systemowe: werdykt M2 per profil (kanały A–F) + rekomendacja. */
   ocenaM2: OcenaM2;
 }

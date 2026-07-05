@@ -24,7 +24,7 @@ import type { KonfiguracjaZabudowy } from "../config";
 import { KONFIG_ZABUDOWA, KONFIG_SCORING } from "../config";
 import { liczBramki, liczBraki, liczKluczoweLiczby, liczSygnaly } from "./uwarunkowania";
 import { kaskadaWskaznikow } from "./kaskadaWskaznikow";
-import { ocenM2, sygnalyOtoczenia } from "./kanalyM2";
+import { ocenM2, sygnalyOtoczenia, liczDostepnosc } from "./kanalyM2";
 
 interface WskaznikiUzyte {
   intensywnosc: number;
@@ -290,6 +290,7 @@ export function uruchomPoziom2(
     sygnaly,
     braki,
     kluczoweLiczby,
+    dostepnosc: liczDostepnosc(d),
     ocenaM2,
   };
 }
