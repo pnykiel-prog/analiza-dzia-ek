@@ -13,6 +13,7 @@ import { konektorOverpass } from "./overpass";
 import { konektorOdleglosci } from "./odleglosci";
 import { konektorSpadek } from "./spadek";
 import { konektorAglomeracja } from "./aglomeracja";
+import { konektorGtfs } from "./gtfs";
 import { konektorWartoscOdtworzeniowa } from "./wartosc";
 import { konektorRynek } from "./rynek";
 
@@ -24,6 +25,7 @@ const REJESTR: Konektor[] = [
   konektorOdleglosci,
   konektorSpadek,
   konektorAglomeracja,
+  konektorGtfs,
   konektorWartoscOdtworzeniowa,
   konektorRynek,
 ];

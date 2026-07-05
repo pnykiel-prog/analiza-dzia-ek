@@ -73,6 +73,8 @@ export interface KonfiguracjaKonektorow {
   spadek: { aktywny: boolean; endpoint: string; offsetM: number; timeoutMs: number };
   /** Kanał C (M2) — dojazd do aglomeracji (proxy geometryczne, offline). */
   aglomeracja: { aktywny: boolean; sredniaPredkoscKmh: number; wspKretosci: number };
+  /** Kontekst transportowy (M2) — statyczna warstwa przystanków GTFS (offline, kursów/dobę). */
+  gtfs: { aktywny: boolean };
   /** Katalog pozostałych źródeł (mapa architektury; włączane w M2/M3). */
   katalog: { klucz: string; zrodlo: string; endpoint: string; poziom: "P1" | "P2"; etap: "M1" | "M2" | "M3"; aktywny: boolean }[];
 }
@@ -226,6 +228,10 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
     sredniaPredkoscKmh: 65,
     wspKretosci: 1.3,
   },
+  // Statyczna warstwa GTFS (gtfs_przystanki.json) — offline, deterministyczna.
+  // Aktywna: przy SEED większość działek → „brak pokrycia" (kontekst null, bezpiecznie);
+  // pełne dane wgrywa tools/gtfs/import.ts.
+  gtfs: { aktywny: true },
   katalog: [
     { klucz: "ULDK", zrodlo: "ULDK (GUGiK)", endpoint: "https://uldk.gugik.gov.pl/", poziom: "P1", etap: "M1", aktywny: true },
     { klucz: "GUS_BDL", zrodlo: "GUS BDL", endpoint: "https://bdl.stat.gov.pl/api/v1", poziom: "P1", etap: "M1", aktywny: true },

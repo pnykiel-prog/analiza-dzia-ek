@@ -406,8 +406,10 @@ export interface KonfiguracjaM2 {
   /**
    * Kontekst transportowy z GTFS (wytyczne transport §3, §8). Ustala, czy przystanek działa
    * jako bramka (miasto), czy tylko flaga (wieś). `progKursyDobe` chroni przed „martwą linią".
+   * `zasiegPokryciaM` odróżnia „wieś w zasięgu GTFS" (najbliższy przystanek bliżej → flaga)
+   * od „brak danych o regionie" (najbliższy przystanek dalej → kontekst nieznany, bez flagi).
    */
-  transportKontekst: { RgtfsM: number; progKursyDobe: number };
+  transportKontekst: { RgtfsM: number; progKursyDobe: number; zasiegPokryciaM: number };
   /** Kanał B — koszt uzbrojenia (odległość do sieci → przydatność ekonomiczna). */
   kosztUzbrojenia: { odlegloscKomfortM: number; odlegloscDrogaM: number; karaSpadekPct: number };
   /** Kanał C — modyfikatory popytu (aglomeracja, potencjał, pustostany). */
@@ -439,7 +441,8 @@ export const KONFIG_M2: KonfiguracjaM2 = {
   },
   minFaktorUslugi: 0.3,
   // Żywe pokrycie GTFS: przystanek z ≥10 kursami/dobę w promieniu 1500 m = kontekst miejski.
-  transportKontekst: { RgtfsM: 1500, progKursyDobe: 10 },
+  // Poza 8 km od najbliższego przystanku w warstwie → uznajemy brak pokrycia GTFS (kontekst nieznany).
+  transportKontekst: { RgtfsM: 1500, progKursyDobe: 10, zasiegPokryciaM: 8000 },
   kosztUzbrojenia: { odlegloscKomfortM: 50, odlegloscDrogaM: 500, karaSpadekPct: 8 },
   modyfikatorPopytu: {
     dojazdKomfortMin: 30,

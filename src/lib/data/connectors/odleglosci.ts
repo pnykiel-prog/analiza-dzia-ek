@@ -174,11 +174,12 @@ function proxyZOdleglosci(odl: Record<string, number>): Partial<DaneDzialki> {
     return znane.length === 0 ? undefined : znane.some((k) => odl[k] <= prog);
   };
   const p: Partial<DaneDzialki> = {};
-  const przyst = wZasiegu("przystanek");
+  // Uwaga: przystanekZCzestotliwoscia NIE z OSM — martwy słupek bez rozkładu nie daje
+  // częstotliwości (wytyczne transport §2). Ustawia je konektor GTFS. OSM daje tylko
+  // LOKALIZACJĘ przystanku (odległość w odleglosciM2) — do bramki kanału A w kontekście miejskim.
   const uslugi = wZasiegu("sklep", "apteka");
   const poz = wZasiegu("poz");
   const eduk = wZasiegu("szkola", "przedszkole");
-  if (przyst !== undefined) p.przystanekZCzestotliwoscia = przyst;
   if (uslugi !== undefined) p.uslugiPodstawowePieszo = uslugi;
   if (poz !== undefined) p.pozWZasiegu = poz;
   if (eduk !== undefined) p.zlobkiSzkolyWZasiegu = eduk;
