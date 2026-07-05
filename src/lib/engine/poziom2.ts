@@ -277,7 +277,7 @@ export function uruchomPoziom2(
     dzialkaId: d.id,
     obwiednia,
     warianty,
-    flagiRyzyka: flagiRyzyka(d, obwiednia, w, cfg, p1),
+    flagiRyzyka: [...flagiRyzyka(d, obwiednia, w, cfg, p1), ...ocenaM2.flagi],
     bramki,
     sygnaly,
     braki,

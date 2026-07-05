@@ -25,14 +25,45 @@ function etykietaUslugi(klucz: string, cfg: KonfiguracjaM2): string {
 }
 
 /**
+ * Kontekst transportowy z „żywego" pokrycia GTFS (wytyczne transport §3):
+ * przystanek z ≥ `progKursyDobe` kursami/dobę w promieniu `RgtfsM` → `z_komunikacja`
+ * (miasto), inaczej `bez_komunikacji` (wieś). Brak danych GTFS (`kursyDobe == null`) → `null`.
+ * Martwa linia (poniżej progu) NIE ustawia kontekstu miejskiego (§4/§9).
+ */
+export function kontekstZGtfs(przystanekM: number | null | undefined, kursyDobe: number | null | undefined, cfg: KonfiguracjaM2 = KONFIG_M2): "z_komunikacja" | "bez_komunikacji" | null {
+  if (kursyDobe == null) return null; // brak GTFS = nieznane (nigdy nie karze — §0)
+  const zywy = przystanekM != null && przystanekM <= cfg.transportKontekst.RgtfsM && kursyDobe >= cfg.transportKontekst.progKursyDobe;
+  return zywy ? "z_komunikacja" : "bez_komunikacji";
+}
+
+/**
+ * Flaga transportowa (wytyczne transport §4.2, §5): na terenie bez żywej komunikacji
+ * INFORMACYJNA flaga, NIGDY odjęcie punktów. Mocniej eksponowana dla seniorów.
+ * Zwraca pustą listę, gdy kontekst miejski lub nieznany (brak GTFS nie tworzy flagi „bez").
+ */
+export function flagiTransportu(d: DaneDzialki): string[] {
+  if (d.kontekstTransportowy !== "bez_komunikacji") return [];
+  return [
+    "Teren bez komunikacji zbiorowej (GTFS) — informacyjnie, nie obniża oceny. " +
+      "Dostępność niosą bliskość aglomeracji i dojazd; istotniejsze dla profilu senioralnego (dowóz/transport na żądanie poza zasięgiem danych).",
+  ];
+}
+
+/**
  * Kanał A — obsługiwalność per profil (spec §4): każda krytyczna usługa ma WŁASNE
  * progi (komfort, dyskwalifikacja). f_usługi = 1,0 (≤ komfort) → `minFaktorUslugi`
  * (liniowo do dyskwalifikacji); ≥ dyskwalifikacja = BRAMKA (weakest-link → mnożnik 0).
  * Braki NIE dyskwalifikują (unknown ≠ far) — schodzą tylko na pewność (F).
+ *
+ * Transport (wytyczne transport §4): `przystanek` liczy się jako bramka TYLKO w kontekście
+ * miejskim (`kontekstTransportowy === "z_komunikacja"`). Na wsi / przy braku GTFS przystanek
+ * jest wyłączony z bramki (nie obniża A, nie dyskwalifikuje) — zastępuje go flaga.
  */
 export function dostepnoscA(d: DaneDzialki, profil: Profil, cfg: KonfiguracjaM2 = KONFIG_M2): { mnoznik: number; obsluzalny: boolean; powody: string[] } {
   const powody: string[] = [];
+  const transportBramkuje = d.kontekstTransportowy === "z_komunikacja";
   const dyst = Object.entries(cfg.progiUslug)
+    .filter(([k]) => k !== "przystanek" || transportBramkuje) // przystanek tylko w mieście (§4.1)
     .map(([k, p]) => ({ k, prog: p[profil], m: d.odleglosciM2?.[k] }))
     .filter((x): x is { k: string; prog: ProgUslugi; m: number } => x.prog != null && x.m != null && x.m >= 0);
   if (dyst.length === 0) {
@@ -166,5 +197,5 @@ export function ocenM2(d: DaneDzialki, p1: WynikPoziom1, dopuszczalnosc: StatusB
   } else {
     rekomendacja = kandydaci.reduce((a, b) => (werdykty[b].score > werdykty[a].score ? b : a));
   }
-  return { werdykty, dopuszczalnosc, rekomendacja, powodBrak };
+  return { werdykty, dopuszczalnosc, rekomendacja, powodBrak, flagi: flagiTransportu(d) };
 }

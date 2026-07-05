@@ -403,6 +403,11 @@ export interface KonfiguracjaM2 {
   progiUslug: Record<string, Partial<Record<"mlodzi" | "seniorzy", ProgUslugi>>>;
   /** Kanał A — dolna wartość gradientu f_usługi na granicy dyskwalifikacji (spec §4: 1,0 → 0,3). */
   minFaktorUslugi: number;
+  /**
+   * Kontekst transportowy z GTFS (wytyczne transport §3, §8). Ustala, czy przystanek działa
+   * jako bramka (miasto), czy tylko flaga (wieś). `progKursyDobe` chroni przed „martwą linią".
+   */
+  transportKontekst: { RgtfsM: number; progKursyDobe: number };
   /** Kanał B — koszt uzbrojenia (odległość do sieci → przydatność ekonomiczna). */
   kosztUzbrojenia: { odlegloscKomfortM: number; odlegloscDrogaM: number; karaSpadekPct: number };
   /** Kanał C — modyfikatory popytu (aglomeracja, potencjał, pustostany). */
@@ -433,6 +438,8 @@ export const KONFIG_M2: KonfiguracjaM2 = {
     przedszkole: { mlodzi: { komfortM: 1000, dyskwalifikacjaM: 8000 } },
   },
   minFaktorUslugi: 0.3,
+  // Żywe pokrycie GTFS: przystanek z ≥10 kursami/dobę w promieniu 1500 m = kontekst miejski.
+  transportKontekst: { RgtfsM: 1500, progKursyDobe: 10 },
   kosztUzbrojenia: { odlegloscKomfortM: 50, odlegloscDrogaM: 500, karaSpadekPct: 8 },
   modyfikatorPopytu: {
     dojazdKomfortMin: 30,
