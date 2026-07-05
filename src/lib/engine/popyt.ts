@@ -144,7 +144,12 @@ function mnoznikUslug(d: DaneDzialki, profil: Profil, cfg: KonfiguracjaPopyt): {
   let raw: number;
   let fallback: boolean;
   if (profil === "mlodzi") {
-    const przyst = d.przystanekZCzestotliwoscia === null ? 0.6 : d.przystanekZCzestotliwoscia ? 1 : 0.3;
+    // Transport punktuje TYLKO w kontekście miejskim (wytyczne transport §4.2): na wsi/bez GTFS
+    // przystanek jest neutralny (nie obniża popytu) — ciężar dostępności niesie dojazd/aglomeracja.
+    const przyst =
+      d.kontekstTransportowy === "z_komunikacja" && d.przystanekZCzestotliwoscia != null
+        ? d.przystanekZCzestotliwoscia ? 1 : 0.3
+        : 0.6;
     const szkoly = d.zlobkiSzkolyWZasiegu === null ? 0.7 : d.zlobkiSzkolyWZasiegu ? 1 : 0.5;
     raw = (dojazdIdx + przyst + szkoly) / 3;
     fallback = d.przystanekZCzestotliwoscia === null && d.czasDojazdAglomeracjaMin === null && d.zlobkiSzkolyWZasiegu === null;

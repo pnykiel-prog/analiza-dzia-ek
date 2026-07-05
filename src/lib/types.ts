@@ -116,6 +116,14 @@ export interface DaneDzialki {
   /** M2 kanał C: bliskość aglomeracji z pierścieni klas miast (sygnał + modyfikator per profil). */
   bliskoscAglomeracji?: Maybe<BliskoscAglomeracji>;
   przystanekZCzestotliwoscia: Maybe<boolean>; // ≥X kursów/dobę, ≤800 m
+  /** GTFS — kursów/dobę roboczą na najbliższym przystanku (żywe pokrycie). */
+  przystanekKursyDobe?: Maybe<number>;
+  /**
+   * Kontekst transportowy z GTFS (wytyczne transport §3): „żywe pokrycie" w promieniu →
+   * `z_komunikacja` (miasto — przystanek działa jako bramka kanału A) vs
+   * `bez_komunikacji` (wieś — przystanek TYLKO flaga, nie obniża oceny). `null` = brak danych GTFS.
+   */
+  kontekstTransportowy?: Maybe<"z_komunikacja" | "bez_komunikacji">;
 
   // G. Infrastruktura społeczna (różne dla profili)
   uslugiPodstawowePieszo: Maybe<boolean>; // tkanka z usługami w zasięgu spaceru (seniorzy)
@@ -473,6 +481,7 @@ export interface OcenaM2 {
   dopuszczalnosc: StatusBramki; // kanał E zbiorczo
   rekomendacja: Profil | "brak"; // najlepszy z dopuszczalnych/obsługiwalnych; „brak" gdy żaden
   powodBrak?: string; // uzasadnienie „BRAK — lokalizacja nieodpowiednia"
+  flagi: string[]; // informacyjne (np. „teren bez komunikacji zbiorowej") — BEZ wpływu na punktację
 }
 
 export interface WynikPoziom2 {
