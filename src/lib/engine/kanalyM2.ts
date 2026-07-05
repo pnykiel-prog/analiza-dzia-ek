@@ -57,6 +57,41 @@ export function modyfikatorTransportu(d: DaneDzialki, profil: Profil, cfg: Konfi
 }
 
 /**
+ * Otoczenie / jakość życia — ŁAGODNY modyfikator per profil (zieleń, plac zabaw, poczta, bank).
+ * NIE bramka i NIGDY kara: brak obiektu = brak bonusu (mnożnik ≥ 1). Bonus wg walkability
+ * (najbliższy obiekt kategorii) i wag per profil (młodzi: zieleń/plac zabaw; seniorzy: poczta/bank).
+ */
+export function modyfikatorOtoczenia(d: DaneDzialki, profil: Profil, cfg: KonfiguracjaM2 = KONFIG_M2): { mnoznik: number; powody: string[] } {
+  const c = cfg.otoczenie;
+  const wagi = c.wagi[profil];
+  let sygnal = 0;
+  const bliskie: string[] = [];
+  for (const kat of c.kategorie) {
+    const w = wagi[kat] ?? 0;
+    if (w <= 0) continue;
+    const m = d.odleglosciM2?.[kat];
+    if (m == null) continue; // brak → neutralne (nie kara)
+    const walk = clampBonus((c.zerM - m) / (c.zerM - c.komfortM));
+    sygnal += w * walk;
+    if (m <= c.zerM) bliskie.push(`${c.etykiety[kat] ?? kat} ~${m} m`);
+  }
+  const mnoznik = Math.round((1 + c.maxBonus * clampBonus(sygnal)) * 100) / 100;
+  const powody = mnoznik > 1 ? [`Otoczenie: ${bliskie.join(", ")} → +${Math.round((mnoznik - 1) * 100)}% popytu (jakość życia, nie bramka).`] : [];
+  return { mnoznik, powody };
+}
+
+/** Pozytywne sygnały otoczenia (do raportu): obiekty jakości życia w zasięgu spaceru. */
+export function sygnalyOtoczenia(d: DaneDzialki, cfg: KonfiguracjaM2 = KONFIG_M2): string[] {
+  const c = cfg.otoczenie;
+  const out: string[] = [];
+  for (const kat of c.kategorie) {
+    const m = d.odleglosciM2?.[kat];
+    if (m != null && m <= c.komfortM) out.push(`${c.etykiety[kat] ?? kat} w zasięgu spaceru (~${m} m)`);
+  }
+  return out;
+}
+
+/**
  * Flaga transportowa (wytyczne panel_transport §2.1, §5): „Nie ma" komunikacji → INFORMACYJNA
  * flaga „teren bez komunikacji zbiorowej", NIGDY odjęcie punktów, mocniej eksponowana dla
  * seniorów. Pominięcie/brak danych → bez flagi (nie wiemy — tylko niższa pewność).
@@ -169,10 +204,11 @@ export function ocenM2(d: DaneDzialki, p1: WynikPoziom1, dopuszczalnosc: StatusB
     const A = dostepnoscA(d, profil, cfg);
     const C = modyfikatorPopytuC(d, profil, cfg);
     const T = modyfikatorTransportu(d, profil, cfg); // łagodny bonus jakości transportu (nie bramka)
-    const popytRealizowalny = clamp(Math.round(popytM1 * A.mnoznik * C.mnoznik * T.mnoznik));
+    const O = modyfikatorOtoczenia(d, profil, cfg); // łagodny bonus jakości otoczenia (nie bramka)
+    const popytRealizowalny = clamp(Math.round(popytM1 * A.mnoznik * C.mnoznik * T.mnoznik * O.mnoznik));
     const ekonFaktor = 0.7 + 0.3 * (przydat.wartosc / 100); // B skaluje, nie zeruje
     let score = clamp(Math.round(popytRealizowalny * ekonFaktor));
-    const powody = [...A.powody, ...C.powody, ...T.powody, ...przydat.powody];
+    const powody = [...A.powody, ...C.powody, ...T.powody, ...O.powody, ...przydat.powody];
     if (!A.obsluzalny) {
       score = 0;
       powody.unshift("Profil nieobsługiwalny — usługi poza zasięgiem (kanał A).");
