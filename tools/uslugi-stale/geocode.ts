@@ -45,11 +45,13 @@ function kandydaci(adres: string): string[] {
   const parts = adres.split(",").map((s) => s.trim()).filter(Boolean);
   if (parts.length >= 2) {
     const ulicaNumer = parts[0];
-    const miejscowosc = parts.slice(1).join(", ").replace(/\b\d{2}-\d{3}\b/g, "").trim();
+    // Miejscowość = OSTATNI segment (po usunięciu kodu pocztowego) — odporne na przecinki
+    // wewnątrz numeru („14C/9,14A/9") i wieloczłonowe adresy.
+    const miejscowosc = parts[parts.length - 1].replace(/\b\d{2}-\d{3}\b/g, "").trim();
     if (miejscowosc) {
-      const out = [`${miejscowosc}, ${ulicaNumer}`];
-      if (miejscowosc.toLowerCase() !== ulicaNumer.toLowerCase()) out.push(miejscowosc);
-      return out;
+      // Pełny adres + fallback na sam centroid miejscowości (gdy dziwny numer nie trafia).
+      const out = [`${miejscowosc}, ${ulicaNumer}`, miejscowosc];
+      return out.filter((v, i) => out.indexOf(v) === i);
     }
   }
   return [adres];
@@ -79,7 +81,11 @@ async function zapytajUug(adres: string): Promise<Wsp> {
   await spij(250);
   const r = await fetch(url, { headers: NAGLOWKI });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  const j: any = await r.json();
+  const txt = await r.text();
+  // UUG bywa zwraca nie-JSON (np. „Blad zapytania." dla dziwnego numeru) — traktuj jak brak
+  // wyniku (null), NIE wyjątek, żeby pętla spróbowała następnego kandydata (centroid miejscowości).
+  let j: any;
+  try { j = JSON.parse(txt); } catch { return null; }
   const res = j?.results?.["1"] ?? (j?.results ? Object.values(j.results)[0] : null);
   if (res && !diagPokazanoRaw) {
     diagPokazanoRaw = true;
