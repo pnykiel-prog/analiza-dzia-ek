@@ -1,0 +1,14 @@
+{
+  "meta": {
+    "opis": "Statyczna warstwa przystankow z GTFS (kanal A / kontekst transportowy) — SEED. Pelna warstwa z tools/gtfs/import.ts.",
+    "data_importu": "SEED",
+    "zrodla": ["KPD/GTFS"]
+  },
+  "przystanki": [
+    { "nazwa": "Warszawa Centrum", "lat": 52.2297, "lon": 21.0122, "kursyDobe": 420, "feed": "SEED" },
+    { "nazwa": "Warszawa Metro Politechnika", "lat": 52.2195, "lon": 21.0125, "kursyDobe": 380, "feed": "SEED" },
+    { "nazwa": "Krakow Teatr Bagatela", "lat": 50.0637, "lon": 19.9339, "kursyDobe": 300, "feed": "SEED" },
+    { "nazwa": "Poznan Rondo Kaponiera", "lat": 52.4082, "lon": 16.9117, "kursyDobe": 260, "feed": "SEED" },
+    { "nazwa": "Wies (martwa linia, przyklad)", "lat": 52.05, "lon": 20.6, "kursyDobe": 4, "feed": "SEED" }
+  ]
+}
