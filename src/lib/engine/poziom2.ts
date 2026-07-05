@@ -253,13 +253,15 @@ export function uruchomPoziom2(
 
   // Uwarunkowania przeniesione z P1: bramki (kanał E), sygnały, braki, kluczowe liczby.
   const bramki = liczBramki(d);
-  const sygnaly = liczSygnaly(d, bramki.szczegoly, KONFIG_SCORING);
+  const sygnalyBaza = liczSygnaly(d, bramki.szczegoly, KONFIG_SCORING);
   const braki = liczBraki(d, bramki.szczegoly);
   const kluczoweLiczby = liczKluczoweLiczby(d, KONFIG_SCORING);
 
   // DOMKNIĘCIE M2 (kanały A–F): popyt realizowalny + przydatność ekonomiczna + bramki
   // → werdykt per profil + rekomendacja. To TU wpisane dane (odległości) zmieniają wynik.
   const ocenaM2 = ocenM2(d, p1, bramki.status);
+  // Flaga transportu (np. „teren bez komunikacji zbiorowej") → do „Flagi i sygnały" (info), nie osobna sekcja.
+  const sygnaly = [...sygnalyBaza, ...ocenaM2.flagi.map((t) => ({ tekst: t, ton: "info" as const }))];
 
   // Trzy warianty (optymalny/maksymalny/kameralny) dla OBU profili. Profil wiodący =
   // rekomendacja M2 (nie tylko z M1); „brak" → wyższy score M2 jako informacyjny wiodący.
@@ -279,7 +281,7 @@ export function uruchomPoziom2(
     dzialkaId: d.id,
     obwiednia,
     warianty,
-    flagiRyzyka: [...flagiRyzyka(d, obwiednia, w, cfg, p1), ...ocenaM2.flagi],
+    flagiRyzyka: flagiRyzyka(d, obwiednia, w, cfg, p1),
     bramki,
     sygnaly,
     braki,

@@ -63,10 +63,7 @@ export function modyfikatorTransportu(d: DaneDzialki, profil: Profil, cfg: Konfi
  */
 export function flagiTransportu(d: DaneDzialki): string[] {
   if (d.transport?.jest !== false) return [];
-  return [
-    "Teren bez komunikacji zbiorowej — informacyjnie, nie obniża oceny (istotniejsze dla profilu senioralnego). " +
-      "Dostępność niosą bliskość aglomeracji i dojazd; dowóz/transport na żądanie bywa poza zasięgiem danych.",
-  ];
+  return ["Teren bez komunikacji zbiorowej — informacyjnie, nie obniża oceny (istotne dla seniorów)"];
 }
 
 /**

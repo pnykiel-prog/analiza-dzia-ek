@@ -1,5 +1,5 @@
 import type { BrakDanych, OcenaM2, PoleWskaznika, Profil, ProfilRekomendowany, Sygnal, WariantZabudowy, Werdykt, WerdyktProfiluM2, WynikPoziom2, ZrodloWskaznika } from "@/lib/types";
-import { Karta, Statystyka, Flagi } from "./ui";
+import { Karta, Statystyka } from "./ui";
 import { WskaznikPewnosci } from "./grunt";
 import { etykietaTypologii, liczba, statusSlowny } from "@/lib/format";
 
@@ -255,12 +255,6 @@ export function Poziom2View({
           );
         })}
       </Karta>
-
-      {p2.flagiRyzyka.length > 0 && (
-        <Karta tytul="Flagi ryzyka">
-          <Flagi flagi={p2.flagiRyzyka} />
-        </Karta>
-      )}
     </>
   );
 }
