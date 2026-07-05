@@ -118,7 +118,6 @@ function szkieletDanych(id: string, p: PozycjaDzialki): DaneDzialki {
     odlegloscDoSieciM: null,
     odlegloscDoZabudowyM: null,
     czasDojazdAglomeracjaMin: null,
-    przystanekZCzestotliwoscia: null,
     uslugiPodstawowePieszo: null,
     pozWZasiegu: null,
     zlobkiSzkolyWZasiegu: null,

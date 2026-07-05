@@ -138,7 +138,9 @@ function budujWariant(
   const liczbaMieszkan = Math.floor(pumMieszkania / sredni);
 
   const normatyw = w.normatywParkingowy || cfg.normatywParkingowy[profil];
-  const transportDobry = d.przystanekZCzestotliwoscia === true || (d.czasDojazdAglomeracjaMin ?? 99) <= 30;
+  const transportDobry =
+    (d.transport?.jest === true && (d.transport.przystanki ?? []).some((p) => (p.odlegloscM ?? 9999) <= 800)) ||
+    (d.czasDojazdAglomeracjaMin ?? 99) <= 30;
   const normatywEf = transportDobry ? Math.min(normatyw, cfg.normatywParkingowy[profil]) : normatyw;
   const miejscaParkingowe = Math.ceil(liczbaMieszkan * normatywEf);
 

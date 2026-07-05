@@ -404,12 +404,18 @@ export interface KonfiguracjaM2 {
   /** Kanał A — dolna wartość gradientu f_usługi na granicy dyskwalifikacji (spec §4: 1,0 → 0,3). */
   minFaktorUslugi: number;
   /**
-   * Kontekst transportowy z GTFS (wytyczne transport §3, §8). Ustala, czy przystanek działa
-   * jako bramka (miasto), czy tylko flaga (wieś). `progKursyDobe` chroni przed „martwą linią".
-   * `zasiegPokryciaM` odróżnia „wieś w zasięgu GTFS" (najbliższy przystanek bliżej → flaga)
-   * od „brak danych o regionie" (najbliższy przystanek dalej → kontekst nieznany, bez flagi).
+   * Transport zbiorowy — ŁAGODNY modyfikator jakości per profil (wytyczne panel_transport §3).
+   * NIE bramka: „nie ma"/pominięte → neutralny (+flaga), „jest" → bonus wg walkability (najbliższy
+   * przystanek) i jakości obsługi (najlepszy: linie × kursy/dzień). Nigdy nie dyskwalifikuje.
    */
-  transportKontekst: { RgtfsM: number; progKursyDobe: number; zasiegPokryciaM: number };
+  transport: {
+    maxBonus: number; // maks. bonus modyfikatora (np. 0.10 → do ×1,10)
+    walkKomfortM: Record<"mlodzi" | "seniorzy", number>; // ≤ → pełna walkability
+    walkZerM: Record<"mlodzi" | "seniorzy", number>; // ≥ → walkability 0
+    liniiPelna: number; // ≥ linii → pełna jakość
+    kursyDzienPelna: number; // ≥ kursów/dzień → pełna jakość
+    wagi: Record<"mlodzi" | "seniorzy", { walk: number; jakosc: number; noc: number }>; // suma ≈ 1
+  };
   /** Kanał B — koszt uzbrojenia (odległość do sieci → przydatność ekonomiczna). */
   kosztUzbrojenia: { odlegloscKomfortM: number; odlegloscDrogaM: number; karaSpadekPct: number };
   /** Kanał C — modyfikatory popytu (aglomeracja, potencjał, pustostany). */
@@ -422,7 +428,6 @@ export interface KonfiguracjaM2 {
 
 export const KONFIG_M2: KonfiguracjaM2 = {
   odleglosciPieszo: [
-    { klucz: "przystanek", etykieta: "Przystanek komunikacji", profil: "oba" },
     { klucz: "sklep", etykieta: "Sklep spożywczy", profil: "oba" },
     { klucz: "apteka", etykieta: "Apteka", profil: "seniorzy" },
     { klucz: "poz", etykieta: "Przychodnia (POZ)", profil: "seniorzy" },
@@ -432,7 +437,6 @@ export const KONFIG_M2: KonfiguracjaM2 = {
   progPieszoM: 800,
   // Progi startowe wg spec §4 [m]: komfort / dyskwalifikacja.
   progiUslug: {
-    przystanek: { seniorzy: { komfortM: 300, dyskwalifikacjaM: 2500 }, mlodzi: { komfortM: 500, dyskwalifikacjaM: 6000 } },
     poz: { seniorzy: { komfortM: 500, dyskwalifikacjaM: 5000 } },
     apteka: { seniorzy: { komfortM: 400, dyskwalifikacjaM: 3500 } },
     sklep: { seniorzy: { komfortM: 400, dyskwalifikacjaM: 3000 }, mlodzi: { komfortM: 600, dyskwalifikacjaM: 4000 } },
@@ -440,9 +444,16 @@ export const KONFIG_M2: KonfiguracjaM2 = {
     przedszkole: { mlodzi: { komfortM: 1000, dyskwalifikacjaM: 8000 } },
   },
   minFaktorUslugi: 0.3,
-  // Żywe pokrycie GTFS: przystanek z ≥10 kursami/dobę w promieniu 1500 m = kontekst miejski.
-  // Poza 8 km od najbliższego przystanku w warstwie → uznajemy brak pokrycia GTFS (kontekst nieznany).
-  transportKontekst: { RgtfsM: 1500, progKursyDobe: 10, zasiegPokryciaM: 8000 },
+  // Transport = łagodny bonus (do +10% popytu), nigdy kara. Seniorzy ważą walkability mocniej,
+  // młodzi bardziej jakość obsługi i kursy nocne (zmiany). Kursy nocne = mała waga (niuans).
+  transport: {
+    maxBonus: 0.1,
+    walkKomfortM: { seniorzy: 300, mlodzi: 500 },
+    walkZerM: { seniorzy: 1500, mlodzi: 2500 },
+    liniiPelna: 5,
+    kursyDzienPelna: 40,
+    wagi: { seniorzy: { walk: 0.65, jakosc: 0.33, noc: 0.02 }, mlodzi: { walk: 0.4, jakosc: 0.5, noc: 0.1 } },
+  },
   kosztUzbrojenia: { odlegloscKomfortM: 50, odlegloscDrogaM: 500, karaSpadekPct: 8 },
   modyfikatorPopytu: {
     dojazdKomfortMin: 30,

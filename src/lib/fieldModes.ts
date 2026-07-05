@@ -73,7 +73,6 @@ export const TRYBY_P2: Record<string, Tryb> = {
   pozWZasiegu: "A°",
   zlobkiSzkolyWZasiegu: "A°",
   czasDojazdAglomeracjaMin: "A°",
-  przystanekZCzestotliwoscia: "A°",
   natura2000: "A°",
   ochronaWykluczajaca: "A°",
   strefaKonserwatorska: "A°",
