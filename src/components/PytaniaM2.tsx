@@ -143,18 +143,8 @@ export function PytaniaM2({
         <div className="text-[13px] font-semibold text-grunt-text mb-2">Odległości i komunikacja</div>
 
         {odlAuto.length > 0 && (
-          <div className="mb-3 rounded-md bg-grunt-green-bg/50 border border-grunt-green/20 px-3 py-2">
-            <div className="text-[11px] font-medium text-grunt-green mb-1.5">
-              Ustalone automatycznie — {odlAuto.length} z {KATEGORIE_ODL.length}
-            </div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1">
-              {odlAuto.map((o) => (
-                <div key={o.klucz} className="flex items-baseline justify-between text-[12px]">
-                  <span className="text-grunt-text-muted2">{o.etykieta}</span>
-                  <span className="mono text-grunt-text">{o.m} m</span>
-                </div>
-              ))}
-            </div>
+          <div className="mb-2 text-[12px] text-grunt-green">
+            ✓ {odlAuto.length} z {KATEGORIE_ODL.length} odległości ustalono automatycznie — pełna lista ze statusem jest w wynikach analizy.
           </div>
         )}
 
