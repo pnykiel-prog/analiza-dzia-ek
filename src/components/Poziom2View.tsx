@@ -193,7 +193,7 @@ export function Poziom2View({
         </div>
       )}
 
-      {p2.dostepnosc && (
+      {p2.dostepnosc?.pozycje?.length ? (
       <Karta
         tytul="Dostępność (odległości pieszo)"
         podtytul="Usługi (kanał A — mogą dyskwalifikować) i otoczenie (jakość życia — tylko bonus). Braki nie dyskwalifikują."
@@ -240,7 +240,7 @@ export function Poziom2View({
           })}
         </div>
       </Karta>
-      )}
+      ) : null}
 
       <Karta
         tytul="Obwiednia zabudowy"
