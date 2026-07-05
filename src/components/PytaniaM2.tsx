@@ -20,6 +20,12 @@ export interface OdpowiedziM2 {
   planistykaPotwierdzona: boolean; // klient potwierdził: realne dane z MPZP/dokumentu
 }
 
+/** Wszystkie kategorie odległościowe (równorzędnie): usługi pieszo (kanał A) + otoczenie (modyfikator). */
+const KATEGORIE_ODL: { klucz: string; etykieta: string }[] = [
+  ...KONFIG_M2.odleglosciPieszo.map((o) => ({ klucz: o.klucz, etykieta: o.etykieta })),
+  ...KONFIG_M2.otoczenie.kategorie.map((k) => ({ klucz: k, etykieta: KONFIG_M2.otoczenie.etykiety[k] ?? k })),
+];
+
 /**
  * Poziom 2 — proste pytania do klienta (wersja uproszczona, bez audytu braków).
  * Auto pobiera co się da w tle; tu pytamy tylko o to, czego auto nie ustaliło
@@ -40,7 +46,7 @@ export function PytaniaM2({
   const [droga, setDroga] = useState<string>(dane.dostepDrogaPubliczna == null ? "" : dane.dostepDrogaPubliczna ? "tak" : "nie");
   const [odl, setOdl] = useState<Record<string, string>>(() => {
     const start: Record<string, string> = {};
-    for (const o of KONFIG_M2.odleglosciPieszo) {
+    for (const o of KATEGORIE_ODL) {
       const v = dane.odleglosciM2?.[o.klucz];
       start[o.klucz] = v == null ? "" : String(v);
     }
@@ -69,10 +75,10 @@ export function PytaniaM2({
   const num = (s: string): number | null => (s.trim() === "" ? null : Number(s));
 
   // Odległości: rozdziel na ustalone automatycznie (nie pytamy) i brakujące (pytamy) — spec §7.
-  const odlAuto = KONFIG_M2.odleglosciPieszo
+  const odlAuto = KATEGORIE_ODL
     .map((o) => ({ ...o, m: dane.odleglosciM2?.[o.klucz] }))
     .filter((o): o is typeof o & { m: number } => o.m != null);
-  const odlDoPytania = KONFIG_M2.odleglosciPieszo.filter((o) => dane.odleglosciM2?.[o.klucz] == null);
+  const odlDoPytania = KATEGORIE_ODL.filter((o) => dane.odleglosciM2?.[o.klucz] == null);
 
   function przelicz() {
     // Wysyłamy tylko odległości, o które pytaliśmy (auto trzyma się w dane.odleglosciM2 z prowenancją).
@@ -132,14 +138,14 @@ export function PytaniaM2({
         </div>
       )}
 
-      {/* 2. Odległości pieszo — auto pokazujemy jako ustalone; pytamy TYLKO o brakujące (spec §7). */}
-      <div className="mb-4">
-        <div className="text-[13px] text-grunt-text mb-1.5">Odległości pieszo do usług</div>
+      {/* 2. PANEL: Odległości i komunikacja — wszystkie kategorie równorzędnie + przystanki. */}
+      <div className="mb-4 rounded-lg border border-grunt-divider p-3">
+        <div className="text-[13px] font-semibold text-grunt-text mb-2">Odległości i komunikacja</div>
 
         {odlAuto.length > 0 && (
           <div className="mb-3 rounded-md bg-grunt-green-bg/50 border border-grunt-green/20 px-3 py-2">
             <div className="text-[11px] font-medium text-grunt-green mb-1.5">
-              Ustalone automatycznie — {odlAuto.length} z {KONFIG_M2.odleglosciPieszo.length}
+              Ustalone automatycznie — {odlAuto.length} z {KATEGORIE_ODL.length}
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1">
               {odlAuto.map((o) => (
@@ -155,7 +161,7 @@ export function PytaniaM2({
         {odlDoPytania.length > 0 ? (
           <>
             <div className="text-[11px] text-grunt-text-muted2 mb-1.5">
-              {odlAuto.length > 0 ? "Uzupełnij pozostałe (opcjonalnie):" : "Podaj, jeśli znasz (opcjonalnie):"}
+              {odlAuto.length > 0 ? "Uzupełnij pozostałe odległości (opcjonalnie):" : "Podaj odległości, jeśli znasz (opcjonalnie):"}
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {odlDoPytania.map((o) => (
@@ -177,12 +183,11 @@ export function PytaniaM2({
         ) : (
           <div className="text-[12px] text-grunt-text-muted2">Wszystkie odległości ustalone automatycznie — nic nie musisz podawać.</div>
         )}
-      </div>
 
-      {/* 2b. Transport publiczny — RĘCZNY panel (opcjonalny). Modyfikator jakości + flaga, nie bramka. */}
-      <div className="mb-4 border-t border-grunt-divider pt-3">
-        <div className="flex items-center justify-between mb-1.5">
-          <div className="text-[13px] text-grunt-text">Transport publiczny (opcjonalnie)</div>
+        {/* Transport publiczny — w tym samym panelu. Modyfikator jakości + flaga, nie bramka. */}
+        <div className="border-t border-grunt-divider pt-3 mt-3">
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="text-[13px] text-grunt-text">Komunikacja publiczna (przystanki)</div>
           {komunikacja !== "" && (
             <button type="button" onClick={() => setKomunikacja("")} className="text-[11px] text-grunt-text-faint2 underline">
               Pomiń
@@ -246,6 +251,7 @@ export function PytaniaM2({
             </button>
           </div>
         )}
+        </div>
       </div>
 
       {/* 3. Wysokość zabudowy w okolicy — tylko gdy auto (BDOT) nie pobrało */}
