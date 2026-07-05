@@ -1,0 +1,13 @@
+{
+  "meta": {
+    "opis": "Statyczna warstwa sklepow spozywczych (kanal A) — lokalizatory sieci + OSM + [REGON]. SEED. Pelna warstwa: tools/sklepy/import.ts.",
+    "data_importu": "SEED",
+    "zrodla": ["siec", "OSM", "REGON"]
+  },
+  "rekordy": [
+    { "id": "SEED:biedronka:1", "kategoria": "sklep", "nazwa": "Biedronka", "adres": "Marszalkowska 100, 00-026 Warszawa", "lat": 52.2296, "lon": 21.0122, "teryt_gmina": "1465011", "siec": "Biedronka", "zrodlo": "siec", "data_importu": "SEED" },
+    { "id": "SEED:dino:1", "kategoria": "sklep", "nazwa": "Dino", "adres": "Rynek 1, 62-090 Rokietnica", "lat": 52.5, "lon": 16.7, "teryt_gmina": "3021052", "siec": "Dino", "zrodlo": "siec", "data_importu": "SEED" },
+    { "id": "SEED:zabka:1", "kategoria": "sklep", "nazwa": "Zabka", "adres": "Dluga 5, 31-146 Krakow", "lat": 50.0677, "lon": 19.9411, "teryt_gmina": "1261011", "siec": "Zabka", "zrodlo": "siec", "data_importu": "SEED" },
+    { "id": "SEED:osm:1", "kategoria": "sklep", "nazwa": "Sklep osiedlowy (niezalezny)", "adres": "", "lat": 52.4064, "lon": 16.9252, "teryt_gmina": "3064011", "siec": "niezalezny", "zrodlo": "OSM", "data_importu": "SEED" }
+  ]
+}
