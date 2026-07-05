@@ -29,7 +29,6 @@ const POLA_DANYCH: (keyof DaneDzialki)[] = [
   "odlegloscDoSieciM",
   "odlegloscDoZabudowyM",
   "czasDojazdAglomeracjaMin",
-  "przystanekZCzestotliwoscia",
   "uslugiPodstawowePieszo",
   "pozWZasiegu",
   "zlobkiSzkolyWZasiegu",

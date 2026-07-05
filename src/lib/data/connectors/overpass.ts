@@ -105,8 +105,8 @@ export const konektorOverpass: Konektor = {
     if (elementy === null) return brakWyniku(this.klucz, this.zrodlo, czas, "Brak odpowiedzi Overpass.");
 
     const k = klasyfikujPoi(elementy);
+    // Transport zbiorowy wycofany z OSM (panel ręczny) — Overpass daje tylko usługi pieszo.
     const dane: Partial<DaneDzialki> = {
-      przystanekZCzestotliwoscia: k.przystanek, // proxy: obecność przystanku (bez częstotliwości)
       uslugiPodstawowePieszo: k.uslugi,
       pozWZasiegu: k.poz,
       zlobkiSzkolyWZasiegu: k.szkola,
@@ -115,7 +115,7 @@ export const konektorOverpass: Konektor = {
       pole,
       zrodlo: this.zrodlo,
       czas,
-      pewnosc: pole === "przystanekZCzestotliwoscia" ? 55 : 75,
+      pewnosc: 75,
       status: "ok",
       tryb: "A",
     }));

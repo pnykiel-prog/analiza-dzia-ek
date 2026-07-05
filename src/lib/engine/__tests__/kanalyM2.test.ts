@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { dostepnoscA, przydatnoscEkonomicznaB, modyfikatorPopytuC, ocenM2, kontekstZGtfs, flagiTransportu } from "../kanalyM2";
+import { dostepnoscA, przydatnoscEkonomicznaB, modyfikatorPopytuC, modyfikatorTransportu, ocenM2, flagiTransportu } from "../kanalyM2";
 import { uruchomPoziom1 } from "../poziom1";
 import { DZIALKI_PRZYKLADOWE } from "../../data/sample";
 import type { DaneDzialki } from "../../types";
@@ -29,37 +29,28 @@ test("kanał A: brak odległości → NIE dyskwalifikuje (unknown ≠ far)", () 
   assert.equal(a.mnoznik, 1);
 });
 
-test("kanał A: progi PER USŁUGA — sklep 2800 m nie dyskwalifikuje seniora (próg 3000), przystanek 2600 tak (próg 2500)", () => {
-  // Sklep senior: dyskw 3000 → 2800 nie bramkuje (dawny wspólny próg 2500 błędnie by zbramkował).
+test("kanał A: progi PER USŁUGA — sklep 2800 m nie dyskwalifikuje seniora (próg 3000)", () => {
   const sklep = dostepnoscA({ ...baza, odleglosciM2: { sklep: 2800 } } as DaneDzialki, "seniorzy");
   assert.equal(sklep.obsluzalny, true);
   assert.ok(sklep.mnoznik > 0.3 && sklep.mnoznik < 0.5, `sklep 2800 → mnożnik ${sklep.mnoznik}`);
-  // Przystanek senior: dyskw 2500 → 2600 bramkuje (usługa wrażliwsza) — TYLKO w kontekście miejskim.
-  const przyst = dostepnoscA({ ...baza, odleglosciM2: { przystanek: 2600 }, kontekstTransportowy: "z_komunikacja" } as DaneDzialki, "seniorzy");
-  assert.equal(przyst.obsluzalny, false);
-  assert.equal(przyst.mnoznik, 0);
 });
 
-test("kanał A: gradient 1,0 → 0,3 — na środku między komfortem a dyskwalifikacją f≈0,65", () => {
-  // Przystanek senior: komfort 300, dyskw 2500 → środek 1400 m: 1 − 0,7×0,5 = 0,65 (kontekst miejski).
-  const a = dostepnoscA({ ...baza, odleglosciM2: { przystanek: 1400 }, kontekstTransportowy: "z_komunikacja" } as DaneDzialki, "seniorzy");
+test("kanał A: gradient 1,0 → 0,3 — POZ na środku (komfort 500, dyskw 5000) → f≈0,65", () => {
+  const a = dostepnoscA({ ...baza, odleglosciM2: { poz: 2750 } } as DaneDzialki, "seniorzy"); // środek 500..5000
   assert.equal(a.obsluzalny, true);
   assert.ok(Math.abs(a.mnoznik - 0.65) < 0.02, `środek → ${a.mnoznik} (oczekiwane ≈0,65)`);
 });
 
-test("transport §4: przystanek daleko NIE bramkuje na wsi/bez GTFS (kontekst ≠ z_komunikacja)", () => {
-  // Ta sama odległość 2600 m co wyżej, ale bez kontekstu miejskiego → przystanek poza bramką.
-  const bezKontekstu = dostepnoscA({ ...baza, odleglosciM2: { przystanek: 2600 } } as DaneDzialki, "seniorzy");
-  assert.equal(bezKontekstu.obsluzalny, true); // §0: brak GTFS nigdy nie dyskwalifikuje
-  assert.equal(bezKontekstu.mnoznik, 1); // przystanek wyłączony z kanału A
-  const wies = dostepnoscA({ ...baza, odleglosciM2: { przystanek: 2600 }, kontekstTransportowy: "bez_komunikacji" } as DaneDzialki, "seniorzy");
-  assert.equal(wies.obsluzalny, true);
-  assert.equal(wies.mnoznik, 1);
+test("transport panel: NIE jest bramką kanału A — przystanek nie występuje w progach usług", () => {
+  // Nawet ekstremalne dane transportu nie wpływają na dostepnoscA (transport = osobny modyfikator).
+  const a = dostepnoscA({ ...baza, odleglosciM2: { poz: 300 }, transport: { jest: false, przystanki: [] } } as DaneDzialki, "seniorzy");
+  assert.equal(a.obsluzalny, true);
+  assert.equal(a.mnoznik, 1);
 });
 
-test("transport §6: usługi pieszo (POZ) bramkują niezależnie od kontekstu transportu (wieś)", () => {
-  // Na wsi transport = flaga, ale brak POZ w zasięgu nadal chroni seniora (osobna bramka).
-  const a = dostepnoscA({ ...baza, odleglosciM2: { poz: 6000 }, kontekstTransportowy: "bez_komunikacji" } as DaneDzialki, "seniorzy");
+test("transport §6: usługi pieszo (POZ) bramkują niezależnie od transportu", () => {
+  // „Nie ma" transportu, ale brak POZ w zasięgu nadal chroni seniora (osobna bramka).
+  const a = dostepnoscA({ ...baza, odleglosciM2: { poz: 6000 }, transport: { jest: false, przystanki: [] } } as DaneDzialki, "seniorzy");
   assert.equal(a.obsluzalny, false);
 });
 
@@ -94,27 +85,40 @@ test("DOMKNIĘCIE: bramka E (fail) → oba profile niedopuszczalne, rekomendacja
   assert.equal(o.werdykty.seniorzy.dopuszczalny, false);
 });
 
-test("transport §3: kontekstZGtfs — żywa linia = miasto, martwa/daleka = wieś, brak = null", () => {
-  assert.equal(kontekstZGtfs(400, 40), "z_komunikacja"); // blisko + częsta
-  assert.equal(kontekstZGtfs(400, 3), "bez_komunikacji"); // martwa linia (2–3 kursy) → NIE miasto
-  assert.equal(kontekstZGtfs(3000, 40), "bez_komunikacji"); // częsta, ale poza promieniem
-  assert.equal(kontekstZGtfs(400, null), null); // brak GTFS → nieznane
-  assert.equal(kontekstZGtfs(null, 40), "bez_komunikacji"); // częstotliwość jest, ale przystanek poza zasięgiem
+test("transport §3: modyfikator — dobry przystanek daje bonus; brak/nie ma = neutralny (1,0)", () => {
+  const dobry = modyfikatorTransportu({ ...baza, transport: { jest: true, przystanki: [{ odlegloscM: 200, liczbaLinii: 8, kursyDzien: 60, kursyNoc: 10 }] } } as DaneDzialki, "mlodzi");
+  assert.ok(dobry.mnoznik > 1, `dobry transport → bonus ${dobry.mnoznik}`);
+  assert.ok(dobry.mnoznik <= 1.1, "bonus łagodny (≤ +10%)");
+  assert.equal(modyfikatorTransportu({ ...baza, transport: { jest: false, przystanki: [] } } as DaneDzialki, "mlodzi").mnoznik, 1); // nie ma → neutralny
+  assert.equal(modyfikatorTransportu({ ...baza, transport: null } as DaneDzialki, "seniorzy").mnoznik, 1); // pominięte → neutralny
 });
 
-test("transport §4.2/§9: wieś bez GTFS → flaga, werdykt senioralny NIE obniżony", () => {
-  const wies = { ...baza, odleglosciM2: { poz: 300, apteka: 300, sklep: 300 }, kontekstTransportowy: "bez_komunikacji" } as DaneDzialki;
-  const miasto = { ...baza, odleglosciM2: { poz: 300, apteka: 300, sklep: 300 }, kontekstTransportowy: "z_komunikacja", przystanekZCzestotliwoscia: true } as DaneDzialki;
-  const oW = ocenM2(wies, p1, "pass");
-  const oM = ocenM2(miasto, p1, "pass");
-  assert.ok(oW.flagi.some((f) => /bez komunikacji zbiorowej/i.test(f))); // flaga wywieszona
-  assert.equal(oM.flagi.length, 0); // miasto — bez flagi
-  // Brak transportu na wsi NIE obniża werdyktu senioralnego względem miasta z transportem.
-  assert.ok(oW.werdykty.seniorzy.score >= oM.werdykty.seniorzy.score);
+test("transport §2.2: seniorzy ważą walkability mocniej — bliski przystanek daje im większy bonus", () => {
+  const bliski = { ...baza, transport: { jest: true, przystanki: [{ odlegloscM: 200, liczbaLinii: 1, kursyDzien: 5, kursyNoc: 0 }] } } as DaneDzialki;
+  const tS = modyfikatorTransportu(bliski, "seniorzy");
+  const tM = modyfikatorTransportu(bliski, "mlodzi");
+  assert.ok(tS.mnoznik >= tM.mnoznik, `senior ${tS.mnoznik} ≥ młodzi ${tM.mnoznik} przy bliskim, słabo obsłużonym przystanku`);
 });
 
-test("transport §5: flagiTransportu tylko dla bez_komunikacji (brak GTFS ≠ flaga)", () => {
-  assert.equal(flagiTransportu({ ...baza, kontekstTransportowy: "bez_komunikacji" } as DaneDzialki).length, 1);
-  assert.equal(flagiTransportu({ ...baza, kontekstTransportowy: "z_komunikacja" } as DaneDzialki).length, 0);
-  assert.equal(flagiTransportu({ ...baza } as DaneDzialki).length, 0); // null → brak flagi „bez"
+test("transport §2.1/§5: Nie ma → flaga, NIGDY nie obniża werdyktu; pominięte → bez flagi", () => {
+  const niema = { ...baza, odleglosciM2: { poz: 300, apteka: 300, sklep: 300 }, transport: { jest: false, przystanki: [] } } as DaneDzialki;
+  const pominiete = { ...baza, odleglosciM2: { poz: 300, apteka: 300, sklep: 300 }, transport: null } as DaneDzialki;
+  const oN = ocenM2(niema, p1, "pass");
+  const oP = ocenM2(pominiete, p1, "pass");
+  assert.ok(oN.flagi.some((f) => /bez komunikacji zbiorowej/i.test(f))); // „Nie ma" → flaga
+  assert.equal(oP.flagi.length, 0); // pominięte → brak flagi „bez"
+  // „Nie ma" transportu NIE obniża werdyktu senioralnego względem pominięcia (neutralny, nie kara).
+  assert.equal(oN.werdykty.seniorzy.score, oP.werdykty.seniorzy.score);
+});
+
+test("transport: dobra komunikacja PODNOSI werdykt vs brak (modyfikator jakości, nie bramka)", () => {
+  const dobry = { ...baza, odleglosciM2: { poz: 300, apteka: 300, sklep: 300 }, transport: { jest: true, przystanki: [{ odlegloscM: 150, liczbaLinii: 10, kursyDzien: 80, kursyNoc: 12 }] } } as DaneDzialki;
+  const niema = { ...baza, odleglosciM2: { poz: 300, apteka: 300, sklep: 300 }, transport: { jest: false, przystanki: [] } } as DaneDzialki;
+  assert.ok(ocenM2(dobry, p1, "pass").werdykty.mlodzi.score >= ocenM2(niema, p1, "pass").werdykty.mlodzi.score);
+});
+
+test("transport §5: flagiTransportu tylko dla Nie ma (pominięte / jest → brak flagi)", () => {
+  assert.equal(flagiTransportu({ ...baza, transport: { jest: false, przystanki: [] } } as DaneDzialki).length, 1);
+  assert.equal(flagiTransportu({ ...baza, transport: { jest: true, przystanki: [] } } as DaneDzialki).length, 0);
+  assert.equal(flagiTransportu({ ...baza } as DaneDzialki).length, 0); // pominięte → brak flagi
 });

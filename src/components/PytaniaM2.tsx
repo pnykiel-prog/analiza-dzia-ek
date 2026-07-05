@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { DaneDzialki } from "@/lib/types";
+import type { DaneDzialki, DaneTransportu } from "@/lib/types";
 import { KONFIG_M2 } from "@/lib/config";
 import { Karta } from "./ui";
 
@@ -10,6 +10,7 @@ export interface OdpowiedziM2 {
   dostepDrogi: boolean | null;
   odleglosci: Record<string, number | null>; // metry
   wysokoscOkolicyPieter: number | null;
+  transport: DaneTransportu | null; // ręczny panel transportu; null = pominięte
   planistyka: {
     intensywnosc: number | null;
     maxWysokoscM: number | null;
@@ -46,6 +47,21 @@ export function PytaniaM2({
     return start;
   });
   const [wys, setWys] = useState<string>(dane.wysokoscOkolicyPieter == null ? "" : String(dane.wysokoscOkolicyPieter));
+  // Panel transportu (ręczny): "" = pominięte, "jest" / "niema". Przystanki tylko gdy "jest".
+  const pustyPrzystanek = { odlegloscM: "", liczbaLinii: "", kursyDzien: "", kursyNoc: "" };
+  const [komunikacja, setKomunikacja] = useState<"" | "jest" | "niema">(
+    dane.transport == null ? "" : dane.transport.jest ? "jest" : "niema"
+  );
+  const [przystanki, setPrzystanki] = useState<Record<string, string>[]>(() =>
+    dane.transport?.jest && dane.transport.przystanki.length
+      ? dane.transport.przystanki.map((p) => ({
+          odlegloscM: p.odlegloscM == null ? "" : String(p.odlegloscM),
+          liczbaLinii: p.liczbaLinii == null ? "" : String(p.liczbaLinii),
+          kursyDzien: p.kursyDzien == null ? "" : String(p.kursyDzien),
+          kursyNoc: p.kursyNoc == null ? "" : String(p.kursyNoc),
+        }))
+      : [{ ...pustyPrzystanek }]
+  );
   const [planOtwarte, setPlanOtwarte] = useState(false);
   const [potwierdzona, setPotwierdzona] = useState(false);
   const [plan, setPlan] = useState<Record<string, string>>({ intensywnosc: "", maxWysokoscM: "", maxPowZabudowyPct: "", minPbcPct: "" });
@@ -63,10 +79,23 @@ export function PytaniaM2({
     const odleglosci: Record<string, number | null> = {};
     for (const o of odlDoPytania) odleglosci[o.klucz] = num(odl[o.klucz] ?? "");
     const planPodane = planOtwarte && (plan.intensywnosc || plan.maxWysokoscM || plan.maxPowZabudowyPct || plan.minPbcPct);
+    // Transport: "" → null (pominięte); "niema" → jest:false; "jest" → przystanki z wartościami.
+    const transport =
+      komunikacja === ""
+        ? null
+        : komunikacja === "niema"
+          ? { jest: false, przystanki: [] }
+          : {
+              jest: true,
+              przystanki: przystanki
+                .map((p) => ({ odlegloscM: num(p.odlegloscM), liczbaLinii: num(p.liczbaLinii), kursyDzien: num(p.kursyDzien), kursyNoc: num(p.kursyNoc) }))
+                .filter((p) => p.odlegloscM != null || p.liczbaLinii != null || p.kursyDzien != null || p.kursyNoc != null),
+            };
     onPrzelicz({
       dostepDrogi: droga === "" ? null : droga === "tak",
       odleglosci,
       wysokoscOkolicyPieter: num(wys),
+      transport,
       planistyka: planPodane
         ? {
             intensywnosc: num(plan.intensywnosc),
@@ -147,6 +176,75 @@ export function PytaniaM2({
           </>
         ) : (
           <div className="text-[12px] text-grunt-text-muted2">Wszystkie odległości ustalone automatycznie — nic nie musisz podawać.</div>
+        )}
+      </div>
+
+      {/* 2b. Transport publiczny — RĘCZNY panel (opcjonalny). Modyfikator jakości + flaga, nie bramka. */}
+      <div className="mb-4 border-t border-grunt-divider pt-3">
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="text-[13px] text-grunt-text">Transport publiczny (opcjonalnie)</div>
+          {komunikacja !== "" && (
+            <button type="button" onClick={() => setKomunikacja("")} className="text-[11px] text-grunt-text-faint2 underline">
+              Pomiń
+            </button>
+          )}
+        </div>
+        <div className="flex gap-2 mb-1">
+          {([["jest", "Jest"], ["niema", "Nie ma"]] as const).map(([v, l]) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setKomunikacja(v)}
+              className={`badge ${komunikacja === v ? "bg-grunt-ink text-white" : "bg-grunt-surface-3 text-grunt-text-muted"}`}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+        {komunikacja === "niema" && (
+          <div className="text-[11px] text-grunt-text-muted2">
+            Ustawi flagę „teren bez komunikacji zbiorowej" — informacyjnie, <b>nie obniża oceny</b> (ciężar dostępności bierze bliskość aglomeracji).
+          </div>
+        )}
+        {komunikacja === "jest" && (
+          <div className="mt-2 space-y-2">
+            <div className="text-[11px] text-grunt-text-muted2">Podaj dane najbliższych przystanków (każda liczba dotyczy tego przystanka):</div>
+            {przystanki.map((p, i) => (
+              <div key={i} className="rounded-md bg-grunt-surface-2 border border-grunt-divider px-3 py-2">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[11px] text-grunt-text-muted">Przystanek {i + 1}</span>
+                  {przystanki.length > 1 && (
+                    <button type="button" onClick={() => setPrzystanki((s) => s.filter((_, j) => j !== i))} className="text-[11px] text-grunt-text-faint2 underline">
+                      Usuń
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                  {([
+                    ["odlegloscM", "Odległość [m]"],
+                    ["liczbaLinii", "Linii"],
+                    ["kursyDzien", "Kursów/dzień"],
+                    ["kursyNoc", "Kursów/noc"],
+                  ] as const).map(([k, l]) => (
+                    <label key={k} className="text-sm block">
+                      <span className="text-[11px] text-grunt-text-muted">{l}</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={p[k] ?? ""}
+                        onChange={(e) => setPrzystanki((s) => s.map((row, j) => (j === i ? { ...row, [k]: e.target.value } : row)))}
+                        placeholder="opcjonalnie"
+                        className="inp mt-0.5"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <button type="button" onClick={() => setPrzystanki((s) => [...s, { ...pustyPrzystanek }])} className="text-[12px] text-grunt-text-muted underline">
+              + dodaj przystanek
+            </button>
+          </div>
         )}
       </div>
 

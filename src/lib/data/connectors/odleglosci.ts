@@ -38,8 +38,8 @@ export interface ElementGeo {
 const cfg = KONFIG_KONEKTORY.odleglosci;
 const cfgR = KONFIG_KONEKTORY.routingPieszy;
 
-/** Kategorie brane z OSM na żywo (reszta ze statycznej warstwy). */
-const KATEGORIE_OSM = ["przystanek", "sklep"];
+/** Kategorie brane z OSM na żywo (reszta ze statycznej warstwy). Przystanek — panel ręczny (wycofany z OSM/GTFS). */
+const KATEGORIE_OSM = ["sklep"];
 
 /** Klasyfikuje element OSM do klucza usługi z KONFIG_M2 (lub null, gdy nieistotny). */
 export function klasyfikujUsluge(tags: Record<string, string>): string | null {
@@ -89,14 +89,11 @@ export function kNajblizsze(elementy: ElementGeo[], lat: number, lon: number, k:
   return out;
 }
 
-// Overpass pyta TYLKO o przystanek/sklep — reszta ze statycznej warstwy.
+// Overpass pyta TYLKO o sklep — reszta usług ze statycznej warstwy; transport = panel ręczny.
 function zapytanie(lat: number, lon: number, r: number): string {
   return `[out:json][timeout:25];
 (
   nwr(around:${r},${lat},${lon})[shop~"^(supermarket|convenience|grocery|general)$"];
-  nwr(around:${r},${lat},${lon})[highway=bus_stop];
-  nwr(around:${r},${lat},${lon})[public_transport];
-  nwr(around:${r},${lat},${lon})[railway~"^(station|halt|tram_stop)$"];
 );
 out tags center 500;`;
 }
@@ -174,9 +171,8 @@ function proxyZOdleglosci(odl: Record<string, number>): Partial<DaneDzialki> {
     return znane.length === 0 ? undefined : znane.some((k) => odl[k] <= prog);
   };
   const p: Partial<DaneDzialki> = {};
-  // Uwaga: przystanekZCzestotliwoscia NIE z OSM — martwy słupek bez rozkładu nie daje
-  // częstotliwości (wytyczne transport §2). Ustawia je konektor GTFS. OSM daje tylko
-  // LOKALIZACJĘ przystanku (odległość w odleglosciM2) — do bramki kanału A w kontekście miejskim.
+  // Transport zbiorowy wycofany z automatu (OSM/GTFS) — obsługiwany ręcznym panelem M2
+  // (wytyczne panel_transport). Tu tylko usługi pieszo.
   const uslugi = wZasiegu("sklep", "apteka");
   const poz = wZasiegu("poz");
   const eduk = wZasiegu("szkola", "przedszkole");

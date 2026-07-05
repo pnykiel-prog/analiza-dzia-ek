@@ -59,7 +59,6 @@ function uzupelnijBraki(d: DaneDzialki): DaneDzialki {
     odlegloscDoSieciM: null,
     odlegloscDoZabudowyM: null,
     czasDojazdAglomeracjaMin: null,
-    przystanekZCzestotliwoscia: null,
     uslugiPodstawowePieszo: null,
     pozWZasiegu: null,
     zlobkiSzkolyWZasiegu: null,

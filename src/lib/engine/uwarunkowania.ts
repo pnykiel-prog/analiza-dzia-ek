@@ -167,7 +167,7 @@ export function liczSygnaly(d: DaneDzialki, szczegoly: WynikBramki[], cfg: Konfi
   const poz = (w: boolean | null, tekst: string) => {
     if (w === true) s.push({ tekst, ton: "pozytyw" });
   };
-  poz(d.przystanekZCzestotliwoscia, "Przystanek z sensowną częstotliwością (≤800 m)");
+  poz(d.transport?.jest === true ? true : null, "Komunikacja publiczna w okolicy (deklaracja)");
   poz(d.zlobkiSzkolyWZasiegu, "Szkoła / żłobek w zasięgu");
   poz(d.pozWZasiegu, "POZ w zasięgu");
   poz(d.uslugiPodstawowePieszo, "Usługi podstawowe pieszo");

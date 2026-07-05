@@ -237,7 +237,7 @@ export default function NowaAnalizaPage() {
       odleglosciM2: Object.keys(odl).length ? odl : dane.odleglosciM2,
       dostepDrogaPubliczna: o.dostepDrogi ?? dane.dostepDrogaPubliczna,
       wysokoscOkolicyPieter: o.wysokoscOkolicyPieter ?? dane.wysokoscOkolicyPieter,
-      przystanekZCzestotliwoscia: wZasiegu("przystanek") ?? dane.przystanekZCzestotliwoscia,
+      transport: o.transport ?? dane.transport,
       uslugiPodstawowePieszo: lubZasieg("sklep", "apteka") ?? dane.uslugiPodstawowePieszo,
       pozWZasiegu: wZasiegu("poz") ?? dane.pozWZasiegu,
       zlobkiSzkolyWZasiegu: lubZasieg("szkola", "przedszkole") ?? dane.zlobkiSzkolyWZasiegu,

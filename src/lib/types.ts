@@ -61,6 +61,20 @@ export interface BliskoscAglomeracji {
   modyfikator: { mlodzi: number; seniorzy: number };
 }
 
+/** Ręczny wpis pojedynczego przystanka (panel transportu). Liczby przypisane do TEGO przystanka. */
+export interface PrzystanekReczny {
+  odlegloscM: Maybe<number>; // odległość do przystanku [m] — walkability
+  liczbaLinii: Maybe<number>; // linie przez ten przystanek — jakość obsługi
+  kursyDzien: Maybe<number>; // kursów w dzień — jakość obsługi (główna)
+  kursyNoc: Maybe<number>; // kursów w nocy — niuans (mała waga, głównie młodzi)
+}
+
+/** Ręczny panel transportu (wytyczne panel_transport): deklaracja + przystanki. */
+export interface DaneTransportu {
+  jest: boolean; // „Jest" / „Nie ma" komunikacji publicznej (deklaracja klienta)
+  przystanki: PrzystanekReczny[]; // wypełniane tylko gdy jest === true
+}
+
 export interface DaneDzialki {
   // A. Identyfikacja i geometria (ULDK / EGiB)
   id: string; // identyfikator ewidencyjny TERYT + obręb + nr
@@ -115,15 +129,11 @@ export interface DaneDzialki {
   czasDojazdAglomeracjaMin: Maybe<number>;
   /** M2 kanał C: bliskość aglomeracji z pierścieni klas miast (sygnał + modyfikator per profil). */
   bliskoscAglomeracji?: Maybe<BliskoscAglomeracji>;
-  przystanekZCzestotliwoscia: Maybe<boolean>; // ≥X kursów/dobę, ≤800 m
-  /** GTFS — kursów/dobę roboczą na najbliższym przystanku (żywe pokrycie). */
-  przystanekKursyDobe?: Maybe<number>;
   /**
-   * Kontekst transportowy z GTFS (wytyczne transport §3): „żywe pokrycie" w promieniu →
-   * `z_komunikacja` (miasto — przystanek działa jako bramka kanału A) vs
-   * `bez_komunikacji` (wieś — przystanek TYLKO flaga, nie obniża oceny). `null` = brak danych GTFS.
+   * Transport zbiorowy — RĘCZNY panel (wytyczne panel_transport). Zastępuje automatyzację
+   * GTFS/OSM. Modyfikator jakości + flaga (NIE bramka). `null` = pominięte/nieznane.
    */
-  kontekstTransportowy?: Maybe<"z_komunikacja" | "bez_komunikacji">;
+  transport?: Maybe<DaneTransportu>;
 
   // G. Infrastruktura społeczna (różne dla profili)
   uslugiPodstawowePieszo: Maybe<boolean>; // tkanka z usługami w zasięgu spaceru (seniorzy)

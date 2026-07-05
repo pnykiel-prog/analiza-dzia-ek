@@ -48,7 +48,7 @@ export const DZIALKI_PRZYKLADOWE: DaneDzialki[] = [
     odlegloscDoZabudowyM: 40,
 
     czasDojazdAglomeracjaMin: 35,
-    przystanekZCzestotliwoscia: true,
+    transport: { jest: true, przystanki: [{ odlegloscM: 250, liczbaLinii: 4, kursyDzien: 60, kursyNoc: 6 }] },
 
     uslugiPodstawowePieszo: true,
     pozWZasiegu: true,
@@ -122,7 +122,7 @@ export const DZIALKI_PRZYKLADOWE: DaneDzialki[] = [
     odlegloscDoZabudowyM: 15,
 
     czasDojazdAglomeracjaMin: 40,
-    przystanekZCzestotliwoscia: false,
+    transport: { jest: false, przystanki: [] },
 
     uslugiPodstawowePieszo: true,
     pozWZasiegu: true,
@@ -189,7 +189,7 @@ export const DZIALKI_PRZYKLADOWE: DaneDzialki[] = [
     odlegloscDoZabudowyM: 180,
 
     czasDojazdAglomeracjaMin: 75,
-    przystanekZCzestotliwoscia: false,
+    transport: { jest: false, przystanki: [] },
 
     uslugiPodstawowePieszo: false,
     pozWZasiegu: null,

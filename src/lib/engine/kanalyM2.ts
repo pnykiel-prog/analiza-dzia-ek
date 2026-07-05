@@ -24,46 +24,61 @@ function etykietaUslugi(klucz: string, cfg: KonfiguracjaM2): string {
   return cfg.odleglosciPieszo.find((o) => o.klucz === klucz)?.etykieta ?? klucz;
 }
 
+const clampBonus = (v: number) => Math.max(0, Math.min(1, v));
+
 /**
- * Kontekst transportowy z „żywego" pokrycia GTFS (wytyczne transport §3):
- * przystanek z ≥ `progKursyDobe` kursami/dobę w promieniu `RgtfsM` → `z_komunikacja`
- * (miasto), inaczej `bez_komunikacji` (wieś). Brak danych GTFS (`kursyDobe == null`) → `null`.
- * Martwa linia (poniżej progu) NIE ustawia kontekstu miejskiego (§4/§9).
+ * Transport zbiorowy — ŁAGODNY modyfikator jakości per profil (wytyczne panel_transport §2–§3).
+ * NIE bramka i NIGDY kara: „nie ma"/pominięte/brak przystanków → mnożnik 1,0 (neutralny).
+ * „Jest" → bonus (do `maxBonus`) z walkability (najbliższy przystanek) i jakości obsługi
+ * (najlepszy przystanek: linie × kursy/dzień; kursy nocne = mała waga, głównie młodzi).
+ * Seniorzy ważą walkability mocniej. Zła obsługa = mniejszy bonus, nigdy odjęcie/odrzucenie.
  */
-export function kontekstZGtfs(przystanekM: number | null | undefined, kursyDobe: number | null | undefined, cfg: KonfiguracjaM2 = KONFIG_M2): "z_komunikacja" | "bez_komunikacji" | null {
-  if (kursyDobe == null) return null; // brak GTFS = nieznane (nigdy nie karze — §0)
-  const zywy = przystanekM != null && przystanekM <= cfg.transportKontekst.RgtfsM && kursyDobe >= cfg.transportKontekst.progKursyDobe;
-  return zywy ? "z_komunikacja" : "bez_komunikacji";
+export function modyfikatorTransportu(d: DaneDzialki, profil: Profil, cfg: KonfiguracjaM2 = KONFIG_M2): { mnoznik: number; powody: string[] } {
+  const t = d.transport;
+  const przystanki = t?.jest ? (t.przystanki ?? []).filter((p) => p.odlegloscM != null || p.liczbaLinii != null || p.kursyDzien != null) : [];
+  if (!t?.jest || przystanki.length === 0) return { mnoznik: 1, powody: [] };
+  const c = cfg.transport;
+  const w = c.wagi[profil];
+
+  // Walkability z NAJBLIŻSZEGO przystanku; jakość z NAJLEPSZEGO (najwięcej linii × kursów/dzień).
+  const odl = przystanki.map((p) => p.odlegloscM).filter((v): v is number => v != null);
+  const najblizszy = odl.length ? Math.min(...odl) : null;
+  const walk = najblizszy == null ? 0.5 : clampBonus((c.walkZerM[profil] - najblizszy) / (c.walkZerM[profil] - c.walkKomfortM[profil]));
+
+  const najlepszy = przystanki.reduce((a, b) => ((b.liczbaLinii ?? 0) * (b.kursyDzien ?? 0) >= (a.liczbaLinii ?? 0) * (a.kursyDzien ?? 0) ? b : a));
+  const jakosc = clampBonus(0.5 * clampBonus((najlepszy.liczbaLinii ?? 0) / c.liniiPelna) + 0.5 * clampBonus((najlepszy.kursyDzien ?? 0) / c.kursyDzienPelna));
+  const noc = clampBonus((najlepszy.kursyNoc ?? 0) / Math.max(1, c.kursyDzienPelna / 4));
+
+  const sygnal = clampBonus(w.walk * walk + w.jakosc * jakosc + w.noc * noc);
+  const mnoznik = Math.round((1 + c.maxBonus * sygnal) * 100) / 100;
+  const powody: string[] = [];
+  if (mnoznik > 1) powody.push(`Transport: najbliższy przystanek ${najblizszy ?? "?"} m, najlepszy ${najlepszy.liczbaLinii ?? 0} linii / ${najlepszy.kursyDzien ?? 0} kursów/dzień → +${Math.round((mnoznik - 1) * 100)}% popytu (jakość, nie bramka).`);
+  return { mnoznik, powody };
 }
 
 /**
- * Flaga transportowa (wytyczne transport §4.2, §5): na terenie bez żywej komunikacji
- * INFORMACYJNA flaga, NIGDY odjęcie punktów. Mocniej eksponowana dla seniorów.
- * Zwraca pustą listę, gdy kontekst miejski lub nieznany (brak GTFS nie tworzy flagi „bez").
+ * Flaga transportowa (wytyczne panel_transport §2.1, §5): „Nie ma" komunikacji → INFORMACYJNA
+ * flaga „teren bez komunikacji zbiorowej", NIGDY odjęcie punktów, mocniej eksponowana dla
+ * seniorów. Pominięcie/brak danych → bez flagi (nie wiemy — tylko niższa pewność).
  */
 export function flagiTransportu(d: DaneDzialki): string[] {
-  if (d.kontekstTransportowy !== "bez_komunikacji") return [];
+  if (d.transport?.jest !== false) return [];
   return [
-    "Teren bez komunikacji zbiorowej (GTFS) — informacyjnie, nie obniża oceny. " +
-      "Dostępność niosą bliskość aglomeracji i dojazd; istotniejsze dla profilu senioralnego (dowóz/transport na żądanie poza zasięgiem danych).",
+    "Teren bez komunikacji zbiorowej — informacyjnie, nie obniża oceny (istotniejsze dla profilu senioralnego). " +
+      "Dostępność niosą bliskość aglomeracji i dojazd; dowóz/transport na żądanie bywa poza zasięgiem danych.",
   ];
 }
 
 /**
- * Kanał A — obsługiwalność per profil (spec §4): każda krytyczna usługa ma WŁASNE
+ * Kanał A — obsługiwalność per profil (spec §4): każda krytyczna usługa PIESZO ma WŁASNE
  * progi (komfort, dyskwalifikacja). f_usługi = 1,0 (≤ komfort) → `minFaktorUslugi`
  * (liniowo do dyskwalifikacji); ≥ dyskwalifikacja = BRAMKA (weakest-link → mnożnik 0).
  * Braki NIE dyskwalifikują (unknown ≠ far) — schodzą tylko na pewność (F).
- *
- * Transport (wytyczne transport §4): `przystanek` liczy się jako bramka TYLKO w kontekście
- * miejskim (`kontekstTransportowy === "z_komunikacja"`). Na wsi / przy braku GTFS przystanek
- * jest wyłączony z bramki (nie obniża A, nie dyskwalifikuje) — zastępuje go flaga.
+ * Transport zbiorowy NIE jest tu bramką (panel ręczny → modyfikator, patrz `modyfikatorTransportu`).
  */
 export function dostepnoscA(d: DaneDzialki, profil: Profil, cfg: KonfiguracjaM2 = KONFIG_M2): { mnoznik: number; obsluzalny: boolean; powody: string[] } {
   const powody: string[] = [];
-  const transportBramkuje = d.kontekstTransportowy === "z_komunikacja";
   const dyst = Object.entries(cfg.progiUslug)
-    .filter(([k]) => k !== "przystanek" || transportBramkuje) // przystanek tylko w mieście (§4.1)
     .map(([k, p]) => ({ k, prog: p[profil], m: d.odleglosciM2?.[k] }))
     .filter((x): x is { k: string; prog: ProgUslugi; m: number } => x.prog != null && x.m != null && x.m >= 0);
   if (dyst.length === 0) {
@@ -156,10 +171,11 @@ export function ocenM2(d: DaneDzialki, p1: WynikPoziom1, dopuszczalnosc: StatusB
     const popytM1 = profil === "mlodzi" ? p1.scoreMlodzi : p1.scoreSeniorzy;
     const A = dostepnoscA(d, profil, cfg);
     const C = modyfikatorPopytuC(d, profil, cfg);
-    const popytRealizowalny = clamp(Math.round(popytM1 * A.mnoznik * C.mnoznik));
+    const T = modyfikatorTransportu(d, profil, cfg); // łagodny bonus jakości transportu (nie bramka)
+    const popytRealizowalny = clamp(Math.round(popytM1 * A.mnoznik * C.mnoznik * T.mnoznik));
     const ekonFaktor = 0.7 + 0.3 * (przydat.wartosc / 100); // B skaluje, nie zeruje
     let score = clamp(Math.round(popytRealizowalny * ekonFaktor));
-    const powody = [...A.powody, ...C.powody, ...przydat.powody];
+    const powody = [...A.powody, ...C.powody, ...T.powody, ...przydat.powody];
     if (!A.obsluzalny) {
       score = 0;
       powody.unshift("Profil nieobsługiwalny — usługi poza zasięgiem (kanał A).");
