@@ -193,6 +193,58 @@ export function Poziom2View({
         </div>
       )}
 
+      {p2.dostepnosc && (
+      <Karta
+        tytul="Dostępność usług pieszo"
+        podtytul="Odległości decydujące o werdykcie (kanał A). Braki nie dyskwalifikują — obniżają pewność."
+      >
+        <div className="space-y-1.5">
+          {p2.dostepnosc.uslugi.map((u) => {
+            const kl =
+              u.status === "komfort"
+                ? "bg-grunt-green-bg text-grunt-green"
+                : u.status === "gradient"
+                  ? "bg-grunt-amber-bg text-grunt-amber-text"
+                  : u.status === "bramka"
+                    ? "bg-grunt-red-bg text-grunt-red"
+                    : "bg-grunt-surface-3 text-grunt-text-muted";
+            const etykietaStatus =
+              u.status === "komfort" ? "w komforcie" : u.status === "gradient" ? "w zasięgu" : u.status === "bramka" ? "poza progiem — dyskwalifikuje" : "nieustalona";
+            const prog = u.progi.seniorzy ?? u.progi.mlodzi;
+            return (
+              <div key={u.klucz} className="flex items-center justify-between gap-3 border-b border-grunt-divider last:border-0 pb-1.5 last:pb-0">
+                <div className="min-w-0">
+                  <span className="text-[13px] text-grunt-text">{u.etykieta}</span>
+                  <span className="text-[11px] text-grunt-text-faint2 ml-2">
+                    {u.profile.map((p) => (p === "seniorzy" ? "seniorzy" : "młodzi")).join(" · ")}
+                    {prog ? ` · komfort ≤${prog.komfortM} m, próg ≥${prog.dyskwalifikacjaM} m` : ""}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="mono text-[13px] text-grunt-text">{u.m != null ? `${u.m} m` : "—"}</span>
+                  <span className={`badge ${kl}`}>{etykietaStatus}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {p2.dostepnosc.otoczenie.some((o) => o.m != null) && (
+          <div className="mt-3 pt-2 border-t border-grunt-divider">
+            <div className="text-[11px] font-medium text-grunt-text-muted mb-1">Otoczenie / jakość życia (informacyjnie, nie bramka)</div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {p2.dostepnosc.otoczenie
+                .filter((o) => o.m != null)
+                .map((o) => (
+                  <span key={o.klucz} className="text-[12px] text-grunt-text-muted2">
+                    {o.etykieta}: <span className="mono text-grunt-text">{o.m} m</span>
+                  </span>
+                ))}
+            </div>
+          </div>
+        )}
+      </Karta>
+      )}
+
       <Karta
         tytul="Obwiednia zabudowy"
         podtytul="Twardy limit: ile wolno i co się zmieści (z parametrów planistycznych)"
