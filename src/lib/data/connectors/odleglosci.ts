@@ -25,6 +25,7 @@ import type { Kandydat } from "./geoUslugi";
 import { haversineM, minZDystansow } from "./geoUslugi";
 import { kandydaciStale } from "../uslugiStale";
 import { kandydaciSklep } from "../sklepy";
+import { najblizszeOtoczenie } from "../otoczenie";
 
 export type { Kandydat } from "./geoUslugi";
 export { haversineM, minZDystansow } from "./geoUslugi";
@@ -210,12 +211,15 @@ export const konektorOdleglosci: Konektor = {
     // Realna trasa pieszą do kandydatów (spec §5); brak klucza/awaria → linia prosta.
     const trasy = await routujMatrix(lon, lat, kand);
     const trasowane = trasy ? minZDystansow(kand, trasy) : null;
-    const odleglosciM2 = trasowane ?? minZDystansow(kand, kand.map(() => null));
+    const odleglosciUslug = trasowane ?? minZDystansow(kand, kand.map(() => null));
     const metoda = trasowane ? "trasa pieszą (ORS)" : "linia prosta (haversine)";
     const zrodloOpis = kandOsm.length ? "warstwa stała + OSM" : "warstwa stała";
+    // Otoczenie / jakość życia (zieleń, plac zabaw, poczta, bank) — miękki modyfikator, linia prosta.
+    const otocz = najblizszeOtoczenie(lat, lon, cfg.promienM);
+    const odleglosciM2 = { ...odleglosciUslug, ...otocz };
     logDebug(`Odległości (${zrodloOpis}, ${metoda}) → ${JSON.stringify(odleglosciM2)}`);
 
-    const dane: Partial<DaneDzialki> = { odleglosciM2, ...proxyZOdleglosci(odleglosciM2) };
+    const dane: Partial<DaneDzialki> = { odleglosciM2, ...proxyZOdleglosci(odleglosciUslug) };
     const meta: MetaPola[] = (Object.keys(dane) as (keyof DaneDzialki)[]).map((pole) => ({
       pole,
       zrodlo: `${zrodloOpis} · ${metoda}`,

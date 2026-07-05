@@ -24,7 +24,7 @@ import type { KonfiguracjaZabudowy } from "../config";
 import { KONFIG_ZABUDOWA, KONFIG_SCORING } from "../config";
 import { liczBramki, liczBraki, liczKluczoweLiczby, liczSygnaly } from "./uwarunkowania";
 import { kaskadaWskaznikow } from "./kaskadaWskaznikow";
-import { ocenM2 } from "./kanalyM2";
+import { ocenM2, sygnalyOtoczenia } from "./kanalyM2";
 
 interface WskaznikiUzyte {
   intensywnosc: number;
@@ -260,8 +260,12 @@ export function uruchomPoziom2(
   // DOMKNIĘCIE M2 (kanały A–F): popyt realizowalny + przydatność ekonomiczna + bramki
   // → werdykt per profil + rekomendacja. To TU wpisane dane (odległości) zmieniają wynik.
   const ocenaM2 = ocenM2(d, p1, bramki.status);
-  // Flaga transportu (np. „teren bez komunikacji zbiorowej") → do „Flagi i sygnały" (info), nie osobna sekcja.
-  const sygnaly = [...sygnalyBaza, ...ocenaM2.flagi.map((t) => ({ tekst: t, ton: "info" as const }))];
+  // Flaga transportu (info) + pozytywne sygnały otoczenia (park/plac zabaw/poczta/bank) → „Flagi i sygnały".
+  const sygnaly = [
+    ...sygnalyBaza,
+    ...ocenaM2.flagi.map((t) => ({ tekst: t, ton: "info" as const })),
+    ...sygnalyOtoczenia(d).map((t) => ({ tekst: t, ton: "pozytyw" as const })),
+  ];
 
   // Trzy warianty (optymalny/maksymalny/kameralny) dla OBU profili. Profil wiodący =
   // rekomendacja M2 (nie tylko z M1); „brak" → wyższy score M2 jako informacyjny wiodący.

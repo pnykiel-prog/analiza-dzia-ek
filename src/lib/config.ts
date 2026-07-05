@@ -416,6 +416,19 @@ export interface KonfiguracjaM2 {
     kursyDzienPelna: number; // ≥ kursów/dzień → pełna jakość
     wagi: Record<"mlodzi" | "seniorzy", { walk: number; jakosc: number; noc: number }>; // suma ≈ 1
   };
+  /**
+   * Otoczenie / jakość życia (OSM) — ŁAGODNY modyfikator + pozytywne sygnały, NIE bramka.
+   * Zieleń/plac zabaw ważą młodzi (rodziny), poczta/bank — seniorzy (codzienne sprawy).
+   * Bonus wg walkability (najbliższy obiekt każdej kategorii). Brak → neutralny, nigdy kara.
+   */
+  otoczenie: {
+    maxBonus: number; // maks. bonus (np. 0.06 → do ×1,06)
+    komfortM: number; // ≤ → pełna walkability kategorii
+    zerM: number; // ≥ → walkability 0
+    kategorie: readonly string[]; // klucze w odleglosciM2 (zielen, plac_zabaw, poczta, bank)
+    wagi: Record<"mlodzi" | "seniorzy", Record<string, number>>; // waga per kategoria (suma ≈ 1)
+    etykiety: Record<string, string>; // do sygnałów w raporcie
+  };
   /** Kanał B — koszt uzbrojenia (odległość do sieci → przydatność ekonomiczna). */
   kosztUzbrojenia: { odlegloscKomfortM: number; odlegloscDrogaM: number; karaSpadekPct: number };
   /** Kanał C — modyfikatory popytu (aglomeracja, potencjał, pustostany). */
@@ -453,6 +466,19 @@ export const KONFIG_M2: KonfiguracjaM2 = {
     liniiPelna: 5,
     kursyDzienPelna: 40,
     wagi: { seniorzy: { walk: 0.65, jakosc: 0.33, noc: 0.02 }, mlodzi: { walk: 0.4, jakosc: 0.5, noc: 0.1 } },
+  },
+  // Otoczenie = łagodny bonus (do +6% popytu), nigdy kara. Zieleń/plac zabaw → młodzi;
+  // poczta/bank → seniorzy. Zieleń ważna dla obu (spacer).
+  otoczenie: {
+    maxBonus: 0.06,
+    komfortM: 500,
+    zerM: 2000,
+    kategorie: ["zielen", "plac_zabaw", "poczta", "bank"],
+    wagi: {
+      mlodzi: { zielen: 0.45, plac_zabaw: 0.4, poczta: 0.05, bank: 0.1 },
+      seniorzy: { zielen: 0.35, plac_zabaw: 0.0, poczta: 0.35, bank: 0.3 },
+    },
+    etykiety: { zielen: "Tereny zielone / park", plac_zabaw: "Plac zabaw", poczta: "Poczta", bank: "Bank / bankomat" },
   },
   kosztUzbrojenia: { odlegloscKomfortM: 50, odlegloscDrogaM: 500, karaSpadekPct: 8 },
   modyfikatorPopytu: {

@@ -1,0 +1,13 @@
+{
+  "meta": {
+    "opis": "Warstwa otoczenia / jakosci zycia (OSM): zielen, plac zabaw, poczta, bank. SEED. Pelna: tools/otoczenie/import.ts.",
+    "data_importu": "SEED",
+    "zrodla": ["OSM"]
+  },
+  "rekordy": [
+    { "id": "SEED:zielen:1", "kategoria": "zielen", "nazwa": "Park", "lat": 52.231, "lon": 21.006, "zrodlo": "OSM", "data_importu": "SEED" },
+    { "id": "SEED:plac_zabaw:1", "kategoria": "plac_zabaw", "nazwa": "Plac zabaw", "lat": 52.2305, "lon": 21.009, "zrodlo": "OSM", "data_importu": "SEED" },
+    { "id": "SEED:poczta:1", "kategoria": "poczta", "nazwa": "Poczta", "lat": 52.2288, "lon": 21.0135, "zrodlo": "OSM", "data_importu": "SEED" },
+    { "id": "SEED:bank:1", "kategoria": "bank", "nazwa": "Bank", "lat": 52.2299, "lon": 21.0128, "zrodlo": "OSM", "data_importu": "SEED" }
+  ]
+}
