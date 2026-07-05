@@ -24,6 +24,7 @@ import { USER_AGENT } from "./net";
 import type { Kandydat } from "./geoUslugi";
 import { haversineM, minZDystansow } from "./geoUslugi";
 import { kandydaciStale } from "../uslugiStale";
+import { kandydaciSklep } from "../sklepy";
 
 export type { Kandydat } from "./geoUslugi";
 export { haversineM, minZDystansow } from "./geoUslugi";
@@ -195,11 +196,13 @@ export const konektorOdleglosci: Konektor = {
     // 1) Warstwa statyczna (offline): szkoły/przedszkola/POZ/apteki — tylko w buforze
     //    (punkty poza `promienM` = luka pokrycia, pomijane; kategoria pytana ręcznie).
     const kandStale = kandydaciStale(lat, lon, cfgR.k, undefined, cfg.promienM);
-    // 2) OSM na żywo: przystanek/sklep (może być null przy blokadzie — statyka i tak działa).
+    // 1b) Warstwa sklepów (offline): lokalizatory sieci + OSM/REGON (wytyczne sklepy).
+    const kandSklep = kandydaciSklep(lat, lon, cfgR.k, undefined, cfg.promienM);
+    // 2) OSM na żywo: sklepy niezależne (uzupełnienie; może być null przy blokadzie — statyka i tak działa).
     const elementy = await pobierzOverpass(lat, lon);
     const kandOsm = elementy ? kNajblizsze(elementy, lat, lon, cfgR.k).filter((k) => KATEGORIE_OSM.includes(k.usluga)) : [];
 
-    const kand = [...kandStale, ...kandOsm];
+    const kand = [...kandStale, ...kandSklep, ...kandOsm];
     if (kand.length === 0) {
       return brakWyniku(this.klucz, this.zrodlo, czas, "Brak usług (statyka + OSM) w zasięgu — nieoznaczone, nie dyskwalifikuje.");
     }
