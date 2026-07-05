@@ -54,15 +54,20 @@ test("transport §6: usługi pieszo (POZ) bramkują niezależnie od transportu",
   assert.equal(a.obsluzalny, false);
 });
 
-test("liczDostepnosc: status per usługa (komfort/gradient/bramka/brak) do panelu tekstowego", () => {
-  const d = liczDostepnosc({ ...baza, odleglosciM2: { poz: 300, apteka: 3600, sklep: 250, zielen: 200 } } as DaneDzialki);
-  const poz = d.uslugi.find((u) => u.klucz === "poz")!;
-  const apteka = d.uslugi.find((u) => u.klucz === "apteka")!;
-  const szkola = d.uslugi.find((u) => u.klucz === "szkola")!;
+test("liczDostepnosc: jedna lista — usługi (bramka) i otoczenie (modyfikator) równorzędnie", () => {
+  const d = liczDostepnosc({ ...baza, odleglosciM2: { poz: 300, apteka: 3600, sklep: 250, zielen: 200, bank: 5000 } } as DaneDzialki);
+  const poz = d.pozycje.find((u) => u.klucz === "poz")!;
+  const apteka = d.pozycje.find((u) => u.klucz === "apteka")!;
+  const szkola = d.pozycje.find((u) => u.klucz === "szkola")!;
+  const zielen = d.pozycje.find((u) => u.klucz === "zielen")!;
+  const bank = d.pozycje.find((u) => u.klucz === "bank")!;
   assert.equal(poz.status, "komfort"); // 300 ≤ 500
   assert.equal(apteka.status, "bramka"); // 3600 ≥ 3500 → dyskwalifikuje
   assert.equal(szkola.status, "brak"); // brak odległości → nieustalona
-  assert.ok(d.otoczenie.find((o) => o.klucz === "zielen")?.m === 200); // otoczenie w panelu
+  assert.equal(zielen.typ, "modyfikator"); // otoczenie w tej samej liście
+  assert.equal(zielen.status, "komfort"); // 200 ≤ 500
+  assert.equal(bank.status, "daleko"); // 5000 > 2000 (zerM) → daleko, ale NIE bramka
+  assert.equal(bank.typ, "modyfikator");
 });
 
 test("kanał B: daleka sieć + spadek → niższa przydatność ekonomiczna (skaluje, nie dyskwalifikuje)", () => {

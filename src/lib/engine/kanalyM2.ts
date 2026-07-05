@@ -41,10 +41,12 @@ const ETYKIETY_USLUG: Record<string, string> = {
  * profil), `brak` (nieustalona — pytana ręcznie, niższa pewność; NIE dyskwalifikuje). Czysta funkcja.
  */
 export function liczDostepnosc(d: DaneDzialki, cfg: KonfiguracjaM2 = KONFIG_M2): Dostepnosc {
-  const uslugi = Object.entries(cfg.progiUslug).map(([klucz, prog]) => {
+  const pozycje: Dostepnosc["pozycje"] = [];
+  // Usługi pieszo (bramka kanału A) — mogą dyskwalifikować.
+  for (const [klucz, prog] of Object.entries(cfg.progiUslug)) {
     const m = d.odleglosciM2?.[klucz] ?? null;
     const profile = (["mlodzi", "seniorzy"] as Profil[]).filter((p) => prog[p]);
-    let status: "komfort" | "gradient" | "bramka" | "brak" = "brak";
+    let status: "komfort" | "gradient" | "bramka" | "daleko" | "brak" = "brak";
     if (m != null) {
       status = "komfort";
       for (const p of profile) {
@@ -53,14 +55,19 @@ export function liczDostepnosc(d: DaneDzialki, cfg: KonfiguracjaM2 = KONFIG_M2):
         if (m > pr.komfortM) status = "gradient";
       }
     }
-    return { klucz, etykieta: ETYKIETY_USLUG[klucz] ?? klucz, m, profile, progi: prog, status };
-  });
-  const otoczenie = cfg.otoczenie.kategorie.map((klucz) => ({
-    klucz,
-    etykieta: cfg.otoczenie.etykiety[klucz] ?? klucz,
-    m: d.odleglosciM2?.[klucz] ?? null,
-  }));
-  return { uslugi, otoczenie };
+    const repr = prog.seniorzy ?? prog.mlodzi ?? null;
+    pozycje.push({ klucz, etykieta: ETYKIETY_USLUG[klucz] ?? klucz, m, typ: "bramka", profile, progi: repr ? { komfortM: repr.komfortM, dyskwalifikacjaM: repr.dyskwalifikacjaM } : null, status });
+  }
+  // Otoczenie / jakość życia (modyfikator) — nigdy nie dyskwalifikuje (blisko/w zasięgu/daleko).
+  const oc = cfg.otoczenie;
+  for (const klucz of oc.kategorie) {
+    const m = d.odleglosciM2?.[klucz] ?? null;
+    const profile = (["mlodzi", "seniorzy"] as Profil[]).filter((p) => (oc.wagi[p]?.[klucz] ?? 0) > 0);
+    let status: "komfort" | "gradient" | "bramka" | "daleko" | "brak" = "brak";
+    if (m != null) status = m <= oc.komfortM ? "komfort" : m <= oc.zerM ? "gradient" : "daleko";
+    pozycje.push({ klucz, etykieta: oc.etykiety[klucz] ?? klucz, m, typ: "modyfikator", profile, progi: { komfortM: oc.komfortM, dyskwalifikacjaM: oc.zerM }, status });
+  }
+  return { pozycje };
 }
 
 /**

@@ -195,11 +195,11 @@ export function Poziom2View({
 
       {p2.dostepnosc && (
       <Karta
-        tytul="Dostępność usług pieszo"
-        podtytul="Odległości decydujące o werdykcie (kanał A). Braki nie dyskwalifikują — obniżają pewność."
+        tytul="Dostępność (odległości pieszo)"
+        podtytul="Usługi (kanał A — mogą dyskwalifikować) i otoczenie (jakość życia — tylko bonus). Braki nie dyskwalifikują."
       >
         <div className="space-y-1.5">
-          {p2.dostepnosc.uslugi.map((u) => {
+          {p2.dostepnosc.pozycje.map((u) => {
             const kl =
               u.status === "komfort"
                 ? "bg-grunt-green-bg text-grunt-green"
@@ -209,16 +209,27 @@ export function Poziom2View({
                     ? "bg-grunt-red-bg text-grunt-red"
                     : "bg-grunt-surface-3 text-grunt-text-muted";
             const etykietaStatus =
-              u.status === "komfort" ? "w komforcie" : u.status === "gradient" ? "w zasięgu" : u.status === "bramka" ? "poza progiem — dyskwalifikuje" : "nieustalona";
-            const prog = u.progi.seniorzy ?? u.progi.mlodzi;
+              u.status === "brak"
+                ? "nieustalona"
+                : u.status === "bramka"
+                  ? "poza progiem — dyskwalifikuje"
+                  : u.status === "daleko"
+                    ? "daleko"
+                    : u.status === "gradient"
+                      ? "w zasięgu"
+                      : u.typ === "bramka"
+                        ? "w komforcie"
+                        : "blisko";
+            const profile = u.profile.map((p) => (p === "seniorzy" ? "seniorzy" : "młodzi")).join(" · ");
+            const meta =
+              u.typ === "bramka"
+                ? `${profile}${u.progi ? ` · komfort ≤${u.progi.komfortM} m, próg ≥${u.progi.dyskwalifikacjaM} m` : ""}`
+                : `${profile} · jakość życia (nie bramka)`;
             return (
               <div key={u.klucz} className="flex items-center justify-between gap-3 border-b border-grunt-divider last:border-0 pb-1.5 last:pb-0">
                 <div className="min-w-0">
                   <span className="text-[13px] text-grunt-text">{u.etykieta}</span>
-                  <span className="text-[11px] text-grunt-text-faint2 ml-2">
-                    {u.profile.map((p) => (p === "seniorzy" ? "seniorzy" : "młodzi")).join(" · ")}
-                    {prog ? ` · komfort ≤${prog.komfortM} m, próg ≥${prog.dyskwalifikacjaM} m` : ""}
-                  </span>
+                  <span className="text-[11px] text-grunt-text-faint2 ml-2">{meta}</span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="mono text-[13px] text-grunt-text">{u.m != null ? `${u.m} m` : "—"}</span>
@@ -228,20 +239,6 @@ export function Poziom2View({
             );
           })}
         </div>
-        {p2.dostepnosc.otoczenie.some((o) => o.m != null) && (
-          <div className="mt-3 pt-2 border-t border-grunt-divider">
-            <div className="text-[11px] font-medium text-grunt-text-muted mb-1">Otoczenie / jakość życia (informacyjnie, nie bramka)</div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {p2.dostepnosc.otoczenie
-                .filter((o) => o.m != null)
-                .map((o) => (
-                  <span key={o.klucz} className="text-[12px] text-grunt-text-muted2">
-                    {o.etykieta}: <span className="mono text-grunt-text">{o.m} m</span>
-                  </span>
-                ))}
-            </div>
-          </div>
-        )}
       </Karta>
       )}
 
