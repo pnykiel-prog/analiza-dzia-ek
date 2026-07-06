@@ -57,8 +57,9 @@ async function pobierzOpcjeTeryt(params: Record<string, string>): Promise<{ tery
   }
 }
 
-type Ekran = "wejscie" | "poziom1" | "poziom2" | "poziom3" | "raport";
-const EKRANY: Ekran[] = ["wejscie", "poziom1", "poziom2", "poziom3", "raport"];
+// „uzupelnianie" to osobny ekran między M1 a M2 (nie w stepperze — mapuje się na krok M2).
+type Ekran = "wejscie" | "poziom1" | "uzupelnianie" | "poziom2" | "poziom3" | "raport";
+const EKRANY: Exclude<Ekran, "uzupelnianie">[] = ["wejscie", "poziom1", "poziom2", "poziom3", "raport"];
 
 export default function NowaAnalizaPage() {
   const [ekran, setEkran] = useState<Ekran>("wejscie");
@@ -206,10 +207,10 @@ export default function NowaAnalizaPage() {
     }
   }
 
-  // ── Przejście do P2: bez inicjalizacji audytu — auto już pobrane, pytamy krótko ─
+  // ── „Przejdź do poziomu M2" (z M1) → OSOBNY ekran uzupełniania (nie wyniki M2). ─
   function wejdzP2() {
     if (!dane) return;
-    setEkran("poziom2");
+    setEkran("uzupelnianie");
     setMaxKrok((m) => Math.max(m, 3));
   }
 
@@ -254,6 +255,9 @@ export default function NowaAnalizaPage() {
     setDane(noweDane);
     await przelicz(noweDane);
     setLicze(false);
+    // Po zebraniu danych i przeliczeniu → CZYSTA analiza M2 (wytyczne: przeliczenie przy wejściu do M2).
+    setEkran("poziom2");
+    setMaxKrok((m) => Math.max(m, 3));
   }
 
   // ── Przejście do P3: inicjalizacja parametrów reżimu z konfiguracji ────────
@@ -315,10 +319,13 @@ export default function NowaAnalizaPage() {
   }
 
   const korektyP2 = Object.keys(p2).filter((k) => p2orig[k] !== undefined && p2[k] !== p2orig[k]);
-  const stepAktywny = EKRANY.indexOf(ekran) + 1;
+  // Ekran uzupełniania mapuje się na krok „Poziom 2" w stepperze (jest bramą do M2).
+  const stepAktywny = ekran === "uzupelnianie" ? EKRANY.indexOf("poziom2") + 1 : EKRANY.indexOf(ekran as Exclude<Ekran, "uzupelnianie">) + 1;
 
   function cofnij() {
-    const i = EKRANY.indexOf(ekran);
+    if (ekran === "uzupelnianie") { setEkran("poziom1"); return; }
+    if (ekran === "poziom2") { setEkran("uzupelnianie"); return; }
+    const i = EKRANY.indexOf(ekran as Exclude<Ekran, "uzupelnianie">);
     if (i > 0) setEkran(EKRANY[i - 1]);
   }
   function idzDoKroku(nr: number) {
@@ -399,8 +406,8 @@ export default function NowaAnalizaPage() {
       )}
 
 
-      {/* POZIOM 2 — mapa + kilka prostych pytań (bez audytu braków); analiza poniżej */}
-      {ekran === "poziom2" && dane && (
+      {/* EKRAN UZUPEŁNIANIA (osobny, między M1 a M2) — mapa + pytania; BEZ wyników M2. */}
+      {ekran === "uzupelnianie" && dane && (
         <div className="space-y-4">
           <div className="grid lg:grid-cols-[minmax(0,430px)_1fr] gap-4 items-start">
             <div className="lg:sticky" style={{ top: "var(--grunt-sticky-top)" }}>
@@ -414,6 +421,16 @@ export default function NowaAnalizaPage() {
               />
             </div>
             <PytaniaM2 dane={dane} onPrzelicz={przeliczZOdpowiedzi} licze={licze} />
+          </div>
+        </div>
+      )}
+
+      {/* POZIOM 2 — CZYSTA analiza (bez pytań); pytania są na ekranie uzupełniania. */}
+      {ekran === "poziom2" && dane && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[12px] text-grunt-text-muted2">Analiza na zebranych danych. Więcej danych → dokładniejsza ocena.</p>
+            <button onClick={() => setEkran("uzupelnianie")} className="btn-secondary">Uzupełnij więcej danych</button>
           </div>
         </div>
       )}
