@@ -116,8 +116,8 @@ export function PytaniaM2({
 
   return (
     <Karta
-      tytul="Poziom 2 — kilka pytań o działkę"
-      podtytul="Resztę pobraliśmy automatycznie. Uzupełnij, co znasz — albo zostaw puste i przejdź dalej."
+      tytul="Uzupełnij dane do analizy (opcjonalnie)"
+      podtytul="Część danych pobraliśmy automatycznie. Uzupełnij, co znasz — albo pomiń wszystko i przejdź do analizy. Wyniki zobaczysz na następnym ekranie."
     >
       {/* 1. Dostęp do drogi — tylko gdy auto nie rozstrzygnęło */}
       {!drogaAuto && (
@@ -306,7 +306,7 @@ export function PytaniaM2({
 
       <div className="mt-4">
         <button onClick={przelicz} disabled={licze} className="btn-primary" style={{ height: "var(--grunt-h-cta)" }}>
-          {licze ? "Liczę…" : "Zapisz i przelicz Poziom 2"}
+          {licze ? "Liczę…" : "Przejdź do analizy →"}
         </button>
       </div>
     </Karta>
