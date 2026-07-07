@@ -15,14 +15,15 @@ import { pobierzDzialkePoId } from "./uldk";
 import { centroid, centroid4326ZWkt, czyPrzylegaja, konturSvg, konturGeo, zwartoscKsztaltu, minSzerokoscKsztaltu } from "../geo";
 import { uruchomKonektory } from "./connectors";
 import type { MetaPola, Teren } from "./connectors/types";
-import { medianaRynkowa, wartoscOdtworzeniowaDla } from "../config-rynek";
+import { medianaRynkowa } from "../config-rynek";
+import { stawkaWO } from "./wartoscOdtworzeniowa";
 
 export type ZrodloDanych = "demo" | "uldk" | "brak";
 
 /** Podpowiedzi regionalne (fallback) dla prefillu P2/P3 — z tabel M3. */
 export function medianaRegionalna(woj: string, gmina = "") {
   const m = medianaRynkowa(woj);
-  const w = wartoscOdtworzeniowaDla(woj, gmina);
+  const w = stawkaWO(woj, gmina); // warstwa WO: miasto wydzielone → własna stawka
   return { czynsz: m.czynsz, cenaNowych: m.cenaNowych, wartoscOdtworzeniowa: w.wartosc };
 }
 
@@ -86,6 +87,7 @@ const POLA_AUTO: (keyof DaneDzialki)[] = [
   "udzial65PlusPct",
   "natura2000",
   "wartoscOdtworzeniowaM2",
+  "woMeta",
   "czynszRynkowyM2",
   "cenaNowychM2",
   "pustostanyPct",

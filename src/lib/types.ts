@@ -75,6 +75,16 @@ export interface DaneTransportu {
   przystanki: PrzystanekReczny[]; // wypełniane tylko gdy jest === true
 }
 
+/** Prowenancja stawki wartości odtworzeniowej (warstwa WO) — do jawnych założeń M3. */
+export interface WartoscOdtworzeniowaMeta {
+  jednostka: string;
+  typ: "miasto_wydzielone" | "wojewodztwo_reszta" | "benchmark";
+  okresOd: string | null;
+  okresDo: string | null;
+  obwieszczenie: string | null;
+  benchmark: boolean;
+}
+
 export interface DaneDzialki {
   // A. Identyfikacja i geometria (ULDK / EGiB)
   id: string; // identyfikator ewidencyjny TERYT + obręb + nr
@@ -169,6 +179,8 @@ export interface DaneDzialki {
 
   // I/J. Rynek i ekonomia
   wartoscOdtworzeniowaM2: Maybe<number>; // podstawa pułapu czynszu
+  /** Prowenancja wartości odtworzeniowej (warstwa WO): jednostka, okres obwieszczenia, źródło. */
+  woMeta?: WartoscOdtworzeniowaMeta | null;
   czynszRynkowyM2: Maybe<number>; // miesięczny
   cenaNowychM2: Maybe<number>; // stan deweloperski
   kosztBudowyM2: Maybe<number>; // pod klucz (jeśli znany)

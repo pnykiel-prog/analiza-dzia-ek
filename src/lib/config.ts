@@ -328,7 +328,9 @@ export interface KonfiguracjaFinanse {
     pustostanyPct: number;
     rezerwaRyzykoPct: number; // % kosztu budowy+uzbrojenia
     kosztyProjektowePct: number;
-    kosztyOperacyjneM2Mc: number; // eksploatacja + remonty + zarząd
+    kosztyOperacyjneM2Mc: number; // eksploatacja + remonty + zarząd (strumień OPERACYJNY — NIE wchodzi do zdolności kredytowej)
+    /** Bufor bezpieczeństwa zdolności czynszowej [%] — DSCR ~1,11–1,15 (widełki 10–15%). */
+    rezerwaBezpieczenstwaPct: number;
     domyslnaPartycypacjaNajemcowPct: number;
     domyslnyWkladGminyPct: number;
   };
@@ -398,6 +400,7 @@ export const KONFIG_FINANSE: KonfiguracjaFinanse = {
     rezerwaRyzykoPct: 5,
     kosztyProjektowePct: 8,
     kosztyOperacyjneM2Mc: 11,
+    rezerwaBezpieczenstwaPct: 12.5,
     domyslnaPartycypacjaNajemcowPct: 0,
     domyslnyWkladGminyPct: 0,
   },

@@ -227,5 +227,7 @@ test("runner: brak konfiguracji/geometrii → status brak, raport pełny, bez wy
   };
   const r = await uruchomKonektory(teren, DZIALKI_PRZYKLADOWE[0]);
   assert.equal(r.raport.length >= 4, true); // GUS + KIMPZP + WMS + Overpass
-  assert.deepEqual(r.dane, {}); // brak geometrii/konfiguracji → nic nie wypełniono
+  // Bez geometrii nie wypełniamy pól geometrycznych; wartość odtworzeniowa (warstwa WO)
+  // wyprowadza się z samego województwa → uzupełnia prowenancję woMeta (to jedyne pole).
+  assert.deepEqual(Object.keys(r.dane), ["woMeta"]);
 });
