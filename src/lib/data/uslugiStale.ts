@@ -15,8 +15,9 @@ import type { Kandydat } from "./connectors/geoUslugi";
 import { haversineM } from "./connectors/geoUslugi";
 import surowe from "./uslugi_stale.json";
 
-/** Cztery kategorie ze statycznej warstwy (spec §1). Reszta (przystanek/sklep) — OSM. */
-export const KATEGORIE_STALE = ["szkola", "przedszkole", "poz", "apteka"] as const;
+/** Kategorie z rejestrowej warstwy statycznej (RSPO/RPWDL). Apteki → osobna warstwa OSM
+ *  (`apteki.ts`), bo rejestr RA był niekompletny (brak m.in. podkarpackiego). */
+export const KATEGORIE_STALE = ["szkola", "przedszkole", "poz"] as const;
 export type KategoriaStala = (typeof KATEGORIE_STALE)[number];
 
 export interface UslugaStala {
