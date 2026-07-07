@@ -22,7 +22,6 @@ import { Chip, CalloutWalidacji } from "./grunt";
 
 const INWESTORZY = Object.keys(ETYK_INWESTORA) as TypInwestora[];
 const GRUNT_OPCJE = Object.keys(ETYK_GRUNTU) as SposobWniesieniaDzialki[];
-const WSPOLPRACA_OPCJE = Object.keys(ETYK_WSPOLPRACY) as WspolpracaGmina[];
 const KWALIFIKACJA_INVESTEU: TypInwestora[] = ["SIM_GMINNY", "SIM_MIESZANY", "SIM_PRYWATNY", "TBS", "SPOLDZIELNIA", "SPOLKA_GMINNA"];
 
 // Podmioty powiązane z gminą — tylko one mogą wnieść działkę aportem gminnym / Lokal za Grunt.
@@ -32,6 +31,22 @@ function dozwoloneWniesienie(inwestor: TypInwestora): SposobWniesieniaDzialki[] 
   const gminny = PODMIOTY_GMINNE.includes(inwestor);
   return GRUNT_OPCJE.filter((g) => (g === "APORT_GMINNY" || g === "LOKAL_ZA_GRUNT" ? gminny : true));
 }
+
+/**
+ * Formy współpracy dozwolone dla podmiotu (wytyczne „forma współpracy per podmiot").
+ * ZAPORA: to TYLKO filtr list w drabince — nie zmienia obliczeń montażu. Gmina wyposaża
+ * własny podmiot (aport/udziały), nie zawiera partnerstwa → „umowa partnerska" ukryta dla
+ * gminnych. Wpływ na montaż ma wyłącznie LzG/ZPI (max grant komunalny przyszły) — w silniku.
+ */
+const WSPOLPRACA_PER_PODMIOT: Record<TypInwestora, WspolpracaGmina[]> = {
+  GMINA: ["BRAK"], // inwestor bezpośredni — nie partner
+  SIM_GMINNY: ["APORT", "UDZIAL_KAPITALOWY", "BRAK"],
+  SPOLKA_GMINNA: ["APORT", "UDZIAL_KAPITALOWY", "BRAK"],
+  SIM_MIESZANY: ["UMOWA_PARTNERSKA", "UDZIAL_KAPITALOWY", "APORT"],
+  SIM_PRYWATNY: ["UMOWA_PARTNERSKA", "LOKAL_ZA_GRUNT", "ZPI", "BRAK"],
+  TBS: ["UMOWA_PARTNERSKA", "LOKAL_ZA_GRUNT", "ZPI", "BRAK"],
+  SPOLDZIELNIA: ["UMOWA_PARTNERSKA", "LOKAL_ZA_GRUNT", "ZPI", "BRAK"],
+};
 
 /**
  * Ekran ankiety finansowej (osobny, między M2 a M3). Pyta TYLKO o to, co klient
@@ -65,7 +80,10 @@ export function AnkietaFinansowa({
   const opcjeWniesienia = useMemo(() => dozwoloneWniesienie(typInwestora), [typInwestora]);
   const [sposobWybrany, setSposob] = useState<SposobWniesieniaDzialki>("APORT_GMINNY");
   const sposobWniesieniaDzialki = opcjeWniesienia.includes(sposobWybrany) ? sposobWybrany : opcjeWniesienia[0];
-  const [wspolpracaGmina, setWspolpraca] = useState<WspolpracaGmina>("UMOWA_PARTNERSKA");
+  // Forma współpracy — filtrowana po podmiocie (drabinka), z fallbackiem na dozwolone.
+  const opcjeWspolpracy = useMemo(() => WSPOLPRACA_PER_PODMIOT[typInwestora], [typInwestora]);
+  const [wspolpracaWybrana, setWspolpraca] = useState<WspolpracaGmina>("BRAK");
+  const wspolpracaGmina = opcjeWspolpracy.includes(wspolpracaWybrana) ? wspolpracaWybrana : opcjeWspolpracy[0];
   const [efektywnoscEnergetyczna, setEE] = useState(false);
   const [pozwolenieNaBudowe, setPnB] = useState(false);
 
@@ -136,9 +154,9 @@ export function AnkietaFinansowa({
           ))}
         </Grupa>
 
-        {/* 4. Współpraca z gminą (LzG/ZPI odblokowują max grant komunalny w reżimie przyszłym) */}
-        <Grupa label="Forma współpracy z gminą" podpis="Lokal za Grunt / ZPI podnoszą maksymalny grant komunalny (reżim przyszły).">
-          {WSPOLPRACA_OPCJE.map((w) => (
+        {/* 4. Współpraca z gminą — filtrowana po podmiocie; LzG/ZPI odblokowują max grant komunalny (reżim przyszły) */}
+        <Grupa label="Forma współpracy z gminą" podpis="Filtrowana wg podmiotu. Lokal za Grunt / ZPI podnoszą maksymalny grant komunalny (reżim przyszły).">
+          {opcjeWspolpracy.map((w) => (
             <Chip key={w} selected={wspolpracaGmina === w} onClick={() => setWspolpraca(w)}>{ETYK_WSPOLPRACY[w]}</Chip>
           ))}
         </Grupa>

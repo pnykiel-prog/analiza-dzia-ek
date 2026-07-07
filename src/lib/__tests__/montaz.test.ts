@@ -91,6 +91,20 @@ test("montaż: override oprocentowania obniża kredyt (niższa stopa = wyższa r
   assert.ok(tanie.zrodla.kredyt >= drogie.zrodla.kredyt, "niższe oprocentowanie → większa zdolność kredytowa");
 });
 
+test("montaż: forma współpracy neutralna dla wyniku (ZAPORA) — poza LzG/ZPI nie rusza liczb", () => {
+  // SIM gminny komunalny: dozwolone współprace to aport/udział/brak — żadna nie jest LzG/ZPI,
+  // a podmiot jest gminny (dostęp do grantu niezależny od współpracy) → montaż identyczny.
+  const wariacje: Array<ProfilFinansowy["wspolpracaGmina"]> = ["APORT", "UDZIAL_KAPITALOWY", "BRAK"];
+  const zrodla = wariacje.map((w) => JSON.stringify(zlozKolumne(profil({ typZasobu: "KOMUNALNY", wspolpracaGmina: w }), "current", wej()).zrodla));
+  for (const s of zrodla) assert.equal(s, zrodla[0], "przełączenie współpracy nie rusza źródeł montażu");
+});
+
+test("montaż: LzG/ZPI podnoszą grant komunalny w reżimie przyszłym (jedyny dozwolony wpływ)", () => {
+  const bez = zlozKolumne(profil({ typZasobu: "KOMUNALNY", wspolpracaGmina: "BRAK", sposobWniesieniaDzialki: "JUZ_POSIADANA" }), "future", wej());
+  const zpi = zlozKolumne(profil({ typZasobu: "KOMUNALNY", wspolpracaGmina: "ZPI", sposobWniesieniaDzialki: "JUZ_POSIADANA" }), "future", wej());
+  assert.ok(zpi.zalozenia.grantPct >= bez.zalozenia.grantPct, "ZPI odblokowuje max grant komunalny (przyszły)");
+});
+
 test("montaż: rola działki ze sposobu wniesienia", () => {
   assert.equal(rolaZeSposobu("ZAKUP_KREDYT"), "koszt");
   assert.equal(rolaZeSposobu("APORT_GMINNY"), "zrodlo");
