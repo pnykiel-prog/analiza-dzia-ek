@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import type { DaneDzialki, WynikAnalizy, WynikPoziom1, KluczWerdyktu } from "@/lib/types";
+import type { BramkaWielkosci, DaneDzialki, PojemnoscForma, WynikAnalizy, WynikPoziom1, KluczWerdyktu } from "@/lib/types";
 import type { ProfilFinansowy } from "@/lib/finanse/typy";
 import { domyslnaKonfiguracja, KONFIG_M2, type Konfiguracja } from "@/lib/config";
 import { WOJEWODZTWA } from "@/lib/wojewodztwa";
@@ -485,16 +485,12 @@ export default function NowaAnalizaPage() {
       {wynik && wynik.poziom1 && (
         <div className="space-y-4">
           {ekran === "poziom1" && (
-            <>
-              {/* Rekomendacja pokazana już w lewym panelu potwierdzenia — tu tylko szczegóły. */}
-              <Poziom1View p1={wynik.poziom1} pelny pokazRekomendacje={false} />
-              <BannerBramki
-                tytul="Poziom 1 zaliczony — przejdź do oceny działki"
-                opis="Poziom 2 odsłania model zabudowy i warianty."
-                akcja={wejdzP2}
-                akcjaLabel="Przejdź do Poziomu 2"
-              />
-            </>
+            <EkranM1
+              key={wynik.poziom1.dzialkaId}
+              p1={wynik.poziom1}
+              onDalej={wejdzP2}
+              onKoniec={() => { setWynik(null); setEkran("wejscie"); setMaxKrok(1); }}
+            />
           )}
           {ekran === "poziom2" && (
             <>
@@ -799,6 +795,109 @@ function PunktWejscia({ ikona, tytul, opis }: { ikona: "check" | "dot" | "sigma"
   );
 }
 
+// ── Ekran M1 z bramką wielkości/kształtu (fizyczna wykonalność + forma + próg opłacalności) ──
+// M1 = CZYSTY wynik przesiewu. Bramka rozstrzyga, czy w ogóle pokazać werdykty:
+//  • nieprzydatna/scalenie → sam komunikat (bez werdyktów, bez przejścia do M2);
+//  • niższa opłacalność/konflikt → punkt decyzyjny (obserwacja + „analizować dalej?");
+//  • ok → model zabudowy + werdykty + przejście do M2.
+function EkranM1({ p1, onDalej, onKoniec }: { p1: WynikPoziom1; onDalej: () => void; onKoniec: () => void }) {
+  const br = p1.bramkaWielkosci;
+  const [skalaOk, setSkalaOk] = useState(false);
+  const blokuje = br.wynik === "nieprzydatna" || br.wynik === "scalenie";
+  const pytanie = (br.wynik === "nizsza_oplacalnosc" || br.wynik === "konflikt") && !skalaOk;
+
+  if (blokuje) {
+    return (
+      <div className="space-y-4">
+        <KomunikatBramki bramka={br} />
+        <BannerBramki
+          tytul="Analiza wstępna zatrzymana"
+          opis="Sprawdź inną działkę albo teren po scaleniu z sąsiednimi."
+          secondary={onKoniec}
+          secondaryLabel="Nowa analiza"
+        />
+      </div>
+    );
+  }
+
+  if (pytanie) {
+    return (
+      <div className="space-y-4">
+        <KartaFormy bramka={br} />
+        <BannerBramki
+          tytul={br.konfliktProgow ? "Punkt decyzyjny — kierunek zabudowy" : "Punkt decyzyjny — mniejsza skala inwestycji"}
+          opis={br.komunikat}
+          akcja={() => setSkalaOk(true)}
+          akcjaLabel="Tak, analizuj dalej"
+          secondary={onKoniec}
+          secondaryLabel="Zakończ"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <KartaFormy bramka={br} />
+      {br.ponizejProguOplacalnosci && br.notaSkali && (
+        <p className="text-[11px] text-grunt-text-muted2 bg-grunt-surface-3 border border-grunt-border rounded px-3 py-1.5">ℹ {br.notaSkali}</p>
+      )}
+      <Poziom1View p1={p1} pelny pokazRekomendacje={false} />
+      <BannerBramki
+        tytul="Poziom 1 zaliczony — przejdź do oceny działki"
+        opis="Poziom 2 odsłania model zabudowy i warianty."
+        akcja={onDalej}
+        akcjaLabel="Przejdź do Poziomu 2"
+      />
+    </div>
+  );
+}
+
+function KomunikatBramki({ bramka }: { bramka: BramkaWielkosci }) {
+  const scalenie = bramka.wynik === "scalenie";
+  return (
+    <div className={`flex items-start gap-3 rounded-md border px-3.5 py-3 ${scalenie ? "border-grunt-amber/30 bg-grunt-amber-bg" : "border-grunt-red/25 bg-grunt-red-bg"}`}>
+      <span className={`mono grid place-items-center shrink-0 w-6 h-6 rounded-full text-white text-[13px] font-bold ${scalenie ? "bg-grunt-amber" : "bg-grunt-red"}`}>{scalenie ? "⚑" : "✕"}</span>
+      <div>
+        <div className={`text-[13px] font-semibold ${scalenie ? "text-grunt-amber-text" : "text-grunt-red"}`}>{scalenie ? "Działka zbyt mała samodzielnie" : "Działka nie nadaje się pod zabudowę"}</div>
+        <div className="text-[12px] text-grunt-text-muted mt-0.5">{bramka.komunikat}</div>
+      </div>
+    </div>
+  );
+}
+
+function KartaFormy({ bramka }: { bramka: BramkaWielkosci }) {
+  return (
+    <Karta tytul="Model zabudowy — orientacyjna skala" podtytul="Dwie formy liczone tym samym łańcuchem; rekomendowana daje najwięcej lokali">
+      <div className="grid sm:grid-cols-2 gap-3">
+        <FormaBox etykieta="Zabudowa niska (do 2 kond.)" f={bramka.niska} prog={20} rekomendowana={bramka.formaRekomendowana === "niska"} />
+        <FormaBox etykieta="Zabudowa wysoka (powyżej 2 kond.)" f={bramka.wysoka} prog={40} rekomendowana={bramka.formaRekomendowana === "wysoka"} />
+      </div>
+      <p className="text-[11px] text-grunt-text-faint2 mt-2">Skala orientacyjna z kształtu działki i zabudowy sąsiedztwa — nie zastępuje ustaleń MPZP/WZ (potwierdzenie na Poziomie 2).</p>
+    </Karta>
+  );
+}
+
+function FormaBox({ etykieta, f, prog, rekomendowana }: { etykieta: string; f: PojemnoscForma; prog: number; rekomendowana: boolean }) {
+  const wProgu = f.lokali >= prog;
+  return (
+    <div className={`rounded-card border p-3 ${rekomendowana ? "border-grunt-ink shadow-raised" : "border-grunt-border"}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[12px] font-semibold text-grunt-text">{etykieta}</span>
+        {rekomendowana && <span className="badge bg-grunt-ink text-white text-[10px] shrink-0">★ REKOMENDOWANA</span>}
+      </div>
+      <div className="flex items-end gap-1 mt-2">
+        <span className="mono text-[28px] font-semibold leading-none text-grunt-text">{f.lokali}</span>
+        <span className="text-[12px] text-grunt-text-faint2 mb-0.5">lokali</span>
+      </div>
+      <div className="text-[11px] text-grunt-text-muted2 mt-1">{f.kondygnacje} kond. · PUM ~{liczba(f.pumM2, " m²")}</div>
+      <div className={`text-[11px] mt-1 ${wProgu ? "text-grunt-green" : "text-grunt-amber-text"}`}>
+        {wProgu ? `w progu opłacalności (≥${prog})` : `poniżej progu opłacalności (${prog})`}
+      </div>
+    </div>
+  );
+}
+
 function PotwierdzenieDanych({ dane, meta, p1 }: { dane: DaneDzialki; meta: MetaRozw; p1?: WynikPoziom1 }) {
   const trybMapy: TrybMapy = dane.powierzchniaM2 === 0 ? "notfound" : meta.przylegajace === false ? "nonadjacent" : "ok";
   const ocena = p1?.ocenaPopytu;
@@ -813,8 +912,8 @@ function PotwierdzenieDanych({ dane, meta, p1 }: { dane: DaneDzialki; meta: Meta
         {dane.powierzchniaM2 > 0 && <span className="mono text-[12px] text-grunt-text-muted">{liczba(dane.powierzchniaM2, " m²")}</span>}
         {dane.gmina && <span className="text-[12px] text-grunt-text-muted">{dane.gmina}</span>}
       </div>
-      {/* Rekomendowany kierunek (konsolidacja dolnego paska) */}
-      {rek && ocena && (
+      {/* Rekomendowany kierunek — ukryty, gdy bramka wielkości zatrzymuje działkę (bez werdyktów). */}
+      {rek && ocena && p1?.bramkaWielkosci?.fizycznieWykonalna !== false && (
         <div className="flex items-center justify-between gap-3 mb-3 rounded-md border border-grunt-ink/15 bg-grunt-surface-3 px-3.5 py-2.5">
           <div className="text-[13px] text-grunt-text-muted">
             Rekomendowany kierunek: <strong className="text-grunt-text">{ETYK_WERDYKT_KIER[ocena.rekomendowanyKierunek]}</strong>
