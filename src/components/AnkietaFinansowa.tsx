@@ -10,7 +10,7 @@ import type {
   WspolpracaGmina,
 } from "@/lib/finanse/typy";
 import { dostepneZasoby, sugerujRezim, walidujUprawnienia } from "@/lib/finanse";
-import { rolaZeSposobu } from "@/lib/finanse/przekroj";
+import { rolaZeSposobu } from "@/lib/finanse/montaz";
 import {
   ETYK_GRUNTU,
   ETYK_INWESTORA,
@@ -24,6 +24,14 @@ const INWESTORZY = Object.keys(ETYK_INWESTORA) as TypInwestora[];
 const GRUNT_OPCJE = Object.keys(ETYK_GRUNTU) as SposobWniesieniaDzialki[];
 const WSPOLPRACA_OPCJE = Object.keys(ETYK_WSPOLPRACY) as WspolpracaGmina[];
 const KWALIFIKACJA_INVESTEU: TypInwestora[] = ["SIM_GMINNY", "SIM_MIESZANY", "SIM_PRYWATNY", "TBS", "SPOLDZIELNIA", "SPOLKA_GMINNA"];
+
+// Podmioty powiązane z gminą — tylko one mogą wnieść działkę aportem gminnym / Lokal za Grunt.
+const PODMIOTY_GMINNE: TypInwestora[] = ["GMINA", "SPOLKA_GMINNA", "SIM_GMINNY", "SIM_MIESZANY"];
+/** Sposoby wniesienia dozwolone dla podmiotu (drabinka: filtr po podmiocie). */
+function dozwoloneWniesienie(inwestor: TypInwestora): SposobWniesieniaDzialki[] {
+  const gminny = PODMIOTY_GMINNE.includes(inwestor);
+  return GRUNT_OPCJE.filter((g) => (g === "APORT_GMINNY" || g === "LOKAL_ZA_GRUNT" ? gminny : true));
+}
 
 /**
  * Ekran ankiety finansowej (osobny, między M2 a M3). Pyta TYLKO o to, co klient
@@ -53,14 +61,15 @@ export function AnkietaFinansowa({
   const [typZasobu, setTypZasobu] = useState<TypZasobu>("SPOLECZNY_CZYNSZOWY");
   const zasobEff = opcjeZasobu.some((o) => o.zasob === typZasobu) ? typZasobu : opcjeZasobu[0]?.zasob;
 
-  const [sposobWniesieniaDzialki, setSposob] = useState<SposobWniesieniaDzialki>("APORT_GMINNY");
+  // Wniesienie działki — filtrowane po podmiocie (drabinka), z fallbackiem na dozwolone.
+  const opcjeWniesienia = useMemo(() => dozwoloneWniesienie(typInwestora), [typInwestora]);
+  const [sposobWybrany, setSposob] = useState<SposobWniesieniaDzialki>("APORT_GMINNY");
+  const sposobWniesieniaDzialki = opcjeWniesienia.includes(sposobWybrany) ? sposobWybrany : opcjeWniesienia[0];
   const [wspolpracaGmina, setWspolpraca] = useState<WspolpracaGmina>("UMOWA_PARTNERSKA");
   const [efektywnoscEnergetyczna, setEE] = useState(false);
   const [pozwolenieNaBudowe, setPnB] = useState(false);
 
   const [wartoscDzialki, setWartoscDzialki] = useState(wartoscDzialkiSugestia ? String(Math.round(wartoscDzialkiSugestia)) : "");
-  const [partycypacja, setPartycypacja] = useState("");
-  const [wkladGminy, setWkladGminy] = useState("");
 
   const rola = rolaZeSposobu(sposobWniesieniaDzialki);
   const etykietaDzialki =
@@ -79,8 +88,7 @@ export function AnkietaFinansowa({
         mieszkanieNaStart: false, // usunięte z ankiety (wsparcie najemcy, nie montaż inwestora)
         dataWniosku,
         wartoscDzialkiPln: wartoscDzialki ? Number(wartoscDzialki) : undefined,
-        partycypacjaNajemcowPct: partycypacja ? Number(partycypacja) : undefined,
-        wkladGminyPct: wkladGminy ? Number(wkladGminy) : undefined,
+        // Partycypacja i wkład są liczone automatycznie (silnik montażu), nie pytane.
         pozwolenieNaBudowe,
       }
     : null;
@@ -112,7 +120,14 @@ export function AnkietaFinansowa({
           </Grupa>
         )}
 
-        {/* Q2 — zasób (dynamiczny filtr) */}
+        {/* 2. Sposób wniesienia działki — filtrowany po podmiocie */}
+        <Grupa label="Sposób wniesienia działki" podpis="Aport gminny / Lokal za Grunt tylko dla podmiotów powiązanych z gminą.">
+          {opcjeWniesienia.map((g) => (
+            <Chip key={g} selected={sposobWniesieniaDzialki === g} onClick={() => setSposob(g)}>{ETYK_GRUNTU[g]}</Chip>
+          ))}
+        </Grupa>
+
+        {/* 3. Zasób (co ma powstać) — filtr wg macierzy dostępu */}
         <Grupa label="Typ zasobu (co ma powstać)" podpis="Filtrowane wg macierzy dostępu; „brak” ukryty.">
           {opcjeZasobu.map((o) => (
             <Chip key={o.zasob} selected={zasobEff === o.zasob} limited={o.dostep === "ograniczony"} onClick={() => setTypZasobu(o.zasob)}>
@@ -121,28 +136,22 @@ export function AnkietaFinansowa({
           ))}
         </Grupa>
 
-        {/* Q4 — sposób wniesienia działki */}
-        <Grupa label="Sposób wniesienia działki">
-          {GRUNT_OPCJE.map((g) => (
-            <Chip key={g} selected={sposobWniesieniaDzialki === g} onClick={() => setSposob(g)}>{ETYK_GRUNTU[g]}</Chip>
-          ))}
-        </Grupa>
-
-        {/* Q5 — współpraca z gminą */}
-        <Grupa label="Forma współpracy z gminą">
+        {/* 4. Współpraca z gminą (LzG/ZPI odblokowują max grant komunalny w reżimie przyszłym) */}
+        <Grupa label="Forma współpracy z gminą" podpis="Lokal za Grunt / ZPI podnoszą maksymalny grant komunalny (reżim przyszły).">
           {WSPOLPRACA_OPCJE.map((w) => (
             <Chip key={w} selected={wspolpracaGmina === w} onClick={() => setWspolpraca(w)}>{ETYK_WSPOLPRACY[w]}</Chip>
           ))}
         </Grupa>
 
-        {/* Wartość działki + partycypacje [R] */}
-        <div className="grid sm:grid-cols-3 gap-3">
+        {/* 5. Wartość działki [R] — rola (źródło/koszt) wg sposobu wniesienia */}
+        <div className="grid sm:grid-cols-2 gap-3">
           <PoleLiczbowe label={etykietaDzialki} value={wartoscDzialki} onChange={setWartoscDzialki} sufiks="zł" />
-          <PoleLiczbowe label="Partycypacja najemców (opcjonalnie)" value={partycypacja} onChange={setPartycypacja} sufiks="% kosztu" />
-          <PoleLiczbowe label="Wkład gminy (opcjonalnie)" value={wkladGminy} onChange={setWkladGminy} sufiks="% kosztu" />
         </div>
+        <p className="text-[11px] text-grunt-text-faint2 -mt-2">
+          Partycypacja najemców i wkład domykający są liczone automatycznie (partycypacja przysługuje tylko przy zasobie społecznym czynszowym).
+        </p>
 
-        {/* Przełączniki instrumentów + PnB (info) */}
+        {/* 6. Flagi końcowe: InvestEU · FEnIKS/OZE · PnB (info) */}
         <div className="flex flex-wrap gap-x-6 gap-y-2 pt-1">
           {KWALIFIKACJA_INVESTEU.includes(typInwestora) && (
             <Chk label="Nowo utworzony podmiot bez zdolności kredytowej (gwarancja InvestEU)" checked={nowyPodmiot} onChange={setNowyPodmiot} />
@@ -180,8 +189,6 @@ export function AnkietaFinansowa({
           <ProfilRow k="Wniesienie działki" v={ETYK_GRUNTU[sposobWniesieniaDzialki]} />
           <ProfilRow k="Współpraca z gminą" v={ETYK_WSPOLPRACY[wspolpracaGmina]} />
           {wartoscDzialki && <ProfilRow k={rola === "koszt" ? "Cena działki" : "Wartość działki"} v={`${Number(wartoscDzialki).toLocaleString("pl-PL")} zł`} mono />}
-          {partycypacja && <ProfilRow k="Partycypacja najemców" v={`${partycypacja}%`} mono />}
-          {wkladGminy && <ProfilRow k="Wkład gminy" v={`${wkladGminy}%`} mono />}
           <ProfilRow k="Efektywność / OZE" v={efektywnoscEnergetyczna ? "Tak (FEnIKS)" : "Nie"} />
           {KWALIFIKACJA_INVESTEU.includes(typInwestora) && (
             <ProfilRow k="Nowy podmiot (InvestEU)" v={nowyPodmiot ? "Tak" : "Nie"} />

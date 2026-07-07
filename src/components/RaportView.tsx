@@ -3,12 +3,30 @@
 import type { WynikAnalizy } from "@/lib/types";
 import { WskaznikPewnosci, StosMontazu, type SegmentStosu } from "./grunt";
 import { etykietaTypologii, liczba, plnMln, statusSlowny } from "@/lib/format";
+import { KONFIG_FINANSE } from "@/lib/config";
+import { zlozKolumne, rolaZeSposobu, uzbrojenieProxy, type KolumnaMontazu } from "@/lib/finanse/montaz";
 
 /** Drukowalne „Studium potencjału inwestycyjnego działki" (arkusz A4). */
 export function RaportView({ wynik, data }: { wynik: WynikAnalizy; data?: string }) {
   const { dane, poziom1: p1, poziom2: p2, poziom3: p3 } = wynik;
-  const oczekiwany = p3.scenariusze.find((s) => s.scenariusz === "oczekiwany")!;
-  const spina = oczekiwany.dscr >= 1.2;
+
+  // Montaż finansowy = TEN SAM silnik co przekrój M3 (grant wg zasobu, wkład domykający).
+  const profilFin = p3.analizaFinansowa?.profil ?? null;
+  const rezimFin = p3.analizaFinansowa?.rezim ?? "current";
+  const idxWar = Math.max(0, p2.warianty.findIndex((w) => p1.profilRekomendowany === "oba" || w.profil === p1.profilRekomendowany));
+  const wariantFin = p2.warianty[idxWar];
+  const kolMontaz: KolumnaMontazu | null =
+    profilFin && wariantFin
+      ? zlozKolumne(profilFin, rezimFin, {
+          kosztBudowyM2: dane.kosztBudowyM2 ?? KONFIG_FINANSE.kosztBudowySuwak.domyslny,
+          powierzchniaBudowyM2: wariantFin.pumM2 + wariantFin.powWspolneUslugoweM2,
+          pumMieszkalnaM2: wariantFin.pumM2,
+          wartoscOdtworzeniowaM2: dane.wartoscOdtworzeniowaM2 ?? 7000,
+          wartoscDzialkiPln: profilFin.wartoscDzialkiPln ?? dane.cenaGruntu ?? 0,
+          rolaDzialki: rolaZeSposobu(profilFin.sposobWniesieniaDzialki),
+          uzbrojeniePln: uzbrojenieProxy(dane.odlegloscDoSieciM),
+        })
+      : null;
 
   return (
     <div className="raport-arkusz bg-grunt-surface rounded-panel shadow-sheet mx-auto max-w-[880px] p-8 md:p-10">
@@ -74,34 +92,39 @@ export function RaportView({ wynik, data }: { wynik: WynikAnalizy; data?: string
         );
       })()}
 
-      {/* 04 Model finansowy */}
-      <SekcjaRap numer="04" tytul={`Model finansowy — ${etykietaRezimSkrot(p3.rezimDomyslny)}`}>
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className={`rounded-panel p-4 ${spina ? "bg-grunt-green-bg" : "bg-grunt-amber-bg"}`}>
-            <div className="flex items-center gap-2 mb-3">
-              <span className={`w-3 h-3 rounded-full ${spina ? "bg-grunt-green" : "bg-grunt-amber"}`} />
-              <span className={`text-[15px] font-semibold ${spina ? "text-grunt-green" : "text-grunt-amber-text"}`}>
-                {spina ? "Inwestycja się spina" : "Domknięcie na granicy"}
-              </span>
+      {/* 04 Model finansowy — kalkulacja (nie werdykt); wkład własny domyka */}
+      <SekcjaRap numer="04" tytul={`Model finansowy — ${kolMontaz ? kolMontaz.nazwa : etykietaRezimSkrot(p3.rezimDomyslny)}`}>
+        {kolMontaz ? (
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="rounded-panel p-4 bg-grunt-surface-3">
+              <div className="flex justify-between text-[13px] py-1">
+                <span className="text-grunt-text-muted2">Koszt inwestycji (razem)</span>
+                <span className="mono font-semibold text-grunt-text">{plnMln(kolMontaz.koszt.razem)}</span>
+              </div>
+              <div className="flex justify-between text-[13px] py-1 border-t border-black/5">
+                <span className="text-grunt-text-muted2">Grant / dotacja</span>
+                <span className="mono font-semibold text-grunt-text">{plnMln(kolMontaz.zrodla.grant)} · {kolMontaz.zalozenia.grantPct}%</span>
+              </div>
+              <div className="flex justify-between text-[13px] py-1 border-t border-black/5">
+                <span className="text-grunt-text-muted2">Kredyt (zdolność czynszowa)</span>
+                <span className="mono font-semibold text-grunt-text">{plnMln(kolMontaz.zrodla.kredyt)}</span>
+              </div>
+              <div className="flex justify-between text-[13px] py-1 border-t border-black/5">
+                <span className="text-grunt-text-muted2">{kolMontaz.etykietaWkladu.replace(" (domyka)", "")}</span>
+                <span className="mono font-semibold text-grunt-text">{plnMln(kolMontaz.zrodla.wkladWlasny)} · {Math.round((kolMontaz.zrodla.wkladWlasny / (kolMontaz.koszt.razem || 1)) * 100)}%</span>
+              </div>
             </div>
-            <div className="flex justify-between text-[13px] py-1 border-t border-black/5">
-              <span className="text-grunt-text-muted2">DSCR (oczekiwany)</span>
-              <span className="mono font-semibold text-grunt-text">{liczba(oczekiwany.dscr, "", 2)}</span>
-            </div>
-            <div className="flex justify-between text-[13px] py-1 border-t border-black/5">
-              <span className="text-grunt-text-muted2">CAPEX</span>
-              <span className="mono font-semibold text-grunt-text">{plnMln(oczekiwany.koszt.razem)}</span>
-            </div>
-            <div className="flex justify-between text-[13px] py-1 border-t border-black/5">
-              <span className="text-grunt-text-muted2">Wymagana dotacja</span>
-              <span className="mono font-semibold text-grunt-text">{liczba(oczekiwany.wymaganaDotacjaPct, "%", 1)}</span>
+            <div className="border border-grunt-border rounded-panel p-4">
+              <div className="text-[10px] uppercase tracking-wide text-grunt-text-faint mb-2">Montaż finansowy (kalkulacja)</div>
+              <StosMontazu segmenty={montazZKolumny(kolMontaz)} />
+              {kolMontaz.brakParametrow && (
+                <p className="text-[11px] text-grunt-amber-text mt-2">⚑ Brak parametrów montażu dla tej kombinacji — wynik do uzupełnienia.</p>
+              )}
             </div>
           </div>
-          <div className="border border-grunt-border rounded-panel p-4">
-            <div className="text-[10px] uppercase tracking-wide text-grunt-text-faint mb-2">Montaż finansowy</div>
-            <StosMontazu segmenty={montazRaport(oczekiwany)} />
-          </div>
-        </div>
+        ) : (
+          <p className="text-[12px] text-grunt-text-muted">Model finansowy dostępny po wypełnieniu ankiety finansowej (Poziom 3).</p>
+        )}
       </SekcjaRap>
 
       {/* Prowenancja + zastrzeżenie */}
@@ -125,14 +148,14 @@ export function RaportView({ wynik, data }: { wynik: WynikAnalizy; data?: string
 
 // ── Pomocnicze ───────────────────────────────────────────────────────────────
 
-function montazRaport(s: WynikAnalizy["poziom3"]["scenariusze"][number]): SegmentStosu[] {
-  const koszt = s.koszt.razem || 1;
-  const jst = s.montaz.wkladGminy + s.montaz.srodkiWlasne;
+function montazZKolumny(k: KolumnaMontazu): SegmentStosu[] {
+  const koszt = k.koszt.razem || 1;
   const def = [
-    { nazwa: "Dotacja / grant", v: s.montaz.grant, kolor: "bg-grunt-chart-1" },
-    { nazwa: "Kredyt BGK", v: s.montaz.kredyt, kolor: "bg-grunt-ink" },
-    { nazwa: "Partycypacje najemców", v: s.montaz.partycypacjaNajemcow, kolor: "bg-grunt-chart-4" },
-    { nazwa: "Wkład JST / grunt", v: jst, kolor: "bg-grunt-chart-6" },
+    { nazwa: "Dotacja / grant", v: k.zrodla.grant, kolor: "bg-grunt-chart-1" },
+    { nazwa: "Kredyt", v: k.zrodla.kredyt, kolor: "bg-grunt-ink" },
+    { nazwa: "Aport działki", v: k.zrodla.aport, kolor: "bg-grunt-chart-5" },
+    { nazwa: "Partycypacja najemców", v: k.zrodla.partycypacjaNajemcow, kolor: "bg-grunt-chart-4" },
+    { nazwa: k.etykietaWkladu.replace(" (domyka)", ""), v: k.zrodla.wkladWlasny, kolor: "bg-grunt-chart-6" },
   ];
   return def.filter((c) => c.v > 0).map((c) => ({ nazwa: c.nazwa, kolor: c.kolor, udzialPct: Math.round((c.v / koszt) * 100) }));
 }
