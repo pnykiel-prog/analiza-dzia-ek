@@ -72,6 +72,25 @@ test("montaż: przekrój obu reżimów — komunalny ma wysoki grant w obu (nie 
   assert.ok(p.przyszly.zalozenia.grantPct >= 55, `przyszły komunalny grant, jest ${p.przyszly.zalozenia.grantPct}`);
 });
 
+test("montaż: zdolność kredytowa TYLKO z czynszu (bez kosztów operacyjnych) + wyższa WO → wyższy kredyt", () => {
+  // Społeczny czynszowy: grant niski → luka duża → kredyt wiąże zdolność, nie luka (widać wrażliwość na WO).
+  const niska = zlozKolumne(profil({ typZasobu: "SPOLECZNY_CZYNSZOWY" }), "current", wej({ wartoscOdtworzeniowaM2: 5000 }));
+  const wysoka = zlozKolumne(profil({ typZasobu: "SPOLECZNY_CZYNSZOWY" }), "current", wej({ wartoscOdtworzeniowaM2: 9000 }));
+  assert.ok(wysoka.zrodla.kredyt > niska.zrodla.kredyt, "wyższa WO → wyższa zdolność czynszowa → wyższy kredyt");
+});
+
+test("montaż: kredyt maksymalizowany — komunalny grant+kredyt domykają koszt, wkład ~0", () => {
+  const k = zlozKolumne(profil({ typZasobu: "KOMUNALNY" }), "current", wej({ wartoscOdtworzeniowaM2: 7018 }));
+  const pokrycie = (k.zrodla.grant + k.zrodla.kredyt) / k.koszt.razem;
+  assert.ok(pokrycie > 0.95, `grant+kredyt powinny domknąć koszt, jest ${Math.round(pokrycie * 100)}%`);
+});
+
+test("montaż: override oprocentowania obniża kredyt (niższa stopa = wyższa rata? nie — wyższa stopa niższy kredyt)", () => {
+  const tanie = zlozKolumne(profil({ typZasobu: "SPOLECZNY_CZYNSZOWY" }), "current", wej({ wartoscOdtworzeniowaM2: 9000, oprocOverride: 0.02 }));
+  const drogie = zlozKolumne(profil({ typZasobu: "SPOLECZNY_CZYNSZOWY" }), "current", wej({ wartoscOdtworzeniowaM2: 9000, oprocOverride: 0.05 }));
+  assert.ok(tanie.zrodla.kredyt >= drogie.zrodla.kredyt, "niższe oprocentowanie → większa zdolność kredytowa");
+});
+
 test("montaż: rola działki ze sposobu wniesienia", () => {
   assert.equal(rolaZeSposobu("ZAKUP_KREDYT"), "koszt");
   assert.equal(rolaZeSposobu("APORT_GMINNY"), "zrodlo");

@@ -53,6 +53,8 @@ export interface WejscieMontazu {
   wartoscDzialkiPln: number; // R
   rolaDzialki: RolaDzialki;
   uzbrojeniePln: number; // z modelu (proxy)
+  /** Override oprocentowania kredytu [ułamek, np. 0.03] — jawne założenie edytowalne w wyniku M3. */
+  oprocOverride?: number;
 }
 
 export interface KolumnaMontazu {
@@ -131,7 +133,8 @@ export function zlozKolumne(
   const grantPct = grantSk ? srodek(grantSk.udzialPct) : null; // % (proc() już przeliczył)
   const partPct = partSk ? partSk.udzialPct.max : 0; // auto: max gdzie przysługuje
   const maxKredytPct = a.kredyt ? a.kredyt.maxUdzialCapexPct.max : 0;
-  const oproc = a.kredyt ? srodek(a.kredyt.oprocentowanie) : rp.oprocentowanie;
+  const oprocBazowe = a.kredyt ? srodek(a.kredyt.oprocentowanie) : rp.oprocentowanie;
+  const oproc = wej.oprocOverride != null ? wej.oprocOverride : oprocBazowe; // jawne założenie edytowalne
   const okres = a.kredyt ? a.kredyt.okresLat : rp.okresKredytuLata;
   const brakParametrow = grantPct == null && !a.kredyt;
   if (brakParametrow) flagi.push("Brak parametrów montażu dla tej kombinacji w pliku — wynik do uzupełnienia (nie zgadujemy).");
@@ -147,23 +150,27 @@ export function zlozKolumne(
   const rezerwa = Math.round(((budowa + uzbrojenie) * z.rezerwaRyzykoPct) / 100);
   const razem = grunt + budowa + uzbrojenie + projekt + kosztyFinansowe + rezerwa;
 
-  // ── Czynsz pułap (5 % wartości odtworzeniowej) + kredyt ze zdolności czynszowej ─
+  // ── Zdolność kredytowa TYLKO ze strumienia czynszowego, z buforem bezpieczeństwa ─
+  // Dwa strumienie przychodu SIM się NIE mieszają: czynszowy (≤5% WO/rok) spłaca kredyt;
+  // operacyjny (utrzymanie/remonty) finansuje się osobno → koszty operacyjne NIE odejmowane.
   const czynszM2 = (wej.wartoscOdtworzeniowaM2 * rp.stopaPulapuCzynszu) / 12;
-  const przychodRoczny = czynszM2 * wej.pumMieszkalnaM2 * 12 * (1 - z.pustostanyPct / 100);
-  const kosztyOperacyjne = z.kosztyOperacyjneM2Mc * wej.pumMieszkalnaM2 * 12;
-  const przychodNetto = przychodRoczny - kosztyOperacyjne;
+  const przychodCzynszowyRok = czynszM2 * wej.pumMieszkalnaM2 * 12 * (1 - z.pustostanyPct / 100);
+  // Bufor 10–15% (DSCR ~1,11–1,15) — czynsz przewyższa ratę, nie jest napięty co do złotówki.
+  const przychodNaSplate = przychodCzynszowyRok * (1 - z.rezerwaBezpieczenstwaPct / 100);
   const annuityFactor = oproc > 0 ? (1 - Math.pow(1 + oproc, -okres)) / oproc : okres;
-  const kredytZObslugi = przychodNetto > 0 ? przychodNetto * annuityFactor : 0;
-  const kredyt = Math.max(0, Math.round(Math.min(kredytZObslugi, (maxKredytPct / 100) * razem)));
+  const kredytZeZdolnosci = przychodNaSplate > 0 ? przychodNaSplate * annuityFactor : 0;
 
-  // ── Kaskada domykająca (suma ≤ koszt; wkład własny ≥ 0) ─────────────────────
+  // ── Źródła: najpierw wniesione/bezzwrotne (max), potem kredyt WYPEŁNIA lukę (maksymalizowany) ─
   const aport = wej.rolaDzialki === "zrodlo" ? Math.round(wej.wartoscDzialkiPln) : 0;
-  let reszta = Math.max(0, razem - kredyt - aport);
-  const grant = grantPct != null ? Math.round(Math.min((grantPct / 100) * razem, reszta)) : 0;
-  reszta = Math.max(0, reszta - grant);
-  const partycypacjaNajemcow = Math.round(Math.min((partPct / 100) * razem, reszta));
-  reszta = Math.max(0, reszta - partycypacjaNajemcow);
-  const wkladWlasny = reszta;
+  let dostepne = Math.max(0, razem - aport);
+  const grant = grantPct != null ? Math.round(Math.min((grantPct / 100) * razem, dostepne)) : 0;
+  dostepne -= grant;
+  const partycypacjaNajemcow = Math.round(Math.min((partPct / 100) * razem, dostepne));
+  dostepne -= partycypacjaNajemcow;
+  const luka = dostepne; // = razem − aport − grant − partycypacja (do sfinansowania kredytem/wkładem)
+  // Kredyt maksymalizowany: min(zdolność czynszowa, limit programowy, luka) — nie zostawiamy zdolności.
+  const kredyt = Math.max(0, Math.round(Math.min(kredytZeZdolnosci, (maxKredytPct / 100) * razem, luka)));
+  const wkladWlasny = Math.max(0, luka - kredyt); // pozycja domykająca
 
   return {
     rezim: rezimUI,

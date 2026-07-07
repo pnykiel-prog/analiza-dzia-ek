@@ -490,7 +490,7 @@ export default function NowaAnalizaPage() {
             const wartOdtw = dane?.wartoscOdtworzeniowaM2 ?? mediana?.wartoscOdtworzeniowa ?? 7000;
             return (
               <>
-                <MontazPrzekrojView wariant={wariant} wartoscOdtworzeniowaM2={wartOdtw} odlegloscDoSieciM={dane?.odlegloscDoSieciM ?? null} profil={profilFin} />
+                <MontazPrzekrojView wariant={wariant} wartoscOdtworzeniowaM2={wartOdtw} woMeta={dane?.woMeta ?? null} odlegloscDoSieciM={dane?.odlegloscDoSieciM ?? null} profil={profilFin} />
                 <BannerBramki
                   tytul="Studium gotowe — wygeneruj raport"
                   opis="Drukowalne podsumowanie: werdykt, pewność sekcji, model zabudowy i finansowy, prowenancja."

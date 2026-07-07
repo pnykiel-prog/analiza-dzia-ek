@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { WariantZabudowy } from "@/lib/types";
+import type { WariantZabudowy, WartoscOdtworzeniowaMeta } from "@/lib/types";
 import type { ProfilFinansowy } from "@/lib/finanse/typy";
 import { KONFIG_FINANSE } from "@/lib/config";
 import { przekrojMontazu, rolaZeSposobu, udzialPct, uzbrojenieProxy, type KolumnaMontazu, type WejscieMontazu } from "@/lib/finanse/montaz";
@@ -23,16 +23,23 @@ function pln(k: number): string {
 export function MontazPrzekrojView({
   wariant,
   wartoscOdtworzeniowaM2,
+  woMeta,
   odlegloscDoSieciM,
   profil,
 }: {
   wariant: WariantZabudowy;
   wartoscOdtworzeniowaM2: number;
+  woMeta?: WartoscOdtworzeniowaMeta | null;
   odlegloscDoSieciM: number | null;
   profil: ProfilFinansowy;
 }) {
   const suwak = KONFIG_FINANSE.kosztBudowySuwak;
   const [kosztBudowyM2, setKoszt] = useState(suwak.domyslny);
+  // Jawne założenia edytowalne (najmocniej ruszają montaż): WO + oprocentowanie.
+  const [woEdyt, setWoEdyt] = useState(String(Math.round(wartoscOdtworzeniowaM2)));
+  const [oprocEdyt, setOprocEdyt] = useState(""); // puste → każdy reżim swoje oprocentowanie
+  const wo = Number(woEdyt) > 0 ? Number(woEdyt) : wartoscOdtworzeniowaM2;
+  const oprocOverride = Number(oprocEdyt) > 0 ? Number(oprocEdyt) / 100 : undefined;
 
   const rola = rolaZeSposobu(profil.sposobWniesieniaDzialki);
   const powierzchniaBudowy = wariant.pumM2 + wariant.powWspolneUslugoweM2;
@@ -41,16 +48,40 @@ export function MontazPrzekrojView({
       kosztBudowyM2,
       powierzchniaBudowyM2: powierzchniaBudowy,
       pumMieszkalnaM2: wariant.pumM2,
-      wartoscOdtworzeniowaM2,
+      wartoscOdtworzeniowaM2: wo,
       wartoscDzialkiPln: profil.wartoscDzialkiPln ?? 0,
       rolaDzialki: rola,
       uzbrojeniePln: uzbrojenieProxy(odlegloscDoSieciM),
+      oprocOverride,
     };
     return przekrojMontazu(profil, wej);
-  }, [wariant, wartoscOdtworzeniowaM2, odlegloscDoSieciM, profil, kosztBudowyM2, rola, powierzchniaBudowy]);
+  }, [wariant, wo, oprocOverride, odlegloscDoSieciM, profil, kosztBudowyM2, rola, powierzchniaBudowy]);
+
+  const okres = woMeta?.okresOd && woMeta?.okresDo ? `${woMeta.okresOd} – ${woMeta.okresDo}` : null;
+  const przeterm = !!woMeta?.okresDo && woMeta.okresDo < "2026-07-07";
 
   return (
     <div className="space-y-4">
+      {/* Jawne założenia — WO (z okresu obwieszczenia) + oprocentowanie, edytowalne */}
+      <Karta tytul="Założenia montażu (edytowalne)" podtytul="Dwie liczby najmocniej ruszają wynik — wartość odtworzeniowa i oprocentowanie">
+        <div className="grid sm:grid-cols-2 gap-3">
+          <label className="text-sm block">
+            <span className="text-[11px] font-medium text-grunt-text-muted2">Wartość odtworzeniowa [zł/m²]</span>
+            <input type="number" value={woEdyt} onChange={(e) => setWoEdyt(e.target.value)} className="inp mono mt-1" />
+            <span className="text-[10px] text-grunt-text-faint2 block mt-1">
+              {woMeta?.benchmark
+                ? `benchmark (brak obwieszczenia dla tej lokalizacji) — ${woMeta.jednostka}`
+                : `${woMeta?.jednostka ?? ""}${okres ? ` · okres ${okres}` : ""}${woMeta?.obwieszczenie ? ` · ${woMeta.obwieszczenie}` : ""}`}
+              {przeterm && <span className="text-grunt-amber-text"> · ⚑ stawka przeterminowana — sprawdź obwieszczenie</span>}
+            </span>
+          </label>
+          <label className="text-sm block">
+            <span className="text-[11px] font-medium text-grunt-text-muted2">Oprocentowanie kredytu [%] — oba reżimy</span>
+            <input type="number" step="0.25" value={oprocEdyt} onChange={(e) => setOprocEdyt(e.target.value)} placeholder="wg reżimu (np. 3)" className="inp mono mt-1" />
+            <span className="text-[10px] text-grunt-text-faint2 block mt-1">Puste → obecny środek zakresu SBC 2–4%; przyszły wg programu (do potwierdzenia).</span>
+          </label>
+        </div>
+      </Karta>
       {/* Suwak kosztu budowy */}
       <Karta tytul="Koszt budowy — dźwignia montażu" podtytul={`zł/m² × powierzchnia (${Math.round(powierzchniaBudowy)} m²) · przelicza oba reżimy na żywo`}>
         <div className="flex items-center gap-4">
