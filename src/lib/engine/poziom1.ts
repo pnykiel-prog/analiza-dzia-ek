@@ -30,8 +30,10 @@ import type {
 } from "../types";
 import type { KonfiguracjaPoziom1, KonfiguracjaScoring } from "../config";
 import { KONFIG_POZIOM1, KONFIG_SCORING } from "../config";
+import type { BramkaWielkosci, SasiedztwoDane } from "../types";
 import { ocenPopytP1 } from "./popytP1";
 import { prognozaPotencjalu, sasiedztwoDeterministyczne } from "./potencjal";
+import { liczBramkeWielkosci } from "./bramkaWielkosci";
 import { clamp } from "./utils";
 import { statusZeSymbolu } from "../mpzp";
 
@@ -77,8 +79,18 @@ function funkcjaDozwolona(d: DaneDzialki, podstawa: PodstawaPlanistyczna): boole
 
 // ── Pojemność zabudowy z prognozy potencjału ──────────────────────────────────
 
-function liczPrognoze(d: DaneDzialki, mpzp: "jest" | "brak" | "nieznane", cfg: KonfiguracjaPoziom1): PrognozaPotencjalu {
-  const sasiedztwo = sasiedztwoDeterministyczne(d.id || `${d.teryt}-${d.powierzchniaM2}`, d.sredniSpadekPct);
+/**
+ * Prognoza potencjału z REKOMENDOWANEJ formy zabudowy (spójna z bramką wielkości):
+ * forma niska → kondygnacje ≤ maxKondygnacjeNiska + mniejsze wspólne (bez wind).
+ */
+function liczPrognoze(
+  d: DaneDzialki,
+  sasiedztwo: SasiedztwoDane,
+  mpzp: "jest" | "brak" | "nieznane",
+  bramka: BramkaWielkosci,
+  cfg: KonfiguracjaPoziom1
+): PrognozaPotencjalu {
+  const forma = bramka.formaRekomendowana;
   return prognozaPotencjalu({
     powierzchniaM2: d.powierzchniaM2,
     zwartosc: d.zwartoscKsztaltu ?? null,
@@ -88,6 +100,10 @@ function liczPrognoze(d: DaneDzialki, mpzp: "jest" | "brak" | "nieznane", cfg: K
     metrazSredniM2: cfg.metrazSredniM2,
     wspolczynnikEfektywnosci: cfg.wspolczynnikEfektywnosci,
     cfg: cfg.potencjal,
+    forma,
+    maxKondygnacje: forma === "niska" ? cfg.bramka.maxKondygnacjeNiska : undefined,
+    udzialWspolne: cfg.bramka.udzialWspolne[forma],
+    udzialUslugi: cfg.bramka.udzialUslugi,
   });
 }
 
@@ -148,8 +164,13 @@ export function uruchomPoziom1(
   const funkcjaOk = funkcjaDozwolona(d, podstawa);
   const mpzp = obecnoscMpzp(d, podstawa);
 
-  // Pojemność: PROGNOZA orientacyjnego potencjału (kształt + sąsiedztwo + spadek).
-  const prognoza = liczPrognoze(d, mpzp, cfg);
+  // Bramka wielkości/kształtu (na pewnej geometrii, PRZED popytem/pojemnością):
+  // fizyczna wykonalność (twarda) + forma zabudowy (niska/wysoka) + próg opłacalności (miękki).
+  const sasiedztwo = sasiedztwoDeterministyczne(d.id || `${d.teryt}-${d.powierzchniaM2}`, d.sredniSpadekPct);
+  const bramkaWielkosci = liczBramkeWielkosci(d, sasiedztwo, mpzp, cfg);
+
+  // Pojemność: PROGNOZA orientacyjnego potencjału rekomendowanej formy (spójna z bramką).
+  const prognoza = liczPrognoze(d, sasiedztwo, mpzp, bramkaWielkosci, cfg);
   const pojemnosc = pojemnoscZPrognozy(prognoza);
 
   // Popyt: pełna ocena P1 — siatka 4 werdyktów (społeczne vs komunalne × profil).
@@ -175,6 +196,9 @@ export function uruchomPoziom1(
 
   const flagi: string[] = [];
   if (funkcjaOk === false) flagi.push("Funkcja mieszkaniowa niedozwolona wg wskazanego przeznaczenia — działka nieprzydatna.");
+  if (bramkaWielkosci.ponizejProguOplacalnosci && bramkaWielkosci.fizycznieWykonalna && bramkaWielkosci.notaSkali) {
+    flagi.push(bramkaWielkosci.notaSkali);
+  }
   flagi.push("Pojemność to orientacyjna prognoza z kształtu działki i zabudowy sąsiedztwa — nie zastępuje ustaleń MPZP/WZ (potwierdzenie na Poziomie 2).");
   for (const f of prognoza.flagi) if (!flagi.includes(f)) flagi.push(f);
   const rek = ocenaPopytu.werdykty[ocenaPopytu.rekomendowanyKierunek];
@@ -189,6 +213,7 @@ export function uruchomPoziom1(
     powierzchniaM2: d.powierzchniaM2,
     podstawa,
     funkcjaMieszkaniowaDozwolona: funkcjaOk !== false,
+    bramkaWielkosci,
     prognoza,
     ocenaPopytu,
     pojemnosc,

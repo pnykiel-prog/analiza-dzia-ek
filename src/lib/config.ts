@@ -11,7 +11,7 @@
  *  - Finanse P3: % grantu, kredyt, oprocentowanie, pułap, indeksy — co rok / co nowelizację
  */
 
-import type { Profil, Rezim } from "./types";
+import type { FormaZabudowy, Profil, Rezim } from "./types";
 
 /**
  * Bramki środowiskowe (Natura 2000, powódź, wykluczająca ochrona, osuwiska/teren górniczy)
@@ -65,6 +65,26 @@ export interface KonfiguracjaPoziom1 {
   symboleMieszkaniowe: string[];
   /** Parametry prognozy potencjału zabudowy (kształt + sąsiedztwo + spadek). */
   potencjal: KonfiguracjaPotencjal;
+  /** Bramka wielkości/kształtu: fizyczna wykonalność + formy + progi opłacalności. */
+  bramka: KonfiguracjaBramka;
+}
+
+/** Bramka wielkości/kształtu (M1) — progi strojone, nie twarde granice logiki. */
+export interface KonfiguracjaBramka {
+  /** Maksymalna liczba kondygnacji zabudowy niskiej. */
+  maxKondygnacjeNiska: number;
+  /** Próg opłacalności (liczba lokali) formy niskiej — punkt decyzyjny, nie odrzucenie. */
+  progOplacalnosciNiska: number;
+  /** Próg opłacalności (liczba lokali) formy wysokiej. */
+  progOplacalnosciWysoka: number;
+  /** Minimalna szerokość zabudowalna [m] — poniżej nie zmieści się budynek (fizyczna bramka). */
+  minSzerokoscBudowlanaM: number;
+  /** Poniżej tej powierzchni [m²] fizyczna niewykonalność sugeruje scalenie, nie „nieprzydatna". */
+  progScalenieM2: number;
+  /** Udział powierzchni wspólnych (klatki/windy/komunikacja) wg formy — niska mniejszy (bez wind). */
+  udzialWspolne: Record<FormaZabudowy, number>;
+  /** Udział usług w parterze — obniża PUM. */
+  udzialUslugi: number;
 }
 
 /** Kalibracja prognozy potencjału zabudowy (port `potential.py`). */
@@ -88,6 +108,17 @@ export const KONFIG_POZIOM1: KonfiguracjaPoziom1 = {
     kondygnacjeFallback: 2,
     zwartoscNeutralna: 0.7,
     efektywnoscNeutralna: 0.85,
+  },
+  bramka: {
+    maxKondygnacjeNiska: 2,
+    progOplacalnosciNiska: 20,
+    progOplacalnosciWysoka: 40,
+    minSzerokoscBudowlanaM: 6,
+    progScalenieM2: 500,
+    // η_PU (0,80) × (1 − wspólne − usługi) daje realny udział PUM w GFA:
+    //   wysoka młodzi ≈ 0,80×(1−0,16−0,05)=0,63 ; niska ≈ 0,80×(1−0,08−0,05)=0,70.
+    udzialWspolne: { niska: 0.08, wysoka: 0.16 },
+    udzialUslugi: 0.05,
   },
 };
 

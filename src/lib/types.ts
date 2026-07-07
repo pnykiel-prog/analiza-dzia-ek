@@ -390,6 +390,47 @@ export interface PojemnoscP1 {
   szacLiczbaMieszkanSeniorzy: number | null;
 }
 
+/** Forma zabudowy — dwie kategorie skali (bez wskazywania typologii). */
+export type FormaZabudowy = "niska" | "wysoka";
+
+/**
+ * Pojemność jednej formy zabudowy (niska ≤2 kond. / wysoka >2 kond.) — wspólny
+ * łańcuch `Pz → GFA → PU → PUM → mieszkania`. Mieszkania liczone ZAWSZE z PUM
+ * (po odjęciu powierzchni wspólnych i usług) — bez zawyżania z PU.
+ */
+export interface PojemnoscForma {
+  forma: FormaZabudowy;
+  kondygnacje: number;
+  powZabudowyM2: number; // Pz (footprint)
+  powCalkowitaM2: number; // GFA = Pz × kondygnacje
+  puM2: number; // powierzchnia użytkowa = GFA × η_PU
+  pumM2: number; // powierzchnia użytkowa MIESZKALNA = PU × (1 − wspólne − usługi)
+  mieszkania: { mlodzi: number; seniorzy: number };
+  lokali: number; // reprezentatywna skala (liczba lokali dla metrażu młodych)
+}
+
+/** Rozstrzygnięcie bramki wielkości/kształtu (M1). */
+export type RozstrzygniecieBramki = "ok" | "nieprzydatna" | "scalenie" | "nizsza_oplacalnosc" | "konflikt";
+
+/**
+ * Bramka wielkości/kształtu (M1, po geometrii ULDK, PRZED popytem/pojemnością).
+ * Dwie natury: fizyczna wykonalność (twarda, odrzuca bez pytania) + próg
+ * opłacalności (miękki punkt decyzyjny — obserwacja z zaproszeniem, nie wyrok).
+ */
+export interface BramkaWielkosci {
+  wynik: RozstrzygniecieBramki;
+  komunikat: string;
+  fizycznieWykonalna: boolean;
+  formaRekomendowana: FormaZabudowy; // najefektywniejsza (najwięcej lokali)
+  niska: PojemnoscForma;
+  wysoka: PojemnoscForma;
+  lokali: { niska: number; wysoka: number };
+  ponizejProguOplacalnosci: boolean;
+  progOplacalnosci: number; // próg rekomendowanej formy (niska 20 / wysoka 40)
+  konfliktProgow: boolean; // wysoka poniżej progu, niska w progu → decyzja klienta
+  notaSkali?: string; // dyskretna nota o skali (po zgodzie klienta)
+}
+
 /** Dopasowanie pojemność↔popyt per profil → werdykt. */
 export interface DopasowanieProfil {
   profil: Profil;
@@ -405,6 +446,8 @@ export interface WynikPoziom1 {
   powierzchniaM2: number;
   podstawa: PodstawaPlanistyczna;
   funkcjaMieszkaniowaDozwolona: boolean;
+  /** Bramka wielkości/kształtu: fizyczna wykonalność + forma zabudowy + próg opłacalności. */
+  bramkaWielkosci: BramkaWielkosci;
   /** Prognoza potencjału zabudowy (z kształtu + sąsiedztwa) — źródło pojemności na P1. */
   prognoza: PrognozaPotencjalu;
   /** Ocena popytu P1 (pełna): siatka 4 werdyktów, kwalifikacje, atrakcyjność migracyjna. */

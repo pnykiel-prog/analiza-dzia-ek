@@ -17,7 +17,7 @@
  * (BDOT budynki + NMT spadek). Funkcje są czyste i testowalne offline.
  */
 
-import type { PrognozaPotencjalu, Profil, SasiedztwoDane } from "../types";
+import type { FormaZabudowy, PrognozaPotencjalu, Profil, SasiedztwoDane } from "../types";
 import type { KonfiguracjaPotencjal } from "../config";
 import { KONFIG_POZIOM1 } from "../config";
 
@@ -102,10 +102,21 @@ export function prognozaPotencjalu(args: {
   metrazSredniM2?: Record<Profil, number>;
   wspolczynnikEfektywnosci?: number;
   cfg?: KonfiguracjaPotencjal;
+  /** Forma zabudowy: „wysoka" (domyślnie) lub „niska" (kondygnacje ≤ maxKondygnacje). */
+  forma?: FormaZabudowy;
+  /** Górny limit kondygnacji (np. 2 dla formy niskiej) — wiąże liczbę kondygnacji z sąsiedztwa. */
+  maxKondygnacje?: number;
+  /** Udział powierzchni wspólnych (klatki/windy). Domyślnie z KONFIG_POZIOM1.bramka wg formy. */
+  udzialWspolne?: number;
+  /** Udział usług w parterze. Domyślnie z KONFIG_POZIOM1.bramka. */
+  udzialUslugi?: number;
 }): PrognozaPotencjalu {
   const cfg = args.cfg ?? KONFIG_POZIOM1.potencjal;
   const metraz = args.metrazSredniM2 ?? KONFIG_POZIOM1.metrazSredniM2;
-  const pumEff = args.wspolczynnikEfektywnosci ?? KONFIG_POZIOM1.wspolczynnikEfektywnosci;
+  const etaPU = args.wspolczynnikEfektywnosci ?? KONFIG_POZIOM1.wspolczynnikEfektywnosci;
+  const forma: FormaZabudowy = args.forma ?? "wysoka";
+  const uWspolne = args.udzialWspolne ?? KONFIG_POZIOM1.bramka.udzialWspolne[forma];
+  const uUslugi = args.udzialUslugi ?? KONFIG_POZIOM1.bramka.udzialUslugi;
   const mpzp = args.mpzp ?? "nieznane";
   const nb = args.sasiedztwo;
   const area = Math.max(0, args.powierzchniaM2);
@@ -114,11 +125,15 @@ export function prognozaPotencjalu(args: {
   const { mult: slopeMult, flagi: flagiSpadek } = mnoznikSpadku(nb.spadekPct);
 
   const pokrycie = Math.min(nb.pokrycieUdzial, cfg.gornyLimitPokrycia);
-  const kondygnacje = nb.wysokosciDostepne ? nb.typoweKondygnacje : cfg.kondygnacjeFallback;
+  let kondygnacje = nb.wysokosciDostepne ? nb.typoweKondygnacje : cfg.kondygnacjeFallback;
+  if (args.maxKondygnacje != null) kondygnacje = Math.min(kondygnacje, args.maxKondygnacje);
 
   const powZabudowy = area * pokrycie * shapeEff * slopeMult;
-  const powCalkowita = powZabudowy * kondygnacje;
-  const pum = powCalkowita * pumEff;
+  const powCalkowita = powZabudowy * kondygnacje; // GFA
+  // Mieszkania liczymy ZAWSZE z PUM (użytkowa MIESZKALNA), nie z PU: po η_PU odejmujemy
+  // powierzchnie wspólne i usługi — inaczej powstaje zawyżenie ~25% (spec model pojemności §1).
+  const pu = powCalkowita * etaPU;
+  const pum = pu * Math.max(0, 1 - uWspolne - uUslugi);
   const mieszkania = {
     mlodzi: Math.floor(pum / metraz.mlodzi),
     seniorzy: Math.floor(pum / metraz.seniorzy),
