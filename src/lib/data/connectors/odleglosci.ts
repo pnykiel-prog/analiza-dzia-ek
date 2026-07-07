@@ -24,6 +24,7 @@ import { USER_AGENT } from "./net";
 import type { Kandydat } from "./geoUslugi";
 import { haversineM, minZDystansow } from "./geoUslugi";
 import { kandydaciStale } from "../uslugiStale";
+import { kandydaciApteka } from "../apteki";
 import { kandydaciSklep } from "../sklepy";
 import { najblizszeOtoczenie } from "../otoczenie";
 
@@ -194,16 +195,18 @@ export const konektorOdleglosci: Konektor = {
     if (!teren.centroid4326) return brakWyniku(this.klucz, this.zrodlo, czas, "Brak centroidu WGS84 (brak geometrii).");
     const [lon, lat] = teren.centroid4326;
 
-    // 1) Warstwa statyczna (offline): szkoły/przedszkola/POZ/apteki — tylko w buforze
+    // 1) Warstwa statyczna (offline): szkoły/przedszkola/POZ — tylko w buforze
     //    (punkty poza `promienM` = luka pokrycia, pomijane; kategoria pytana ręcznie).
     const kandStale = kandydaciStale(lat, lon, cfgR.k, undefined, cfg.promienM);
+    // 1a) Apteki (offline): warstwa OSM — rejestr RA był niekompletny (brak podkarpackiego).
+    const kandApteka = kandydaciApteka(lat, lon, cfgR.k, undefined, cfg.promienM);
     // 1b) Warstwa sklepów (offline): lokalizatory sieci + OSM/REGON (wytyczne sklepy).
     const kandSklep = kandydaciSklep(lat, lon, cfgR.k, undefined, cfg.promienM);
     // 2) OSM na żywo: sklepy niezależne (uzupełnienie; może być null przy blokadzie — statyka i tak działa).
     const elementy = await pobierzOverpass(lat, lon);
     const kandOsm = elementy ? kNajblizsze(elementy, lat, lon, cfgR.k).filter((k) => KATEGORIE_OSM.includes(k.usluga)) : [];
 
-    const kand = [...kandStale, ...kandSklep, ...kandOsm];
+    const kand = [...kandStale, ...kandApteka, ...kandSklep, ...kandOsm];
     if (kand.length === 0) {
       return brakWyniku(this.klucz, this.zrodlo, czas, "Brak usług (statyka + OSM) w zasięgu — nieoznaczone, nie dyskwalifikuje.");
     }
