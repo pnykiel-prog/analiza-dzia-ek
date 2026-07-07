@@ -25,41 +25,32 @@ interface WpisWO {
 }
 
 /**
- * Zasiew z ostatnich dostępnych obwieszczeń (część do odświeżenia do bieżącego okresu
- * 1.04–30.09.2026). Uzupełniać co pół roku wg listy źródeł w wytycznych.
+ * Dane bieżące — okres 1.04.2026–30.09.2026 (obwieszczenia wojewodów). 15 województw;
+ * lubelskie do weryfikacji → póki co fallback benchmark. Aktualizować co pół roku
+ * (1.04 i 1.10) wg listy źródeł w `warstwa_wartosc_odtworzeniowa.md` §5.
  */
+const OKRES = { okresOd: "2026-04-01", okresDo: "2026-09-30" };
+const zr = (woj: string, url: string): Pick<WpisWO, "obwieszczenie" | "zrodloUrl"> => ({
+  obwieszczenie: `Wojewoda ${woj} (okres 1.04–30.09.2026)`,
+  zrodloUrl: url,
+});
 const WARSTWA_WO: Record<string, WpisWO> = {
-  śląskie: {
-    reszta: 7054,
-    miasta: { Katowice: 7902 },
-    okresOd: "2026-04-01",
-    okresDo: "2026-09-30",
-    obwieszczenie: "Wojewoda Śląski",
-    zrodloUrl: "https://www.katowice.uw.gov.pl",
-  },
-  mazowieckie: {
-    reszta: 7004.17,
-    miasta: { Warszawa: 10946.93 },
-    okresOd: "2025-10-01",
-    okresDo: "2026-03-31",
-    obwieszczenie: "Wojewoda Mazowiecki",
-    zrodloUrl: "https://edziennik.mazowieckie.pl",
-  },
-  podkarpackie: {
-    reszta: 4851,
-    miasta: { Rzeszów: 7018 },
-    okresOd: "2025-04-01",
-    okresDo: "2025-09-30",
-    obwieszczenie: "Wojewoda Podkarpacki, 18.03.2025",
-    zrodloUrl: "https://edziennik.rzeszow.uw.gov.pl",
-  },
-  pomorskie: {
-    reszta: 7271,
-    okresOd: "2025-10-01",
-    okresDo: "2026-03-31",
-    obwieszczenie: "Wojewoda Pomorski",
-    zrodloUrl: "https://edziennik.gdansk.uw.gov.pl",
-  },
+  dolnośląskie: { reszta: 7748, miasta: { Wrocław: 10342 }, ...OKRES, ...zr("Dolnośląski", "https://edzienniki.duw.pl") },
+  "kujawsko-pomorskie": { reszta: 6685, miasta: { Bydgoszcz: 7759, Toruń: 7774 }, ...OKRES, ...zr("Kujawsko-Pomorski", "https://edzienniki.bydgoszcz.uw.gov.pl") },
+  lubuskie: { reszta: 7977, miasta: { "Gorzów Wielkopolski": 8869, "Zielona Góra": 8869 }, ...OKRES, ...zr("Lubuski", "https://bip.lubuskie.uw.gov.pl") },
+  łódzkie: { reszta: 5923, miasta: { Łódź: 7125 }, ...OKRES, ...zr("Łódzki", "https://dziennik.lodzkie.eu") },
+  małopolskie: { reszta: 7198, miasta: { Kraków: 10003 }, ...OKRES, ...zr("Małopolski", "https://edziennik.malopolska.uw.gov.pl") },
+  mazowieckie: { reszta: 7828.57, miasta: { Warszawa: 12149.38 }, ...OKRES, ...zr("Mazowiecki", "https://edziennik.mazowieckie.pl") },
+  opolskie: { reszta: 5397.36, miasta: { Opole: 6684.37 }, ...OKRES, ...zr("Opolski", "https://duwo.opole.uw.gov.pl") },
+  podkarpackie: { reszta: 7170, miasta: { Rzeszów: 8935 }, ...OKRES, ...zr("Podkarpacki", "https://edziennik.rzeszow.uw.gov.pl") },
+  podlaskie: { reszta: 7091, miasta: { Białystok: 7470 }, ...OKRES, ...zr("Podlaski", "https://edziennik.bialystok.uw.gov.pl") },
+  pomorskie: { reszta: 8206, miasta: { Gdańsk: 9914 }, ...OKRES, ...zr("Pomorski", "https://edziennik.gdansk.uw.gov.pl") },
+  śląskie: { reszta: 7054, miasta: { Katowice: 7902 }, ...OKRES, ...zr("Śląski", "https://www.katowice.uw.gov.pl") },
+  świętokrzyskie: { reszta: 6561.76, miasta: { Kielce: 7699.7 }, ...OKRES, ...zr("Świętokrzyski", "https://edziennik.kielce.uw.gov.pl") },
+  "warmińsko-mazurskie": { reszta: 7247, miasta: { Olsztyn: 8741 }, ...OKRES, ...zr("Warmińsko-Mazurski", "https://edzienniki.olsztyn.uw.gov.pl") },
+  wielkopolskie: { reszta: 7310, miasta: { Poznań: 10333 }, ...OKRES, ...zr("Wielkopolski", "https://edziennik.poznan.uw.gov.pl") },
+  zachodniopomorskie: { reszta: 7718, miasta: { Szczecin: 8723 }, ...OKRES, ...zr("Zachodniopomorski", "https://e-dziennik.szczecin.uw.gov.pl") },
+  // lubelskie: do weryfikacji obwieszczenia → tymczasowo fallback benchmark (config-rynek).
 };
 
 export interface StawkaWO {
