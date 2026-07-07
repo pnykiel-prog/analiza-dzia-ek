@@ -338,6 +338,8 @@ export interface KonfiguracjaFinanse {
     oczekiwany: { mnoznikKosztu: number; mnoznikWartOdtw: number; mnoznikStopy: number };
     korzystny: { mnoznikKosztu: number; mnoznikWartOdtw: number; mnoznikStopy: number };
   };
+  /** Suwak kosztu budowy [zł/m²] w wyniku M3 — przelicza montaż na żywo. */
+  kosztBudowySuwak: { min: number; max: number; domyslny: number; krok: number };
 }
 
 export const KONFIG_FINANSE: KonfiguracjaFinanse = {
@@ -404,6 +406,7 @@ export const KONFIG_FINANSE: KonfiguracjaFinanse = {
     oczekiwany: { mnoznikKosztu: 1.0, mnoznikWartOdtw: 1.0, mnoznikStopy: 1.0 },
     korzystny: { mnoznikKosztu: 0.95, mnoznikWartOdtw: 1.03, mnoznikStopy: 0.5 },
   },
+  kosztBudowySuwak: { min: 4000, max: 15000, domyslny: 9500, krok: 250 },
 };
 
 // ── Poziom 2 (wersja uproszczona): proste pytania do klienta ──────────────────

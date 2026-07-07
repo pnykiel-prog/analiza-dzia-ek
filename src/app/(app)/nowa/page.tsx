@@ -12,8 +12,9 @@ import { Karta } from "@/components/ui";
 import { Poziom1View } from "@/components/Poziom1View";
 import { Poziom2View } from "@/components/Poziom2View";
 import { PytaniaM2, type OdpowiedziM2 } from "@/components/PytaniaM2";
-import { Poziom3View } from "@/components/Poziom3View";
 import { AnkietaFinansowa } from "@/components/AnkietaFinansowa";
+import { MontazPrzekrojView } from "@/components/MontazPrzekrojView";
+import { rolaZeSposobu } from "@/lib/finanse/przekroj";
 import { Stepper, BannerBramki } from "@/components/grunt";
 import { SYMBOLE_MPZP, statusZeSymbolu } from "@/lib/mpzp";
 import { PodgladTerenu, type TrybMapy, type WarstwyMapy } from "@/components/GruntMap";
@@ -58,8 +59,12 @@ async function pobierzOpcjeTeryt(params: Record<string, string>): Promise<{ tery
 }
 
 // „uzupelnianie" to osobny ekran między M1 a M2 (nie w stepperze — mapuje się na krok M2).
-type Ekran = "wejscie" | "poziom1" | "uzupelnianie" | "poziom2" | "poziom3" | "raport";
-const EKRANY: Exclude<Ekran, "uzupelnianie">[] = ["wejscie", "poziom1", "poziom2", "poziom3", "raport"];
+// „uzupelnianie" (M1→M2) i „ankieta" (M2→M3) to osobne ekrany poza stepperem —
+// mapują się odpowiednio na krok M2 i M3.
+type Ekran = "wejscie" | "poziom1" | "uzupelnianie" | "poziom2" | "ankieta" | "poziom3" | "raport";
+type EkranStepper = Exclude<Ekran, "uzupelnianie" | "ankieta">;
+const EKRANY: EkranStepper[] = ["wejscie", "poziom1", "poziom2", "poziom3", "raport"];
+const EKRAN_STEP: Record<"uzupelnianie" | "ankieta", EkranStepper> = { uzupelnianie: "poziom2", ankieta: "poziom3" };
 
 export default function NowaAnalizaPage() {
   const [ekran, setEkran] = useState<Ekran>("wejscie");
@@ -279,14 +284,17 @@ export default function NowaAnalizaPage() {
       kosztBudowyM2: s(dane?.kosztBudowyM2),
       cenaGruntu: s(dane?.cenaGruntu),
     });
-    setEkran("poziom3");
+    // „Przejdź do analizy finansowej" → OSOBNY ekran ankiety (bez montażu, jak M1→M2).
+    setEkran("ankieta");
     setMaxKrok((m) => Math.max(m, 4));
   }
 
-  // Zatwierdzenie ankiety = brama P3: zapis profilu i przeliczenie z montażem.
+  // Zatwierdzenie ankiety = brama P3: zapis profilu, przeliczenie i przejście do WYNIKU M3.
   async function zatwierdzAnkiete(profil: ProfilFinansowy) {
     setProfilFin(profil);
     await przeliczP3(profil);
+    setEkran("poziom3");
+    setMaxKrok((m) => Math.max(m, 4));
   }
 
   async function przeliczP3(profilOverride?: ProfilFinansowy) {
@@ -306,11 +314,14 @@ export default function NowaAnalizaPage() {
     k.finanse.zalozenia.domyslnaPartycypacjaNajemcowPct = n(p3.partycypacjaNajemcow) ?? 0;
     k.finanse.zalozenia.domyslnyWkladGminyPct = n(p3.wkladGminy) ?? 0;
 
+    // Wartość działki z ankiety → cena gruntu w modelu (gdy zakup) — spójność z raportem.
+    const rolaDz = profil ? rolaZeSposobu(profil.sposobWniesieniaDzialki) : "neutralna";
+    const cenaGruntu = profil?.wartoscDzialkiPln != null && rolaDz === "koszt" ? profil.wartoscDzialkiPln : n(p3.cenaGruntu);
     const noweDane: DaneDzialki = {
       ...dane,
       wartoscOdtworzeniowaM2: n(p3.wartoscOdtworzeniowaM2),
       kosztBudowyM2: n(p3.kosztBudowyM2),
-      cenaGruntu: n(p3.cenaGruntu),
+      cenaGruntu,
     };
     setDane(noweDane);
     await przelicz(noweDane, k, profil);
@@ -319,13 +330,18 @@ export default function NowaAnalizaPage() {
   }
 
   const korektyP2 = Object.keys(p2).filter((k) => p2orig[k] !== undefined && p2[k] !== p2orig[k]);
-  // Ekran uzupełniania mapuje się na krok „Poziom 2" w stepperze (jest bramą do M2).
-  const stepAktywny = ekran === "uzupelnianie" ? EKRANY.indexOf("poziom2") + 1 : EKRANY.indexOf(ekran as Exclude<Ekran, "uzupelnianie">) + 1;
+  // Ekrany poza stepperem mapują się na swój krok (uzupełnianie→M2, ankieta→M3).
+  const stepAktywny =
+    ekran === "uzupelnianie" || ekran === "ankieta"
+      ? EKRANY.indexOf(EKRAN_STEP[ekran]) + 1
+      : EKRANY.indexOf(ekran as EkranStepper) + 1;
 
   function cofnij() {
     if (ekran === "uzupelnianie") { setEkran("poziom1"); return; }
     if (ekran === "poziom2") { setEkran("uzupelnianie"); return; }
-    const i = EKRANY.indexOf(ekran as Exclude<Ekran, "uzupelnianie">);
+    if (ekran === "ankieta") { setEkran("poziom2"); return; }
+    if (ekran === "poziom3") { setEkran("ankieta"); return; }
+    const i = EKRANY.indexOf(ekran as EkranStepper);
     if (i > 0) setEkran(EKRANY[i - 1]);
   }
   function idzDoKroku(nr: number) {
@@ -435,50 +451,13 @@ export default function NowaAnalizaPage() {
         </div>
       )}
 
-      {/* POZIOM 3 — ankieta finansowa (brama) → montaż finansowy */}
-      {ekran === "poziom3" && dane && (
-        <div className="space-y-4">
-          <AnkietaFinansowa onSubmit={zatwierdzAnkiete} licze={licze} />
-          {!profilFin && (
-            <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-              Wypełnij ankietę i zatwierdź profil — dopiero wtedy odsłonią się parametry montażu i wynik finansowy.
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* POZIOM 3 — edytowalne parametry reżimu/montażu (jeden ekran) */}
-      {ekran === "poziom3" && dane && profilFin && (
-        <div className="space-y-4">
-          <Karta tytul="Poziom 3 — parametry reżimu i montażu (A±)" podtytul="Bazowo z konfiguracji reżimu B (program 2027+); modyfikowalne dla scenariuszy">
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <NumP3 label="Oprocentowanie" k="oprocentowanie" p3={p3} setP3={setP3} sufiks="%" krok="0.25" />
-              <NumP3 label="Okres kredytu" k="okresKredytuLata" p3={p3} setP3={setP3} sufiks="lat" />
-              <NumP3 label="Grant" k="maxGrantPct" p3={p3} setP3={setP3} sufiks="%" />
-              <NumP3 label="Faza: projekt + PnB" k="projektDecyzjeMies" p3={p3} setP3={setP3} sufiks="mies." />
-              <NumP3 label="Faza: nabór finansowania" k="naborFinansowaniaMies" p3={p3} setP3={setP3} sufiks="mies." />
-              <NumP3 label="Faza: budowa" k="budowaMies" p3={p3} setP3={setP3} sufiks="mies." />
-              <NumP3 label="Indeks kosztu budowy" k="indeksKosztu" p3={p3} setP3={setP3} sufiks="%/rok" krok="0.5" />
-              <NumP3 label="Indeks wart. odtworzeniowej" k="indeksWartOdtw" p3={p3} setP3={setP3} sufiks="%/rok" krok="0.5" />
-            </div>
-          </Karta>
-
-          <Karta tytul="Poziom 3 — koszty i partycypacje (A± / R)" podtytul="Wartość odtworzeniowa A°; koszt budowy A±; cena gruntu i partycypacje R">
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <NumP3 label="Wartość odtworzeniowa" tryb="A°" k="wartoscOdtworzeniowaM2" p3={p3} setP3={setP3} sufiks="zł/m²" />
-              <NumP3 label="Koszt budowy (pod klucz)" k="kosztBudowyM2" p3={p3} setP3={setP3} sufiks="zł/m²" />
-              <NumP3 label="Cena gruntu (całość)" tryb="R" k="cenaGruntu" p3={p3} setP3={setP3} sufiks="zł" />
-              <NumP3 label="Partycypacja najemców" tryb="R" k="partycypacjaNajemcow" p3={p3} setP3={setP3} sufiks="% kosztu" />
-              <NumP3 label="Wkład gminy" tryb="R" k="wkladGminy" p3={p3} setP3={setP3} sufiks="% kosztu" />
-            </div>
-          </Karta>
-
-          <div className="flex gap-3">
-            <button onClick={() => przeliczP3()} disabled={licze} className="btn-primary" style={{ height: "var(--grunt-h-cta)" }}>
-              {licze ? "Liczę…" : "Przelicz Poziom 3 (uwzględnij parametry)"}
-            </button>
-          </div>
-        </div>
+      {/* EKRAN ANKIETY (osobny, między M2 a M3) — profil finansowy; BEZ montażu (motywacja). */}
+      {ekran === "ankieta" && dane && (
+        <AnkietaFinansowa
+          onSubmit={zatwierdzAnkiete}
+          licze={licze}
+          wartoscDzialkiSugestia={dane.cenaGruntu ?? null}
+        />
       )}
 
       {/* WYNIKI — jeden ekran = jeden poziom; szczegóły tylko dla administratora */}
@@ -498,23 +477,29 @@ export default function NowaAnalizaPage() {
               <Poziom2View p2={wynik.poziom2} profilRek={wynik.poziom1.profilRekomendowany} sygnaly={wynik.poziom2.sygnaly} />
               <BannerBramki
                 tytul="Poziom 2 gotowy — czas na model finansowy"
-                opis="Najpierw ankieta finansowa (kto pyta i jak finansuje), potem montaż i domknięcie Poziomu 3."
+                opis="Osobny ekran ankiety (kto pyta i jak finansuje), potem przekrój montażu w obu reżimach."
                 akcja={wejdzP3}
-                akcjaLabel="Przejdź do ankiety i Poziomu 3"
+                akcjaLabel="Przejdź do analizy finansowej"
               />
             </>
           )}
-          {ekran === "poziom3" && profilFin && (
-            <>
-              <Poziom3View p3={wynik.poziom3} />
-              <BannerBramki
-                tytul="Studium gotowe — wygeneruj raport"
-                opis="Drukowalne podsumowanie: werdykt, pewność sekcji, model zabudowy i finansowy, prowenancja."
-                akcja={() => { setEkran("raport"); setMaxKrok((m) => Math.max(m, 5)); }}
-                akcjaLabel="Otwórz studium (raport)"
-              />
-            </>
-          )}
+          {ekran === "poziom3" && profilFin && (() => {
+            const warianty = wynik.poziom2.warianty;
+            const idx = Math.max(0, warianty.findIndex((w) => wynik.poziom1.profilRekomendowany === "oba" || w.profil === wynik.poziom1.profilRekomendowany));
+            const wariant = warianty[idx] ?? warianty[0];
+            const wartOdtw = dane?.wartoscOdtworzeniowaM2 ?? mediana?.wartoscOdtworzeniowa ?? 7000;
+            return (
+              <>
+                <MontazPrzekrojView wariant={wariant} wartoscOdtworzeniowaM2={wartOdtw} profil={profilFin} />
+                <BannerBramki
+                  tytul="Studium gotowe — wygeneruj raport"
+                  opis="Drukowalne podsumowanie: werdykt, pewność sekcji, model zabudowy i finansowy, prowenancja."
+                  akcja={() => { setEkran("raport"); setMaxKrok((m) => Math.max(m, 5)); }}
+                  akcjaLabel="Otwórz studium (raport)"
+                />
+              </>
+            );
+          })()}
         </div>
       )}
     </div>
@@ -1063,15 +1048,6 @@ function PoleRynkowe({ label, k, p2, setP2, orig, N, sufiks }: P2Props & { N: nu
       {naglowekPola(`${label}${sufiks ? ` (${sufiks})` : ""}`, tryb, skor)}
       <input type="number" value={p2[k] ?? ""} onChange={(e) => setP2((s) => ({ ...s, [k]: e.target.value }))} className="inp mt-0.5" />
       <span className={`text-[11px] ${kolorStatus}`}>N={N} · {status} · {etykietaZrodla}</span>
-    </label>
-  );
-}
-
-function NumP3({ label, tryb = "A±", k, p3, setP3, sufiks, krok }: { label: string; tryb?: Tryb; k: string; p3: Record<string, string>; setP3: (f: (s: Record<string, string>) => Record<string, string>) => void; sufiks?: string; krok?: string }) {
-  return (
-    <label className="text-sm block">
-      <span className="text-xs text-slate-500 flex items-center gap-1.5">{label}{sufiks ? ` (${sufiks})` : ""} <TrybBadge tryb={tryb} /></span>
-      <input type="number" step={krok ?? "any"} value={p3[k] ?? ""} onChange={(e) => setP3((s) => ({ ...s, [k]: e.target.value }))} className="inp mt-0.5" />
     </label>
   );
 }

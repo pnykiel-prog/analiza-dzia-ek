@@ -61,6 +61,15 @@ export interface ProfilFinansowy {
   efektywnoscEnergetyczna: boolean; // Q6 (FEnIKS/OZE)
   mieszkanieNaStart: boolean; // Q7 (dopłata do czynszu — OPEX, nie CAPEX)
   dataWniosku: string; // Q8 (ISO yyyy-mm-dd)
+  // ── Pola przekroju M3 (wartość działki + partycypacje) — opcjonalne, dla montażu ──
+  /** Wartość/cena działki [R] — rola (źródło/koszt) zależna od sposobu wniesienia. */
+  wartoscDzialkiPln?: number;
+  /** Partycypacja najemców [% kosztu] — opcjonalna. */
+  partycypacjaNajemcowPct?: number;
+  /** Wkład gminy [% kosztu] — opcjonalny. */
+  wkladGminyPct?: number;
+  /** Pozwolenie na budowę — tylko informacja o dojrzałości projektu (bez wpływu na montaż). */
+  pozwolenieNaBudowe?: boolean;
 }
 
 // ── Analiza (wyjście) ────────────────────────────────────────────────────────
