@@ -14,7 +14,7 @@ import { Poziom2View } from "@/components/Poziom2View";
 import { PytaniaM2, type OdpowiedziM2 } from "@/components/PytaniaM2";
 import { AnkietaFinansowa } from "@/components/AnkietaFinansowa";
 import { MontazPrzekrojView } from "@/components/MontazPrzekrojView";
-import { rolaZeSposobu } from "@/lib/finanse/przekroj";
+import { rolaZeSposobu } from "@/lib/finanse/montaz";
 import { Stepper, BannerBramki } from "@/components/grunt";
 import { SYMBOLE_MPZP, statusZeSymbolu } from "@/lib/mpzp";
 import { PodgladTerenu, type TrybMapy, type WarstwyMapy } from "@/components/GruntMap";
@@ -490,7 +490,7 @@ export default function NowaAnalizaPage() {
             const wartOdtw = dane?.wartoscOdtworzeniowaM2 ?? mediana?.wartoscOdtworzeniowa ?? 7000;
             return (
               <>
-                <MontazPrzekrojView wariant={wariant} wartoscOdtworzeniowaM2={wartOdtw} profil={profilFin} />
+                <MontazPrzekrojView wariant={wariant} wartoscOdtworzeniowaM2={wartOdtw} odlegloscDoSieciM={dane?.odlegloscDoSieciM ?? null} profil={profilFin} />
                 <BannerBramki
                   tytul="Studium gotowe — wygeneruj raport"
                   opis="Drukowalne podsumowanie: werdykt, pewność sekcji, model zabudowy i finansowy, prowenancja."
