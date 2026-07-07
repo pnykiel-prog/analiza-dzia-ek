@@ -891,9 +891,15 @@ function FormaBox({ etykieta, f, prog, rekomendowana }: { etykieta: string; f: P
         <span className="text-[12px] text-grunt-text-faint2 mb-0.5">lokali</span>
       </div>
       <div className="text-[11px] text-grunt-text-muted2 mt-1">{f.kondygnacje} kond. · PUM ~{liczba(f.pumM2, " m²")}</div>
-      <div className={`text-[11px] mt-1 ${wProgu ? "text-grunt-green" : "text-grunt-amber-text"}`}>
-        {wProgu ? `w progu opłacalności (≥${prog})` : `poniżej progu opłacalności (${prog})`}
-      </div>
+      {/* Ocenę progu opłacalności pokazujemy TYLKO przy rekomendowanej formie — to ona
+          decyduje o wyniku; przy alternatywnej dajemy neutralny opis (bez „poniżej progu"). */}
+      {rekomendowana ? (
+        <div className={`text-[11px] mt-1 ${wProgu ? "text-grunt-green" : "text-grunt-amber-text"}`}>
+          {wProgu ? `w progu opłacalności (≥${prog})` : `poniżej progu opłacalności (${prog})`}
+        </div>
+      ) : (
+        <div className="text-[11px] mt-1 text-grunt-text-faint2">forma alternatywna</div>
+      )}
     </div>
   );
 }

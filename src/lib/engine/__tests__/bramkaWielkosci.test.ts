@@ -54,7 +54,7 @@ test("bramka: mała skala → punkt decyzyjny (nizsza_oplacalnosc), nie odrzucen
 });
 
 test("bramka: konflikt progów — wysoka poniżej 40, niska w progu (≥20) → decyzja klienta", () => {
-  const b = liczBramkeWielkosci(dz({ powierzchniaM2: 1500, zwartosc: 0.9, minSzerokoscM: 40 }), SASIEDZTWO_NIS, "brak");
+  const b = liczBramkeWielkosci(dz({ powierzchniaM2: 1500, zwartoscKsztaltu: 0.9, minSzerokoscM: 40 }), SASIEDZTWO_NIS, "brak");
   assert.equal(b.wynik, "konflikt");
   assert.equal(b.konfliktProgow, true);
   assert.ok(b.wysoka.lokali < 40, "wysoka poniżej swojego progu");
