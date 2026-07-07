@@ -36,7 +36,9 @@ export function Karta({
   children: React.ReactNode;
 }) {
   return (
-    <section className="card p-[18px]">
+    // min-w-0: karta jako dziecko flex/grid może się skurczyć — treść (np. tabela) scrolluje
+    // wewnątrz swojego overflow-x-auto zamiast rozpychać układ na wąskich ekranach.
+    <section className="card p-[18px] min-w-0">
       {(tytul || prawy) && (
         <div className="flex items-start justify-between gap-3 mb-3">
           <div>

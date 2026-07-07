@@ -8,11 +8,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
       <PasekGorny />
-      <main className="mx-auto px-6 py-6" style={{ maxWidth: "var(--grunt-page-max)" }}>
+      <main className="mx-auto px-4 sm:px-6 py-6" style={{ maxWidth: "var(--grunt-page-max)" }}>
         {children}
       </main>
       <footer
-        className="mx-auto px-6 py-8 text-[11px] text-grunt-text-faint"
+        className="mx-auto px-4 sm:px-6 py-8 text-[11px] text-grunt-text-faint"
         style={{ maxWidth: "var(--grunt-page-max)" }}
       >
         GRUNT · warstwa wizualna wg wytycznych 1.0. Parametry (progi, wagi, reżimy finansowe) są
@@ -29,7 +29,7 @@ function PasekGorny() {
       style={{ height: "var(--grunt-h-header)" }}
     >
       <div
-        className="mx-auto h-full px-6 flex items-center justify-between gap-6"
+        className="mx-auto h-full px-4 sm:px-6 flex items-center justify-between gap-3 sm:gap-6"
         style={{ maxWidth: "var(--grunt-page-max)" }}
       >
         <Link href="/" className="flex items-center gap-2.5 shrink-0">
@@ -40,22 +40,22 @@ function PasekGorny() {
             <span className="text-grunt-ink text-[16px] font-bold" style={{ letterSpacing: "0.14em" }}>
               GRUNT
             </span>
-            <span className="text-[9px] text-grunt-text-faint2 uppercase" style={{ letterSpacing: "0.12em" }}>
+            <span className="hidden sm:block text-[9px] text-grunt-text-faint2 uppercase" style={{ letterSpacing: "0.12em" }}>
               analiza potencjału działek
             </span>
           </span>
         </Link>
 
-        <nav className="flex items-center gap-5 text-[13px] text-grunt-text-3">
-          <Link href="/nowa" className="hover:text-grunt-ink">Nowa analiza</Link>
-          <Link href="/archiwum" className="hover:text-grunt-ink">Przeanalizowane działki</Link>
-          <Link href="/konfiguracja" className="hover:text-grunt-ink">Konfiguracja</Link>
-          <Link href="/o-aplikacji" className="hover:text-grunt-ink">O aplikacji</Link>
+        <nav className="flex items-center gap-4 sm:gap-5 text-[12px] sm:text-[13px] text-grunt-text-3 overflow-x-auto no-scrollbar min-w-0">
+          <Link href="/nowa" className="hover:text-grunt-ink whitespace-nowrap">Nowa analiza</Link>
+          <Link href="/archiwum" className="hover:text-grunt-ink whitespace-nowrap">Przeanalizowane działki</Link>
+          <Link href="/konfiguracja" className="hover:text-grunt-ink whitespace-nowrap">Konfiguracja</Link>
+          <Link href="/o-aplikacji" className="hover:text-grunt-ink whitespace-nowrap">O aplikacji</Link>
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           <LegendaProfili />
-          <button className="btn-secondary" style={{ height: "var(--grunt-h-btn-sm)" }}>
+          <button className="btn-secondary hidden sm:inline-flex" style={{ height: "var(--grunt-h-btn-sm)" }}>
             Raport PDF
           </button>
         </div>

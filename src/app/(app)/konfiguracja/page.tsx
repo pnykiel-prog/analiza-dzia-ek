@@ -65,14 +65,14 @@ export default function KonfiguracjaPage() {
         </p>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Wagi wymiarów P1 */}
         <Karta tytul="Poziom 1 — wagi wymiarów per profil" podtytul="Suma per profil powinna wynosić 100">
           <div className="space-y-3">
             {(["mlodzi", "seniorzy"] as const).map((profil) => (
               <div key={profil}>
                 <div className="text-sm font-medium text-slate-600 mb-1">{profil === "mlodzi" ? "Dla młodych" : "Senioralny"}</div>
-                <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                   {(["W1", "W2", "W3", "W4", "W5"] as const).map((w) => (
                     <label key={w} className="text-xs">
                       <span className="text-slate-400">{w}</span>
@@ -166,7 +166,7 @@ export default function KonfiguracjaPage() {
         </div>
 
         {wynik && wynik.poziom1 && (
-          <div className="grid md:grid-cols-4 gap-3 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4">
             <Wynik etykieta="Score młodzi" wartosc={`${wynik.poziom1.scoreMlodzi}/100`} />
             <Wynik etykieta="Score seniorzy" wartosc={`${wynik.poziom1.scoreSeniorzy}/100`} />
             <Wynik etykieta="Pewność" wartosc={pct(wynik.poziom1.pewnosc)} />
@@ -234,7 +234,7 @@ export default function KonfiguracjaPage() {
 
       {/* Katalog źródeł danych */}
       <Karta tytul="Katalog źródeł danych" podtytul="Warstwa adapterów — realne API podpina się bez zmiany silników">
-        <div className="grid md:grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {zrodla.map((z) => (
             <div key={z.klucz} className="text-xs border border-slate-100 rounded-lg p-2.5">
               <div className="flex items-center justify-between">

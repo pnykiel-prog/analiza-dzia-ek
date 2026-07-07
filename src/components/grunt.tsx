@@ -41,7 +41,7 @@ export function Stepper({
       style={{ minHeight: "var(--grunt-h-subnav)" }}
     >
       <div
-        className="mx-auto h-full px-6 flex items-stretch"
+        className="mx-auto h-full px-4 sm:px-6 flex items-stretch overflow-x-auto no-scrollbar"
         style={{ maxWidth: "var(--grunt-page-max)" }}
       >
         {kroki.map((k, i) => {
@@ -49,30 +49,32 @@ export function Stepper({
             k.nr === aktywny ? "aktywny" : k.nr < aktywny || k.nr <= maxOsiagniety ? (k.nr < aktywny ? "ukonczony" : "osiagniety") : "niedostepny";
           const ukonczony = k.nr < aktywny;
           const osiagalny = k.nr <= maxOsiagniety;
+          // Na wąskich ekranach etykietę pokazujemy tylko dla aktywnego kroku (reszta = numer).
+          const pokazEtykiete = stan === "aktywny";
           return (
-            <div key={k.nr} className="flex items-center">
+            <div key={k.nr} className="flex items-center shrink-0">
               <button
                 type="button"
                 disabled={!osiagalny || !onKrok}
                 onClick={() => osiagalny && onKrok?.(k.nr)}
-                className={`relative flex items-center gap-2.5 py-2.5 pr-4 ${osiagalny && onKrok ? "cursor-pointer" : "cursor-default"}`}
+                className={`relative flex items-center gap-2.5 py-2.5 pr-2 sm:pr-4 ${osiagalny && onKrok ? "cursor-pointer" : "cursor-default"}`}
               >
                 <ZnacznikKroku nr={k.nr} stan={ukonczony ? "ukonczony" : stan} />
-                <span className="flex flex-col items-start leading-tight">
+                <span className={`${pokazEtykiete ? "flex" : "hidden sm:flex"} flex-col items-start leading-tight`}>
                   <span
-                    className={`text-[12.5px] ${
+                    className={`text-[12.5px] whitespace-nowrap ${
                       stan === "aktywny" ? "text-grunt-ink font-semibold" : stan === "niedostepny" ? "text-grunt-text-ghost" : "text-grunt-text-3"
                     }`}
                   >
                     {k.etykieta}
                   </span>
-                  <span className={`text-[10px] ${stan === "niedostepny" ? "text-grunt-text-ghost" : "text-grunt-text-faint2"}`}>
+                  <span className={`hidden sm:block text-[10px] ${stan === "niedostepny" ? "text-grunt-text-ghost" : "text-grunt-text-faint2"}`}>
                     {k.podtytul}
                   </span>
                 </span>
                 {stan === "aktywny" && <span className="absolute left-0 bottom-0 h-0.5 w-full bg-grunt-ink" />}
               </button>
-              {i < kroki.length - 1 && <span className="w-8 h-px bg-grunt-border-2 mx-1" />}
+              {i < kroki.length - 1 && <span className="w-4 sm:w-8 h-px bg-grunt-border-2 mx-1 shrink-0" />}
             </div>
           );
         })}
