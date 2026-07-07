@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import type {
   ProfilFinansowy,
-  RezimFinansowy,
   SposobWniesieniaDzialki,
   TypInwestora,
   TypZasobu,
@@ -11,10 +10,10 @@ import type {
   WspolpracaGmina,
 } from "@/lib/finanse/typy";
 import { dostepneZasoby, sugerujRezim, walidujUprawnienia } from "@/lib/finanse";
+import { rolaZeSposobu } from "@/lib/finanse/przekroj";
 import {
   ETYK_GRUNTU,
   ETYK_INWESTORA,
-  ETYK_REZIMU,
   ETYK_WSPOLPRACY,
   ETYK_ZASOBU,
 } from "@/lib/finanse/etykiety";
@@ -26,23 +25,29 @@ const GRUNT_OPCJE = Object.keys(ETYK_GRUNTU) as SposobWniesieniaDzialki[];
 const WSPOLPRACA_OPCJE = Object.keys(ETYK_WSPOLPRACY) as WspolpracaGmina[];
 const KWALIFIKACJA_INVESTEU: TypInwestora[] = ["SIM_GMINNY", "SIM_MIESZANY", "SIM_PRYWATNY", "TBS", "SPOLDZIELNIA", "SPOLKA_GMINNA"];
 
+/**
+ * Ekran ankiety finansowej (osobny, między M2 a M3). Pyta TYLKO o to, co klient
+ * zna lub czym decyduje — parametry systemowe (oprocentowanie, okres, grant, indeksy)
+ * są w konfiguracji, reżim nie jest pytaniem (wynik pokazuje OBA). Na tym ekranie
+ * klient NIE widzi montażu — tylko rosnący „Profil finansowy" (motywacja).
+ */
 export function AnkietaFinansowa({
   onSubmit,
   licze,
   domyslnaData,
+  wartoscDzialkiSugestia,
 }: {
   onSubmit: (profil: ProfilFinansowy) => void;
   licze?: boolean;
   domyslnaData?: string;
+  wartoscDzialkiSugestia?: number | null;
 }) {
   const [typInwestora, setTypInwestora] = useState<TypInwestora>("SIM_GMINNY");
   const [udzialGminy, setUdzialGminy] = useState<UdzialGminy>("wiekszosciowy");
   const [nowyPodmiot, setNowyPodmiot] = useState(false);
-  const [dataWniosku, setDataWniosku] = useState(domyslnaData ?? "2026-06-01");
+  const [dataWniosku] = useState(domyslnaData ?? "2026-06-01");
   const sugestia = useMemo(() => sugerujRezim(dataWniosku), [dataWniosku]);
-  const [rezim, setRezim] = useState<RezimFinansowy>(sugestia.rezim);
-  const [rezimReczny, setRezimReczny] = useState(false);
-  const rezimEff = rezimReczny ? rezim : sugestia.rezim;
+  const rezimEff = sugestia.rezim; // reżim nie jest pytaniem — wynik pokazuje oba
 
   const opcjeZasobu = useMemo(() => dostepneZasoby(rezimEff, typInwestora), [rezimEff, typInwestora]);
   const [typZasobu, setTypZasobu] = useState<TypZasobu>("SPOLECZNY_CZYNSZOWY");
@@ -51,7 +56,15 @@ export function AnkietaFinansowa({
   const [sposobWniesieniaDzialki, setSposob] = useState<SposobWniesieniaDzialki>("APORT_GMINNY");
   const [wspolpracaGmina, setWspolpraca] = useState<WspolpracaGmina>("UMOWA_PARTNERSKA");
   const [efektywnoscEnergetyczna, setEE] = useState(false);
-  const [mieszkanieNaStart, setMnS] = useState(false);
+  const [pozwolenieNaBudowe, setPnB] = useState(false);
+
+  const [wartoscDzialki, setWartoscDzialki] = useState(wartoscDzialkiSugestia ? String(Math.round(wartoscDzialkiSugestia)) : "");
+  const [partycypacja, setPartycypacja] = useState("");
+  const [wkladGminy, setWkladGminy] = useState("");
+
+  const rola = rolaZeSposobu(sposobWniesieniaDzialki);
+  const etykietaDzialki =
+    rola === "koszt" ? "Cena zakupu działki (koszt) [R]" : rola === "zrodlo" ? "Wartość działki (aport — źródło) [R]" : "Wartość działki (informacyjnie) [R]";
 
   const profil: ProfilFinansowy | null = zasobEff
     ? {
@@ -63,8 +76,12 @@ export function AnkietaFinansowa({
         sposobWniesieniaDzialki,
         wspolpracaGmina,
         efektywnoscEnergetyczna,
-        mieszkanieNaStart,
+        mieszkanieNaStart: false, // usunięte z ankiety (wsparcie najemcy, nie montaż inwestora)
         dataWniosku,
+        wartoscDzialkiPln: wartoscDzialki ? Number(wartoscDzialki) : undefined,
+        partycypacjaNajemcowPct: partycypacja ? Number(partycypacja) : undefined,
+        wkladGminyPct: wkladGminy ? Number(wkladGminy) : undefined,
+        pozwolenieNaBudowe,
       }
     : null;
 
@@ -73,12 +90,12 @@ export function AnkietaFinansowa({
   return (
     <div className="grid lg:grid-cols-[1fr_minmax(0,320px)] gap-4 items-start">
     <Karta
-      tytul="Ankieta finansowa — kto pyta o analizę (brama Poziomu 3)"
-      podtytul="Typ inwestora, zasób, reżim i sposób wniesienia działki determinują montaż i wynik finansowy"
+      tytul="Ankieta finansowa — kto pyta i jak finansuje"
+      podtytul="Tylko dane, które znasz lub którymi decydujesz. Parametry systemowe są w konfiguracji; wynik pokaże oba reżimy."
     >
       <div className="space-y-4">
         {/* Q1 — inwestor */}
-        <Grupa label="Q1. Typ inwestora">
+        <Grupa label="Typ inwestora">
           {INWESTORZY.map((i) => (
             <Chip key={i} selected={typInwestora === i} onClick={() => setTypInwestora(i)}>{ETYK_INWESTORA[i]}</Chip>
           ))}
@@ -86,7 +103,7 @@ export function AnkietaFinansowa({
 
         {/* Q1a — udział gminy (SIM_MIESZANY) */}
         {typInwestora === "SIM_MIESZANY" && (
-          <Grupa label="Q1a. Udział gminy">
+          <Grupa label="Udział gminy">
             {(["wiekszosciowy", "mniejszosciowy", "symboliczny"] as UdzialGminy[]).map((u) => (
               <Chip key={u} selected={udzialGminy === u} onClick={() => setUdzialGminy(u)}>
                 {u === "wiekszosciowy" ? "Większościowy" : u === "mniejszosciowy" ? "Mniejszościowy" : "Symboliczny"}
@@ -96,7 +113,7 @@ export function AnkietaFinansowa({
         )}
 
         {/* Q2 — zasób (dynamiczny filtr) */}
-        <Grupa label="Q2. Typ zasobu (co ma powstać)" podpis="Filtrowane wg macierzy dostępu; „brak” ukryty.">
+        <Grupa label="Typ zasobu (co ma powstać)" podpis="Filtrowane wg macierzy dostępu; „brak” ukryty.">
           {opcjeZasobu.map((o) => (
             <Chip key={o.zasob} selected={zasobEff === o.zasob} limited={o.dostep === "ograniczony"} onClick={() => setTypZasobu(o.zasob)}>
               {ETYK_ZASOBU[o.zasob]}
@@ -104,54 +121,39 @@ export function AnkietaFinansowa({
           ))}
         </Grupa>
 
-        <div className="grid sm:grid-cols-2 gap-4">
-          {/* Q8 — data wniosku */}
-          <label className="text-sm block">
-            <span className="text-[11px] font-medium text-grunt-text-muted2">Q8. Data złożenia wniosku o finansowanie</span>
-            <input type="date" value={dataWniosku} onChange={(e) => setDataWniosku(e.target.value)} className="inp mono mt-1" />
-          </label>
-
-          {/* Q3 — reżim (chipy, sugerowany z daty) */}
-          <div>
-            <span className="text-[11px] font-medium text-grunt-text-muted2">Q3. Reżim prawny analizy</span>
-            <div className="flex flex-wrap gap-2 mt-1">
-              {(["current", "future"] as RezimFinansowy[]).map((r) => (
-                <Chip key={r} selected={rezimEff === r} onClick={() => { setRezim(r); setRezimReczny(true); }}>{ETYK_REZIMU[r]}</Chip>
-              ))}
-            </div>
-            <span className="text-[10px] text-grunt-text-faint2">Sugerowany z daty: {ETYK_REZIMU[sugestia.rezim]}</span>
-          </div>
-        </div>
-
         {/* Q4 — sposób wniesienia działki */}
-        <Grupa label="Q4. Sposób wniesienia działki">
+        <Grupa label="Sposób wniesienia działki">
           {GRUNT_OPCJE.map((g) => (
             <Chip key={g} selected={sposobWniesieniaDzialki === g} onClick={() => setSposob(g)}>{ETYK_GRUNTU[g]}</Chip>
           ))}
         </Grupa>
 
         {/* Q5 — współpraca z gminą */}
-        <Grupa label="Q5. Forma współpracy z gminą">
+        <Grupa label="Forma współpracy z gminą">
           {WSPOLPRACA_OPCJE.map((w) => (
             <Chip key={w} selected={wspolpracaGmina === w} onClick={() => setWspolpraca(w)}>{ETYK_WSPOLPRACY[w]}</Chip>
           ))}
         </Grupa>
 
-        {/* Checkboxy Q1b / Q6 / Q7 */}
+        {/* Wartość działki + partycypacje [R] */}
+        <div className="grid sm:grid-cols-3 gap-3">
+          <PoleLiczbowe label={etykietaDzialki} value={wartoscDzialki} onChange={setWartoscDzialki} sufiks="zł" />
+          <PoleLiczbowe label="Partycypacja najemców (opcjonalnie)" value={partycypacja} onChange={setPartycypacja} sufiks="% kosztu" />
+          <PoleLiczbowe label="Wkład gminy (opcjonalnie)" value={wkladGminy} onChange={setWkladGminy} sufiks="% kosztu" />
+        </div>
+
+        {/* Przełączniki instrumentów + PnB (info) */}
         <div className="flex flex-wrap gap-x-6 gap-y-2 pt-1">
           {KWALIFIKACJA_INVESTEU.includes(typInwestora) && (
-            <Chk label="Q1b. Nowo utworzony podmiot bez zdolności kredytowej (gwarancja InvestEU)" checked={nowyPodmiot} onChange={setNowyPodmiot} />
+            <Chk label="Nowo utworzony podmiot bez zdolności kredytowej (gwarancja InvestEU)" checked={nowyPodmiot} onChange={setNowyPodmiot} />
           )}
-          <Chk label="Q6. Efektywność energetyczna / OZE (FEnIKS)" checked={efektywnoscEnergetyczna} onChange={setEE} />
-          <Chk label="Q7. Mieszkanie na Start (dopłata do czynszu — OPEX)" checked={mieszkanieNaStart} onChange={setMnS} />
+          <Chk label="Efektywność energetyczna / OZE (FEnIKS)" checked={efektywnoscEnergetyczna} onChange={setEE} />
+          <Chk label="Pozwolenie na budowę (informacyjnie — dojrzałość projektu)" checked={pozwolenieNaBudowe} onChange={setPnB} />
         </div>
       </div>
 
       {/* Walidacja / okno przejściowe */}
       <div className="mt-4 space-y-2">
-        {sugestia.oknoPrzejsciowe && (
-          <CalloutWalidacji ton="ostrzezenie" tytul="Okno przejściowe 2027–2028" opis={`${sugestia.uzasadnienie} Analiza pokaże porównanie obu reżimów.`} />
-        )}
         {walidacja?.zablokowana && <CalloutWalidacji ton="blad" tytul="Profil zablokowany" opis={walidacja.ostrzezenia[0]} />}
         {walidacja && !walidacja.zablokowana && walidacja.dostep === "ograniczony" && (
           <CalloutWalidacji ton="ostrzezenie" tytul="Dostęp ograniczony" opis={walidacja.ostrzezenia[0]} />
@@ -164,26 +166,29 @@ export function AnkietaFinansowa({
         className="btn-primary mt-4"
         style={{ height: "var(--grunt-h-cta)" }}
       >
-        {licze ? "Składam montaż i liczę…" : "Zatwierdź profil i złóż montaż →"}
+        {licze ? "Składam montaż i liczę…" : "Zatwierdź profil i pokaż montaż →"}
       </button>
     </Karta>
 
-    {/* Live profil finansowy (sticky) */}
+    {/* Live profil finansowy (sticky) — BEZ montażu (motywacja) */}
     <div className="lg:sticky" style={{ top: "var(--grunt-sticky-top)" }}>
       <Karta tytul="Profil finansowy">
         <dl className="divide-y divide-grunt-divider-row">
           <ProfilRow k="Inwestor" v={ETYK_INWESTORA[typInwestora]} />
           <ProfilRow k="Zasób" v={zasobEff ? ETYK_ZASOBU[zasobEff] : "—"} />
-          <ProfilRow k="Reżim" v={ETYK_REZIMU[rezimEff]} />
+          <ProfilRow k="Reżim" v="Oba (porównanie)" />
           <ProfilRow k="Wniesienie działki" v={ETYK_GRUNTU[sposobWniesieniaDzialki]} />
           <ProfilRow k="Współpraca z gminą" v={ETYK_WSPOLPRACY[wspolpracaGmina]} />
+          {wartoscDzialki && <ProfilRow k={rola === "koszt" ? "Cena działki" : "Wartość działki"} v={`${Number(wartoscDzialki).toLocaleString("pl-PL")} zł`} mono />}
+          {partycypacja && <ProfilRow k="Partycypacja najemców" v={`${partycypacja}%`} mono />}
+          {wkladGminy && <ProfilRow k="Wkład gminy" v={`${wkladGminy}%`} mono />}
           <ProfilRow k="Efektywność / OZE" v={efektywnoscEnergetyczna ? "Tak (FEnIKS)" : "Nie"} />
-          <ProfilRow k="Mieszkanie na Start" v={mieszkanieNaStart ? "Tak" : "Nie"} />
           {KWALIFIKACJA_INVESTEU.includes(typInwestora) && (
             <ProfilRow k="Nowy podmiot (InvestEU)" v={nowyPodmiot ? "Tak" : "Nie"} />
           )}
-          <ProfilRow k="Data wniosku" v={dataWniosku} mono />
+          <ProfilRow k="Pozwolenie na budowę" v={pozwolenieNaBudowe ? "Tak" : "Nie"} />
         </dl>
+        <p className="text-[11px] text-grunt-text-faint2 mt-3">Montaż finansowy pokaże się po zatwierdzeniu profilu.</p>
       </Karta>
     </div>
     </div>
@@ -206,6 +211,18 @@ function Grupa({ label, podpis, children }: { label: string; podpis?: string; ch
       <div className="flex flex-wrap gap-2 mt-1.5">{children}</div>
       {podpis && <span className="text-[10px] text-grunt-text-faint2 mt-1 block">{podpis}</span>}
     </div>
+  );
+}
+
+function PoleLiczbowe({ label, value, onChange, sufiks }: { label: string; value: string; onChange: (v: string) => void; sufiks?: string }) {
+  return (
+    <label className="text-sm block">
+      <span className="text-[11px] font-medium text-grunt-text-muted2">{label}</span>
+      <div className="relative mt-1">
+        <input type="number" inputMode="numeric" value={value} onChange={(e) => onChange(e.target.value)} className="inp mono" placeholder="—" />
+        {sufiks && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-grunt-text-faint2 pointer-events-none">{sufiks}</span>}
+      </div>
+    </label>
   );
 }
 
