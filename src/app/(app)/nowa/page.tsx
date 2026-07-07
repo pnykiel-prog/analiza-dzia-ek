@@ -350,10 +350,10 @@ export default function NowaAnalizaPage() {
 
   return (
     <div className="space-y-5">
-      <div className="-mx-6 -mt-6">
+      <div className="-mx-4 sm:-mx-6 -mt-6">
         <Stepper aktywny={stepAktywny} maxOsiagniety={maxKrok} onKrok={idzDoKroku} />
         {dane && ekran !== "wejscie" && ekran !== "poziom1" && (
-          <div className="bg-grunt-surface border-b border-grunt-border px-6 py-2 flex flex-wrap items-center gap-x-6 gap-y-1">
+          <div className="bg-grunt-surface border-b border-grunt-border px-4 sm:px-6 py-2 flex flex-wrap items-center gap-x-4 sm:gap-x-6 gap-y-1">
             <span className="text-[10px] uppercase tracking-wider text-grunt-text-faint">Teren inwestycji</span>
             <span className="mono text-[12px] text-grunt-text">{dane.id}</span>
             {dane.powierzchniaM2 > 0 && <span className="mono text-[12px] text-grunt-text-muted">{liczba(dane.powierzchniaM2, " m²")}</span>}
@@ -624,7 +624,7 @@ function EkranWejscia({
       </div>
 
       {/* Pasek startowy: logo + użytkownik */}
-      <header className="relative flex items-center justify-between px-6 lg:px-10" style={{ height: 66 }}>
+      <header className="relative flex items-center justify-between px-4 sm:px-6 lg:px-10" style={{ height: 66 }}>
         <div className="flex items-center gap-2.5">
           <span className="grid place-items-center w-[34px] h-[34px] rounded-md bg-white/10">
             <span className="block w-3 h-3 rounded-[3px] bg-grunt-mint" />
@@ -644,15 +644,15 @@ function EkranWejscia({
       </header>
 
       {/* Treść: dwa panele */}
-      <div className="relative mx-auto px-6 lg:px-10 pb-16" style={{ maxWidth: 1360 }}>
-        <div className="grid lg:grid-cols-[1fr_minmax(0,560px)] gap-10 lg:gap-14 items-center" style={{ minHeight: "calc(100vh - 140px)" }}>
+      <div className="relative mx-auto px-4 sm:px-6 lg:px-10 pb-16" style={{ maxWidth: 1360 }}>
+        <div className="grid lg:grid-cols-[1fr_minmax(0,560px)] gap-8 lg:gap-14 items-start lg:items-center lg:min-h-[calc(100vh-140px)]">
           {/* Lewy hero */}
           <div>
             <span className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[12.5px] font-medium" style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.12)", color: "#CBD8E8" }}>
               <span className="w-2 h-2 rounded-full" style={{ background: "#3FE0BE" }} />
               Nowa analiza działki
             </span>
-            <h1 className="mt-6 font-semibold text-white" style={{ fontSize: 46, lineHeight: 1.08, letterSpacing: "-0.02em" }}>
+            <h1 className="mt-6 font-semibold text-white text-[32px] sm:text-[40px] lg:text-[46px]" style={{ lineHeight: 1.08, letterSpacing: "-0.02em" }}>
               Zacznij od jednej<br />działki. Resztę<br /><span style={{ color: "#3FE0BE" }}>policzymy za Ciebie.</span>
             </h1>
             <p className="mt-6 max-w-[460px] text-[15.5px] leading-relaxed" style={{ color: "#A9BBD2" }}>
@@ -679,7 +679,7 @@ function EkranWejscia({
             {trybWejscia === "kaskada" ? (
               <>
                 <p className="mt-3 text-[12.5px]" style={{ color: "#6B7A92" }}>Wybierz jednostkę administracyjną (TERYT), a następnie podaj numer działki w obrębie.</p>
-                <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Lab label="Województwo">
                     <select value={p0.wojewodztwo} onChange={(e) => patchAdmin({ wojewodztwo: e.target.value, powiat: "", gmina: "", obreb: "", gminaTeryt: undefined })} className="inp bg-white">
                       <option value="">—</option>

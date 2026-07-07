@@ -29,7 +29,7 @@ export function RaportView({ wynik, data }: { wynik: WynikAnalizy; data?: string
       : null;
 
   return (
-    <div className="raport-arkusz bg-grunt-surface rounded-panel shadow-sheet mx-auto max-w-[880px] p-8 md:p-10">
+    <div className="raport-arkusz bg-grunt-surface rounded-panel shadow-sheet mx-auto max-w-[880px] p-5 sm:p-8 md:p-10">
       {/* Nagłówek */}
       <div className="flex items-start justify-between border-b-2 border-grunt-ink pb-4">
         <div>
@@ -81,7 +81,7 @@ export function RaportView({ wynik, data }: { wynik: WynikAnalizy; data?: string
               <div className="text-[14px] font-semibold text-grunt-text mb-3">
                 {w.nazwa} <span className="text-grunt-text-muted2 font-normal">· {etykietaTypologii[w.typologia]}</span>
               </div>
-              <div className="grid grid-cols-4 gap-2 text-center">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                 <StatRap v={liczba(w.liczbaKondygnacji)} e="kondygnacji" />
                 <StatRap v={liczba(w.liczbaMieszkan)} e="mieszkań" />
                 <StatRap v={liczba(w.pumM2)} e="m² PUM" />
