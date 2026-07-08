@@ -101,6 +101,18 @@ test("DOMKNIĘCIE: ekstremalna odległość usług ZMIENIA werdykt i rekomendacj
   assert.ok(oB.werdykty.seniorzy.score > oD.werdykty.seniorzy.score); // wejście realnie rusza wynik
 });
 
+test("ocenM2 (2.1): dane krytyczne do_weryfikacji wstrzymują zielony (cap na zolty), score niezerowy", () => {
+  const blisko = { ...baza, odleglosciM2: { poz: 300, apteka: 300, sklep: 300, przystanek: 300, szkola: 300, przedszkole: 300 } } as DaneDzialki;
+  const pass = ocenM2(blisko, p1, "pass");
+  const cap = ocenM2(blisko, p1, "do_weryfikacji");
+  for (const pr of ["mlodzi", "seniorzy"] as const) {
+    if (pass.werdykty[pr].werdykt === "zielony") assert.equal(cap.werdykty[pr].werdykt, "zolty");
+    // CAP nie zeruje wyniku — to tylko wstrzymanie zielonego (dopuszczalny nadal true).
+    assert.equal(cap.werdykty[pr].score, pass.werdykty[pr].score);
+    assert.equal(cap.werdykty[pr].dopuszczalny, true);
+  }
+});
+
 test("DOMKNIĘCIE: bramka E (fail) → oba profile niedopuszczalne, rekomendacja brak", () => {
   const o = ocenM2({ ...baza, odleglosciM2: { poz: 300 } } as DaneDzialki, p1, "fail");
   assert.equal(o.rekomendacja, "brak");
