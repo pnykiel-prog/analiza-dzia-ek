@@ -119,6 +119,20 @@ export function liczBramki(d: DaneDzialki): { status: StatusBramki; flagi: strin
     if (gorniczeOsuwisko) flagi.push("Teren górniczy / osuwisko");
   }
 
+  // 2.2 Dopóki źródła WMS są niedostępne (BRAMKI_SRODOWISKOWE_AKTYWNE=false), NIE
+  // przepuszczamy cicho ryzyka powodzi/Natury/osuwisk. Krytyczne dane środowiskowe
+  // = „do weryfikacji" + obowiązkowa flaga → zielony wynik wstrzymany do potwierdzenia
+  // (biała plama ≠ brak ryzyka). Znika automatycznie, gdy bramki wrócą.
+  if (!BRAMKI_SRODOWISKOWE_AKTYWNE && !objetePlanem) {
+    szczegoly.push({
+      nazwa: "Bramki środowiskowe (powódź, Natura 2000, osuwiska, ochrona)",
+      zrodlo: "GDOŚ / ISOK / PIG-PIB / NID (WMS)",
+      status: "do_weryfikacji",
+      uzasadnienie: "Źródła WMS niedostępne — dane środowiskowe niezweryfikowane. Zielony wynik wstrzymany do potwierdzenia.",
+    });
+    flagi.push("Dane środowiskowe niezweryfikowane (powódź / Natura 2000 / osuwiska) — wymagana weryfikacja przed decyzją");
+  }
+
   return { status: agregujBramki(szczegoly), flagi, szczegoly };
 }
 

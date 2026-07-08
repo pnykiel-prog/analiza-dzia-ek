@@ -235,6 +235,10 @@ export function modyfikatorPopytuC(d: DaneDzialki, profil: Profil, cfg: Konfigur
 export function ocenM2(d: DaneDzialki, p1: WynikPoziom1, dopuszczalnosc: StatusBramki, cfg: KonfiguracjaM2 = KONFIG_M2): OcenaM2 {
   const przydat = przydatnoscEkonomicznaB(d, cfg);
   const dopuszczalny = dopuszczalnosc !== "fail";
+  // 2.1 Dane KRYTYCZNE niezweryfikowane (bramki „do weryfikacji": środowisko/MPZP/
+  // droga) → CAP: zielony wynik wstrzymany (max „żółty/warunkowy") do potwierdzenia.
+  // Nie zeruje score — tylko blokuje zielony (biała plama danych krytycznych ≠ ryzyko OK).
+  const capDoWeryfikacji = dopuszczalnosc === "do_weryfikacji";
 
   const werdyktProfilu = (profil: Profil): WerdyktProfiluM2 => {
     const popytM1 = profil === "mlodzi" ? p1.scoreMlodzi : p1.scoreSeniorzy;
@@ -254,6 +258,12 @@ export function ocenM2(d: DaneDzialki, p1: WynikPoziom1, dopuszczalnosc: StatusB
       score = 0;
       powody.unshift("Bramka bezwzględna — działka niedopuszczalna (kanał E).");
     }
+    // CAP zielonego przy niezweryfikowanych danych krytycznych (2.1).
+    let werdykt = pasmo(score);
+    if (capDoWeryfikacji && werdykt === "zielony") {
+      werdykt = "zolty";
+      powody.unshift("Wynik wstrzymany na warunkowym — dane krytyczne (środowisko/MPZP/droga) wymagają weryfikacji; zielony po potwierdzeniu.");
+    }
     return {
       profil,
       popytM1,
@@ -262,7 +272,7 @@ export function ocenM2(d: DaneDzialki, p1: WynikPoziom1, dopuszczalnosc: StatusB
       popytRealizowalny,
       przydatnoscEkonomiczna: przydat.wartosc,
       score,
-      werdykt: pasmo(score),
+      werdykt,
       obsluzalny: A.obsluzalny,
       dopuszczalny,
       powody,
