@@ -84,6 +84,13 @@ test("kanał C: daleki dojazd do aglomeracji tłumi popyt młodych silniej niż 
   assert.ok(cM.mnoznik < cS.mnoznik, `młodzi ${cM.mnoznik} < seniorzy ${cS.mnoznik}`);
 });
 
+test("kanał C (3.1): trend ludności i pustostany NIE wpływają na C (liczone w napięciu M1)", () => {
+  const malejaca = { ...baza, trendLudnosc: "malejaca", pustostanyPct: 15 } as DaneDzialki;
+  const rosnaca = { ...baza, trendLudnosc: "rosnaca", pustostanyPct: 2 } as DaneDzialki;
+  // Usunięto podwójne liczenie: te same wejścia lokalizacyjne → ten sam modyfikator C.
+  assert.equal(modyfikatorPopytuC(malejaca, "mlodzi").mnoznik, modyfikatorPopytuC(rosnaca, "mlodzi").mnoznik);
+});
+
 test("DOMKNIĘCIE: ekstremalna odległość usług ZMIENIA werdykt i rekomendację", () => {
   const blisko = { ...baza, odleglosciM2: { poz: 300, apteka: 300, sklep: 300, przystanek: 300, szkola: 300, przedszkole: 300 } } as DaneDzialki;
   const daleko = { ...baza, odleglosciM2: { poz: 9000, apteka: 9000, sklep: 9000, przystanek: 9000, szkola: 9000, przedszkole: 9000 } } as DaneDzialki;

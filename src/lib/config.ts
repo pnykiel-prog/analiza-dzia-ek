@@ -186,17 +186,34 @@ export const KONFIG_POPYT: KonfiguracjaPopyt = {
 // ── POZIOM 1: ocena popytu (wersja pełna) — 4 werdykty, 2 natury ──────────────
 
 export interface KonfiguracjaPopytP1 {
-  /** Progi dochodowe [zł/mc] = wartość odtworzeniowa /m² × mnożnik. */
-  progDochoduKomunalnyMn: number; // próg dolny: dochód < próg → komunalny
-  progDochoduSpolecznyMn: number; // próg górny: dochód < próg → społeczny (≥ → rynek)
-  /** Parametr kształtu rozkładu dochodów (log-normal, σ log) — regionalny. */
-  sigmaDochodu: number;
-  /** Domyślny dochód gminy [zł/mc] gdy brak danych (fallback). */
+  /**
+   * Progi dochodowe K/S/R zakotwiczone w DOCHODZIE ODNIESIENIA (nie w wartości
+   * odtworzeniowej!). WO to koszt budowy — nie ma nic wspólnego z progiem
+   * kwalifikacji dochodowej. Kotwica = przeciętne wynagrodzenie / ustawowe limity
+   * SIM-TBS. Dzięki temu odświeżenie warstwy WO nie przesuwa kwalifikacji.
+   */
+  progiDochodu: {
+    dochodOdniesienieFallback: number; // [zł/mc gosp.] proxy ustawowej kotwicy (przeciętne wynagrodzenie), gdy brak danej regionalnej
+    komunalnyMn: number; // dochód < mn × odniesienie → komunalny (próg dolny)
+    spolecznyMn: number; // dochód < mn × odniesienie → społeczny (≥ → rynek)
+  };
+  /**
+   * Rozkład dochodów PER PROFIL (emerytury ≠ pensje): mnożnik średniej gminnej
+   * i parametr kształtu σ(log). Seniorzy: niższa średnia, mniejsza wariancja;
+   * młodzi: wyższa średnia, większa wariancja.
+   */
+  dochodProfil: Record<Profil, { mnoznikSredniej: number; sigma: number }>;
+  /** Domyślny dochód gminy [zł/mc] gdy brak danych (baza rozkładu). */
   dochodFallback: number;
-  /** Domyślna wartość odtworzeniowa [zł/m²] gdy brak danych (do progów dochodowych). */
-  wartoscOdtwFallback: number;
-  /** Ilu kwalifikujących się (segment S) na 1 mieszkanie = pełna wystarczalność. */
-  margines: number;
+  /** Wielkość gospodarstwa per profil — konwersja osoby → gospodarstwa. */
+  wielkoscGospodarstwa: Record<Profil, number>;
+  /** Ilu kwalifikujących się (GOSPODARSTW segmentu S) na 1 mieszkanie = pełna wystarczalność. */
+  marginesGospodarstwa: number;
+  /**
+   * Reduktor realnej skłonności 65+ do najmu społecznego (własność mieszkania,
+   * wiek, dochód). Sama liczba 65+ zawyża popyt — nie każdy senior szuka najmu.
+   */
+  konwersjaSenior: number;
   /** Benchmark regionalny udziału społecznego (mediana q_S). */
   qBenchS: number;
   /** Benchmark regionalny gęstości komunalnej na 1000 mieszk. (mediana). */
@@ -217,13 +234,17 @@ export interface KonfiguracjaPopytP1 {
 }
 
 export const KONFIG_POPYT_P1: KonfiguracjaPopytP1 = {
-  // Wartość odtworzeniowa ~5000 zł/m² → próg komunalny ~2500, społeczny ~7000 zł/mc.
-  progDochoduKomunalnyMn: 0.5,
-  progDochoduSpolecznyMn: 1.4,
-  sigmaDochodu: 0.6,
+  // Kotwica dochodowa ~8000 zł/mc (przeciętne wynagrodzenie) → próg komunalny
+  // ~6000, społeczny ~12000 zł/mc gosp. NIEZALEŻNE od wartości odtworzeniowej.
+  progiDochodu: { dochodOdniesienieFallback: 8000, komunalnyMn: 0.75, spolecznyMn: 1.5 },
+  dochodProfil: {
+    mlodzi: { mnoznikSredniej: 1.05, sigma: 0.65 },
+    seniorzy: { mnoznikSredniej: 0.72, sigma: 0.45 },
+  },
   dochodFallback: 6500,
-  wartoscOdtwFallback: 5000,
-  margines: 5,
+  wielkoscGospodarstwa: { mlodzi: 2.2, seniorzy: 1.4 },
+  marginesGospodarstwa: 1.5,
+  konwersjaSenior: 0.45,
   qBenchS: 0.22,
   benchKomNa1000: 8,
   wagiSpoleczne: { mlodzi: { wew: 0.55, zew: 0.45 }, seniorzy: { wew: 0.85, zew: 0.15 } },

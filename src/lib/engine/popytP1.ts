@@ -61,30 +61,45 @@ function kwalifikacje(
   profil: Profil,
   cfg: KonfiguracjaPopytP1
 ): KwalifikacjeProfil {
-  const wart = d.wartoscOdtworzeniowaM2 ?? cfg.wartoscOdtwFallback;
-  const dochod = d.dochodPrzecietnyGmina ?? cfg.dochodFallback;
-  const estymacja = d.dochodPrzecietnyGmina == null || d.wartoscOdtworzeniowaM2 == null;
+  // PROGI od DOCHODU ODNIESIENIA (nie od WO — to koszt budowy, nie dochód).
+  const odniesienie = cfg.progiDochodu.dochodOdniesienieFallback;
+  const progDolny = odniesienie * cfg.progiDochodu.komunalnyMn; // < → komunalny
+  const progGorny = odniesienie * cfg.progiDochodu.spolecznyMn; // < → społeczny; ≥ → rynek
 
-  const progDolny = wart * cfg.progDochoduKomunalnyMn;
-  const progGorny = wart * cfg.progDochoduSpolecznyMn;
-  const qK = logNormCdf(progDolny, dochod, cfg.sigmaDochodu);
-  const qKGorny = logNormCdf(progGorny, dochod, cfg.sigmaDochodu);
+  // ROZKŁAD PER PROFIL: emerytury (seniorzy) ≠ pensje (młodzi). Średnia = dochód
+  // gminy × mnożnik profilu; σ profilowa. Progi bezwzględne → frakcja rozkładu.
+  const dochodBaza = d.dochodPrzecietnyGmina ?? cfg.dochodFallback;
+  const dp = cfg.dochodProfil[profil];
+  const srednia = dochodBaza * dp.mnoznikSredniej;
+  const qK = logNormCdf(progDolny, srednia, dp.sigma);
+  const qKGorny = logNormCdf(progGorny, srednia, dp.sigma);
   const qS = Math.max(0, qKGorny - qK);
+  const estymacja = d.dochodPrzecietnyGmina == null;
 
-  // Liczebność grupy: preferuj liczbę bezwzględną z BDL; awaryjnie z udziału % × ludność.
+  // Liczebność grupy [OSOBY]: liczba bezwzględna z BDL; awaryjnie z udziału % × ludność.
   const total = d.liczbaMieszkancowGminy ?? null;
-  let nGrupa: number | null =
+  let nOsoby: number | null =
     profil === "mlodzi" ? d.liczba2039 ?? null : d.liczba65Plus ?? null;
-  if (nGrupa == null && total != null) {
+  if (nOsoby == null && total != null) {
     const pct = profil === "mlodzi" ? d.udzial2039Pct : d.udzial65PlusPct;
-    if (pct != null) nGrupa = (pct / 100) * total;
+    if (pct != null) nOsoby = (pct / 100) * total;
   }
+  // GOSPODARSTWA = osoby / wielkość gospodarstwa profilu (do porównania z liczbą mieszkań).
+  const nGospodarstw = nOsoby == null ? null : nOsoby / cfg.wielkoscGospodarstwa[profil];
+  // Konwersja senioralna: reduktor realnej skłonności 65+ do najmu społecznego
+  // (własność, wiek). Dotyczy STRUMIENIA SPOŁECZNEGO; skala potrzeby komunalnej
+  // (kanał gminny) pozostaje pełna — patrz sekcja 4.2 wytycznych.
+  const konw = profil === "seniorzy" ? cfg.konwersjaSenior : 1;
+
   return {
-    nGrupa: nGrupa == null ? null : Math.round(nGrupa),
+    // nGrupa raportowane w OSOBACH (liczebność grupy wiekowej).
+    nGrupa: nOsoby == null ? null : Math.round(nOsoby),
     qK: Math.round(qK * 1000) / 1000,
     qS: Math.round(qS * 1000) / 1000,
-    nKomunalny: nGrupa == null ? null : Math.round(nGrupa * qK),
-    nSpoleczny: nGrupa == null ? null : Math.round(nGrupa * qS),
+    // nKomunalny = OSOBY (skala potrzeby per mieszkaniec, benchmark /1000 mieszk.).
+    nKomunalny: nOsoby == null ? null : Math.round(nOsoby * qK),
+    // nSpoleczny = GOSPODARSTWA kwalifikujące (do porównania z liczbą mieszkań), z konwersją senioralną.
+    nSpoleczny: nGospodarstw == null ? null : Math.round(nGospodarstw * qS * konw),
     estymacja,
   };
 }
@@ -161,11 +176,12 @@ function atrakcyjnoscMigracyjna(
   const odplywNorm = d.odplywMlodychNa1000 == null ? 0.4 : clamp01(d.odplywMlodychNa1000 / cfg.atrakcyjnosc.odplywBenchNa1000);
   const a3 = Math.round(brama * clamp01(0.5 * odplywNorm + 0.5 * lukaNorm) * 100);
 
-  const wartosc = clamp(Math.round(a1 + cfg.atrakcyjnosc.waga2 * a2 + cfg.atrakcyjnosc.waga3 * a3), 0, cfg.atrakcyjnosc.sufit);
-  // Pewność: A1 (zmierzone) wysoka; udział A2/A3 (estymowane) obniża.
-  const estym = cfg.atrakcyjnosc.waga2 * a2 + cfg.atrakcyjnosc.waga3 * a3;
-  const udzialEstym = wartosc > 0 ? estym / (a1 + estym + 1e-9) : 0;
-  const pewnosc = clamp(Math.round(90 - 40 * udzialEstym - (fallback ? 20 : 0)));
+  // A1 liczone RAZ (3.2): jest BRAMĄ wiarygodności (skaluje A2/A3), więc NIE dodajemy
+  // go drugi raz wprost. Wartość = potencjał odblokowany (A2) + zatrzymany odpływ (A3),
+  // już przefiltrowane przez wiarygodność A1.
+  const wartosc = clamp(Math.round(cfg.atrakcyjnosc.waga2 * a2 + cfg.atrakcyjnosc.waga3 * a3), 0, cfg.atrakcyjnosc.sufit);
+  // Pewność: zmierzony napływ (nie fallback) i wiarygodna brama → wyższa.
+  const pewnosc = clamp(Math.round((fallback ? 55 : 80) - 15 * (1 - brama)));
   return { a1, a2, a3, wartosc, pewnosc, fallback };
 }
 
@@ -183,12 +199,18 @@ function werdyktSpoleczny(
   const klucz: KluczWerdyktu = profil === "mlodzi" ? "spolecznyMlodzi" : "spolecznySeniorzy";
   const flagi: string[] = [];
   const fSila = clamp((kw.qS ?? 0) / cfg.qBenchS, 0.3, 1.3);
-  const denom = Math.max(1, pojemnoscMieszkan * cfg.margines);
+  // Wystarczalność: GOSPODARSTWA kwalifikujące vs liczba mieszkań × margines gospodarstw.
+  const denom = Math.max(1, pojemnoscMieszkan * cfg.marginesGospodarstwa);
   const fWystarcz = kw.nSpoleczny == null ? 0.5 : clamp01(kw.nSpoleczny / denom);
   const popytWew = clamp(Math.round(100 * fWystarcz * fSila));
 
   const wagi = cfg.wagiSpoleczne[profil];
-  const baza = wagi.wew * popytWew + wagi.zew * atrakcyjnosc.wartosc;
+  // FILTR DOCHODOWY MIGRACJI (3.3): napływ zasila popyt SPOŁECZNY tylko w części
+  // kwalifikującej się dochodowo (udział K+S) — zamożny migrant nie zwiększa
+  // popytu na mieszkanie społeczne.
+  const udzialKwalif = clamp01((kw.qK ?? 0) + (kw.qS ?? 0));
+  const atrakcyjnoscFiltr = atrakcyjnosc.wartosc * udzialKwalif;
+  const baza = wagi.wew * popytWew + wagi.zew * atrakcyjnoscFiltr;
   const score = clamp(Math.round(baza * mLuka(luka, cfg) * skala(napiecie01(d), cfg.mNapiecie.min, cfg.mNapiecie.max)));
 
   // Luka czynszowa → sygnał popytu na najem społeczny (estymacja — miejsce w M1, nie M2).
@@ -202,7 +224,7 @@ function werdyktSpoleczny(
   const komentarz =
     kw.nSpoleczny == null
       ? "Brak danych ludnościowych — werdykt orientacyjny."
-      : `${kw.nSpoleczny} kwalifikujących się (segment społeczny) wobec pojemności ${pojemnoscMieszkan} mieszk. × margines ${cfg.margines}.`;
+      : `${kw.nSpoleczny} gospodarstw kwalifikujących się (segment społeczny) wobec pojemności ${pojemnoscMieszkan} mieszk. × margines ${cfg.marginesGospodarstwa}.`;
   return { klucz, natura: "spoleczny", profil, score, werdykt: pasmo(score, cfg), liczbaKwalifikujacych: kw.nSpoleczny, pewnosc, flagi, komentarz };
 }
 

@@ -76,3 +76,18 @@ test("popytP1: wyższy dochód gminy → mniejszy segment komunalny (qK), więks
   const bogata = ocenPopytP1({ ...wzorcowa, dochodPrzecietnyGmina: 12000 }, POJ);
   assert.ok((biedna.kwalifikacje.mlodzi.qK ?? 0) > (bogata.kwalifikacje.mlodzi.qK ?? 0));
 });
+
+test("popytP1 (1.1): progi dochodowe NIEZALEŻNE od wartości odtworzeniowej", () => {
+  // Odświeżenie warstwy WO nie może przesuwać kwalifikacji dochodowej (błąd kategorii WO≠dochód).
+  const a = ocenPopytP1({ ...wzorcowa, wartoscOdtworzeniowaM2: 4000 }, POJ);
+  const b = ocenPopytP1({ ...wzorcowa, wartoscOdtworzeniowaM2: 12000 }, POJ);
+  assert.equal(a.kwalifikacje.mlodzi.qK, b.kwalifikacje.mlodzi.qK);
+  assert.equal(a.kwalifikacje.mlodzi.qS, b.kwalifikacje.mlodzi.qS);
+  assert.equal(a.kwalifikacje.seniorzy.nSpoleczny, b.kwalifikacje.seniorzy.nSpoleczny);
+});
+
+test("popytP1 (1.2): rozkład dochodu per profil — seniorzy (emerytury) mają wyższy qK niż młodzi", () => {
+  const o = ocenPopytP1(wzorcowa, POJ);
+  // Niższa średnia emerytur → większa frakcja poniżej progu komunalnego.
+  assert.ok((o.kwalifikacje.seniorzy.qK ?? 0) > (o.kwalifikacje.mlodzi.qK ?? 0));
+});

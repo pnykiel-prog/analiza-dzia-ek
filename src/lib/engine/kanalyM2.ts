@@ -221,16 +221,9 @@ export function modyfikatorPopytuC(d: DaneDzialki, profil: Profil, cfg: Konfigur
     if (d.liczbaPodmiotowGosp > 140) m *= 1.05;
     else if (d.liczbaPodmiotowGosp < 80) m *= 0.95;
   }
-  if (d.trendLudnosc === "malejaca") {
-    m *= 0.9;
-    powody.push("Malejąca ludność — niższy potencjał rozwoju.");
-  } else if (d.trendLudnosc === "rosnaca") {
-    m *= 1.05;
-  }
-  if (d.pustostanyPct != null && d.pustostanyPct > 8) {
-    m *= 0.9;
-    powody.push(`Wysokie pustostany (${d.pustostanyPct}%) — tłumią popyt.`);
-  }
+  // UWAGA (3.1): trend ludności i pustostany NIE wchodzą tu ponownie — są już
+  // liczone w napięciu mieszkaniowym M1 (sygnał popytu gminnego, nie lokalizacji).
+  // Podwójne liczenie usunięte, by jeden sygnał demograficzny nie uderzał dwa razy.
   return { mnoznik: clamp(Math.round(m * 100), 40, 130) / 100, powody };
 }
 
