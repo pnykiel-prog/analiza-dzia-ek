@@ -17,6 +17,7 @@ import { uruchomKonektory } from "./connectors";
 import type { MetaPola, Teren } from "./connectors/types";
 import { medianaRynkowa } from "../config-rynek";
 import { stawkaWO } from "./wartoscOdtworzeniowa";
+import { strefySrodowiskowe } from "./srodowisko";
 
 export type ZrodloDanych = "demo" | "uldk" | "brak";
 
@@ -245,6 +246,20 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
   if (dane) {
     const wkt0 = wktZnalezione[0];
     const centroid4326 = wkt0 ? centroid4326ZWkt(wkt0) : null;
+    // Bramki E (środowisko): przecięcie centroidu działki z lokalnymi warstwami
+    // (powódź/ochrona/osuwiska). Ustawiamy pola TYLKO dla ZAŁADOWANYCH warstw —
+    // niezaładowana warstwa zostaje „do weryfikacji" (patrz liczBramki). Seed pusty
+    // → nic nie ustawiamy (zachowanie bez zmian).
+    if (centroid4326) {
+      const [lon, lat] = centroid4326;
+      const strefy = strefySrodowiskowe(lon, lat);
+      const env: Partial<DaneDzialki> = {};
+      if (strefy.zaladowane.powodz_q10 || strefy.zaladowane.powodz_q1 || strefy.zaladowane.powodz_q02)
+        env.ryzykoPowodzioweSzczegolne = strefy.powodz === "Q1" || strefy.powodz === "Q10";
+      if (strefy.zaladowane.ochrona_przyrody) env.natura2000 = strefy.natura2000;
+      if (strefy.zaladowane.osuwiska) env.osuwisko = strefy.osuwisko;
+      if (Object.keys(env).length) dane = { ...dane, ...env };
+    }
     const teren: Teren = {
       id: dane.id,
       // Zawsze przekazujemy kod gminy — z kaskady ULDK, a w trybie ID-only wprost

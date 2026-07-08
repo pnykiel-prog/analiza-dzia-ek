@@ -15,9 +15,32 @@ import type {
   WynikBramki,
 } from "../types";
 import type { KonfiguracjaScoring } from "../config";
-import { BRAMKI_SRODOWISKOWE_AKTYWNE } from "../config";
+import { warstwaZaladowana } from "../data/srodowisko";
 
 // ── Bramki (Warstwa 0) ──────────────────────────────────────────────────────
+
+/**
+ * Jedna bramka środowiskowa E sterowana danymi lokalnej warstwy:
+ *  - niezassana → „do weryfikacji" (brak danych krytycznych, CAP na warunkową),
+ *  - zassana + wykryto przecięcie → „do weryfikacji" (flaga przesiewowa),
+ *  - zassana + brak przecięcia → „pass" (odblokowuje zielony).
+ */
+function bramkaSrodowiskowa(
+  szczegoly: WynikBramki[],
+  flagi: string[],
+  o: { nazwa: string; zrodlo: string; zassana: boolean; wykryto: boolean; flagaWykryto: string; uzasWykryto: string; uzasPass: string }
+): void {
+  if (!o.zassana) {
+    szczegoly.push({ nazwa: o.nazwa, zrodlo: o.zrodlo, status: "do_weryfikacji", uzasadnienie: "Warstwa niezaładowana — brak danych, wymaga weryfikacji." });
+    return;
+  }
+  if (o.wykryto) {
+    szczegoly.push({ nazwa: o.nazwa, zrodlo: o.zrodlo, status: "do_weryfikacji", uzasadnienie: o.uzasWykryto });
+    flagi.push(o.flagaWykryto);
+  } else {
+    szczegoly.push({ nazwa: o.nazwa, zrodlo: o.zrodlo, status: "pass", uzasadnienie: o.uzasPass });
+  }
+}
 
 export function liczBramki(d: DaneDzialki): { status: StatusBramki; flagi: string[]; szczegoly: WynikBramki[] } {
   const szczegoly: WynikBramki[] = [];
@@ -55,20 +78,6 @@ export function liczBramki(d: DaneDzialki): { status: StatusBramki; flagi: strin
   );
   if (d.dostepDrogaPubliczna === false) flagi.push("Brak dostępu do drogi publicznej");
 
-  // Bramki środowiskowe (powódź, ochrona, Natura 2000, osuwiska/teren górniczy) — ZAPARKOWANE.
-  // Źródła WMS (GDOŚ/ISOK/PIG/NID) niedostępne, więc te dane nie wchodzą do analizy M1/M2.
-  if (BRAMKI_SRODOWISKOWE_AKTYWNE) {
-    trojstan(
-      "Obszar szczególnego zagrożenia powodzią",
-      "ISOK / Hydroportal",
-      d.ryzykoPowodzioweSzczegolne,
-      "fail",
-      "Działka w obszarze szczególnego zagrożenia powodzią — wykluczenie.",
-      "Brak przeciwwskazań.",
-      objetePlanem
-    );
-  }
-
   const gruntChroniony = objetePlanem
     ? false
     : d.gruntLesny === null && d.gruntRolnyKlasaIdoIII === null
@@ -83,54 +92,41 @@ export function liczBramki(d: DaneDzialki): { status: StatusBramki; flagi: strin
   );
   if (gruntChroniony) flagi.push("Wymagane odrolnienie/odlesienie");
 
-  if (BRAMKI_SRODOWISKOWE_AKTYWNE) {
-    trojstan(
-      "Rezerwat / park narodowy / wykluczająca forma ochrony",
-      "GDOŚ Geoserwis",
-      d.ochronaWykluczajaca,
-      "fail",
-      "Wykluczająca forma ochrony przyrody.",
-      "Brak przeciwwskazań.",
-      objetePlanem
-    );
-
-    trojstan(
-      "Natura 2000",
-      "GDOŚ Geoserwis",
-      d.natura2000,
-      "warunkowo",
-      "Obszar Natura 2000 — ograniczenia, wymagana ocena (flaga).",
-      "Brak przeciwwskazań.",
-      objetePlanem
-    );
-    if (d.natura2000 === true) flagi.push("Natura 2000");
-
-    const gorniczeOsuwisko =
-      d.terenGorniczy === null && d.osuwisko === null ? null : d.terenGorniczy === true || d.osuwisko === true;
-    trojstan(
-      "Teren górniczy / osuwisko (SOPO)",
-      "MIDAS / SOPO",
-      gorniczeOsuwisko,
-      "warunkowo",
-      "Teren górniczy lub osuwiskowy — ograniczenia posadowienia (flaga).",
-      "Brak przeciwwskazań.",
-      objetePlanem
-    );
-    if (gorniczeOsuwisko) flagi.push("Teren górniczy / osuwisko");
-  }
-
-  // 2.2 Dopóki źródła WMS są niedostępne (BRAMKI_SRODOWISKOWE_AKTYWNE=false), NIE
-  // przepuszczamy cicho ryzyka powodzi/Natury/osuwisk. Krytyczne dane środowiskowe
-  // = „do weryfikacji" + obowiązkowa flaga → zielony wynik wstrzymany do potwierdzenia
-  // (biała plama ≠ brak ryzyka). Znika automatycznie, gdy bramki wrócą.
-  if (!BRAMKI_SRODOWISKOWE_AKTYWNE && !objetePlanem) {
-    szczegoly.push({
-      nazwa: "Bramki środowiskowe (powódź, Natura 2000, osuwiska, ochrona)",
-      zrodlo: "GDOŚ / ISOK / PIG-PIB / NID (WMS)",
-      status: "do_weryfikacji",
-      uzasadnienie: "Źródła WMS niedostępne — dane środowiskowe niezweryfikowane. Zielony wynik wstrzymany do potwierdzenia.",
+  // Bramki E środowiskowe (powódź/ochrona przyrody/osuwiska) — STEROWANE DANYMI
+  // z lokalnych warstw (przecięcie geometrii, ustawione w resolverze). Reguła per
+  // warstwa: zassana + przecięcie → „do weryfikacji" (flaga przesiewowa, CAP na
+  // warunkową); zassana + brak przecięcia → „pass" (odblokowuje zielony); NIEzassana
+  // → „do weryfikacji" (brak danych krytycznych ≠ brak ryzyka). Dla działki objętej
+  // MPZP mieszkaniowym środowisko jest przesądzone w planie → pomijamy (nie flagujemy).
+  if (!objetePlanem) {
+    const powodzZassana = warstwaZaladowana("powodz_q10") || warstwaZaladowana("powodz_q1") || warstwaZaladowana("powodz_q02");
+    bramkaSrodowiskowa(szczegoly, flagi, {
+      nazwa: "Obszar zagrożenia powodzią",
+      zrodlo: "ISOK / Wody Polskie (WFS)",
+      zassana: powodzZassana,
+      wykryto: d.ryzykoPowodzioweSzczegolne === true,
+      flagaWykryto: "Zagrożenie powodziowe (ISOK) — flaga przesiewowa, wymaga weryfikacji",
+      uzasWykryto: "Działka przecina strefę zagrożenia powodzią — flaga przesiewowa (nie rozstrzygnięcie prawne).",
+      uzasPass: "Poza strefą zagrożenia powodzią (dane ISOK).",
     });
-    flagi.push("Dane środowiskowe niezweryfikowane (powódź / Natura 2000 / osuwiska) — wymagana weryfikacja przed decyzją");
+    bramkaSrodowiskowa(szczegoly, flagi, {
+      nazwa: "Ochrona przyrody (Natura 2000 / park / rezerwat)",
+      zrodlo: "GDOŚ Geoserwis (WFS)",
+      zassana: warstwaZaladowana("ochrona_przyrody"),
+      wykryto: d.natura2000 === true,
+      flagaWykryto: "Forma ochrony przyrody — flaga przesiewowa, wymaga weryfikacji",
+      uzasWykryto: "Działka przecina formę ochrony przyrody — ograniczenia, wymagana weryfikacja.",
+      uzasPass: "Poza formami ochrony przyrody (dane GDOŚ).",
+    });
+    bramkaSrodowiskowa(szczegoly, flagi, {
+      nazwa: "Osuwiska / tereny zagrożone ruchami masowymi",
+      zrodlo: "PIG-PIB / SOPO (WFS)",
+      zassana: warstwaZaladowana("osuwiska"),
+      wykryto: d.osuwisko === true,
+      flagaWykryto: "Osuwisko / teren zagrożony — flaga przesiewowa, wymaga weryfikacji",
+      uzasWykryto: "Działka przecina osuwisko lub teren zagrożony — ograniczenia posadowienia.",
+      uzasPass: "Poza osuwiskami (dane SOPO).",
+    });
   }
 
   return { status: agregujBramki(szczegoly), flagi, szczegoly };

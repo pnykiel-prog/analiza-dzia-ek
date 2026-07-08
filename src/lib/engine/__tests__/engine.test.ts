@@ -64,11 +64,9 @@ test("P2: pułap czynszu = wartość odtworzeniowa × 5% ÷ 12", () => {
 });
 
 test("P2 (2.2): bramki srodowiskowe nieaktywne daja pozycje do-weryfikacji + flage (nie ciche przepuszczanie)", () => {
-  const a = uruchomAnalize(bialePlamy); // brak MPZP → środowisko wymaga weryfikacji
-  // Nie ma osobnych szczegółowych bramek (Natura/powódź parkują), ale jest ZBIORCZA pozycja weryfikacyjna.
-  assert.ok(!a.poziom2.bramki.flagi.includes("Natura 2000"));
-  assert.ok(a.poziom2.bramki.szczegoly.some((s) => s.status === "do_weryfikacji" && /środowisk/i.test(s.nazwa)));
-  assert.ok(a.poziom2.bramki.flagi.some((f) => /niezweryfikowane/i.test(f)));
+  const a = uruchomAnalize(bialePlamy); // brak MPZP, warstwy środowiskowe niezassane (seed)
+  // Każda niezassana warstwa (powódź/ochrona/osuwiska) → pozycja „do weryfikacji" (CAP), nie ciche pass.
+  assert.ok(a.poziom2.bramki.szczegoly.some((s) => s.status === "do_weryfikacji" && /powodz|ochron|osuwisk/i.test(s.nazwa)));
 });
 
 test("P2: obwiednia z MPZP ma wyższą pewność niż fallback z sąsiedztwa", () => {
@@ -124,9 +122,9 @@ test("P2: wariant senioralny zawsze ma windę", () => {
 
 test("P2: sygnały i realne białe plamy", () => {
   const a = uruchomAnalize(wzorcowa);
-  // Komplet danych „miękkich"; jedyną białą plamą może być weryfikacja środowiskowa
-  // (2.2 — źródła WMS niedostępne). Poza nią brak braków; sygnały pozytywne.
-  assert.ok(a.poziom2.braki.every((x) => /środowisk/i.test(x.tytul)), `nieoczekiwane braki: ${a.poziom2.braki.map((x) => x.tytul).join(", ")}`);
+  // Komplet danych „miękkich"; białe plamy to tylko niezassane warstwy środowiskowe
+  // (powódź/ochrona/osuwiska — do weryfikacji). Poza nimi brak braków; sygnały pozytywne.
+  assert.ok(a.poziom2.braki.every((x) => /powodz|ochron|osuwisk|środowisk/i.test(x.tytul)), `nieoczekiwane braki: ${a.poziom2.braki.map((x) => x.tytul).join(", ")}`);
   assert.ok(a.poziom2.sygnaly.some((s) => s.ton === "pozytyw"));
 
   const b = uruchomAnalize(bialePlamy);
