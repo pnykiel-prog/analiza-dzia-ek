@@ -399,3 +399,41 @@ export function czyPrzylegaja(wktList: string[], tol = 1.5): boolean {
   }
   return odwiedzone.size === n;
 }
+
+// ── Punkt w poligonie (ray casting) — do przecięć warstw środowiskowych (bramka E) ──
+// Współrzędne w [lon, lat] (WGS84), spójnie z GeoJSON. Screeningowe „czy centroid
+// działki leży w strefie?" — flaga do weryfikacji, nie rozstrzygnięcie prawne.
+
+/** Punkt [lon,lat] wewnątrz pierścienia (ray casting, parzystość przecięć). */
+export function punktWPierscieniu(lon: number, lat: number, ring: [number, number][]): boolean {
+  let wewnatrz = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    const przecina = yi > lat !== yj > lat && lon < ((xj - xi) * (lat - yi)) / (yj - yi + 0) + xi;
+    if (przecina) wewnatrz = !wewnatrz;
+  }
+  return wewnatrz;
+}
+
+/** Współrzędne GeoJSON dla Polygon: [ring][], MultiPolygon: [polygon][ring][]. */
+type WspolrzedneGeo = number[][][] | number[][][][];
+
+/**
+ * Punkt [lon,lat] w geometrii GeoJSON (Polygon lub MultiPolygon), z obsługą dziur
+ * (pierścień 0 = zewnętrzny, kolejne = wycięcia). Zwraca true, gdy punkt jest w
+ * którymkolwiek poligonie i poza jego dziurami.
+ */
+export function punktWGeometrii(lon: number, lat: number, typ: string, wsp: WspolrzedneGeo): boolean {
+  const poligony = typ === "MultiPolygon" ? (wsp as number[][][][]) : [wsp as number[][][]];
+  for (const poly of poligony) {
+    const zewn = poly[0] as [number, number][] | undefined;
+    if (!zewn || !punktWPierscieniu(lon, lat, zewn)) continue;
+    let wDziurze = false;
+    for (let i = 1; i < poly.length; i++) {
+      if (punktWPierscieniu(lon, lat, poly[i] as [number, number][])) { wDziurze = true; break; }
+    }
+    if (!wDziurze) return true;
+  }
+  return false;
+}
