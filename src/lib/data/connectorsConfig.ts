@@ -30,7 +30,13 @@ export interface KonfiguracjaKonektorow {
       wynagrodzenie: string;
       zameldowania: string;
       wymeldowania: string;
+      /** NSP 2021 — gospodarstwa domowe ogółem (mianownik udziału własności). */
+      gospodarstwaOgolem: string;
+      /** NSP 2021 — gospodarstwa zajmujące mieszkanie na zasadzie WŁASNOŚCI (licznik). */
+      gospodarstwaWlasnosc: string;
     };
+    /** Rok spisu (NSP) — dane o tytule prawnym do mieszkania (per gmina). */
+    nspRok: number;
     /** Mnożnik: przeciętne wynagrodzenie brutto (powiat) → proxy dochodu gosp. dom. [zł/mc]. */
     dochodMnoznikWynagrodzenie: number;
     /** Średnia krajowa wynagrodzenia [zł/mc] — do przeliczenia indeksu „Polska=100" na zł. */
@@ -98,7 +104,10 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       wynagrodzenie: "przeciętne miesięczne wynagrodzenia brutto",
       zameldowania: "zameldowania w ruchu wewnętrznym",
       wymeldowania: "wymeldowania w ruchu wewnętrznym",
+      gospodarstwaOgolem: "gospodarstwa domowe według tytułu prawnego do zajmowanego mieszkania ogółem",
+      gospodarstwaWlasnosc: "gospodarstwa domowe według tytułu prawnego do zajmowanego mieszkania własność",
     },
+    nspRok: 2021,
     dochodMnoznikWynagrodzenie: 1.0,
     wynagrodzenieKrajoweMies: 7155,
     // Potwierdzone ID zmiennych BDL (diagnostyka /api/diag-gus, gmina Rzeszów):

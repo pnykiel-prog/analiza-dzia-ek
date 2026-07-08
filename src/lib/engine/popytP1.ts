@@ -85,9 +85,13 @@ function kwalifikacje(
     if (pct != null) nOsoby = (pct / 100) * total;
   }
   // DEFINICJA PROFILU: brak własnego lokalu — filtr populacyjny PRZED dochodem,
-  // dla OBU profili (nie tylko seniorów). Odcina właścicieli u źródła; własność
-  // liczona RAZ (nie jako osobny mnożnik). Estymacja → niższa pewność (flaga w werdykcie).
-  const nBezLokalu = nOsoby == null ? null : nOsoby * cfg.udzialBezWlasnegoLokalu[profil];
+  // dla OBU profili. Udział bez lokalu z NSP 2021 (per gmina) × skew profilu, gdy
+  // dostępny; inaczej estymata z config. Własność liczona RAZ (nie osobny mnożnik).
+  const udzialBezLokalu =
+    d.udzialGospodarstwBezWlasnosciPct != null
+      ? clamp01((d.udzialGospodarstwBezWlasnosciPct / 100) * cfg.skewBezWlasnosci[profil])
+      : cfg.udzialBezWlasnegoLokalu[profil];
+  const nBezLokalu = nOsoby == null ? null : nOsoby * udzialBezLokalu;
   // GOSPODARSTWA = osoby bez lokalu / wielkość gospodarstwa (do porównania z liczbą mieszkań).
   const nGospodarstw = nBezLokalu == null ? null : nBezLokalu / cfg.wielkoscGospodarstwa[profil];
 
@@ -224,12 +228,17 @@ function werdyktSpoleczny(
   if (luka != null && luka >= PROG_LUKI_FLAGA) flagi.push(`Wysoka luka cenowa (${Math.round(luka)}%) — realny popyt na najem społeczny.`);
   if (kw.nSpoleczny == null) flagi.push("Brak liczb ludności/dochodu — popyt społeczny szacowany (obniżona pewność).");
   if (kw.estymacja) flagi.push("Udział dochodowy (segment społeczny) estymowany z rozkładu regionalnego — do potwierdzenia na P2.");
-  // Definicja profilu: populacja bez własnego lokalu estymowana z sygnałów (udział własności) → niższa pewność.
-  flagi.push("Populacja bez własnego lokalu (warunek kwalifikacji) szacowana z sygnałów — obniżona pewność.");
+  // Definicja profilu: populacja bez własnego lokalu — z NSP 2021 (per gmina) lub estymata.
+  const nspWlasnosc = d.udzialGospodarstwBezWlasnosciPct != null;
+  flagi.push(
+    nspWlasnosc
+      ? "Populacja bez własnego lokalu z NSP 2021 (tytuł prawny, per gmina) × skew profilu."
+      : "Populacja bez własnego lokalu szacowana z sygnałów (brak NSP) — obniżona pewność."
+  );
   if (luka == null) flagi.push("Brak lokalnego czynszu rynkowego — luka i atrakcyjność szacunkowe.");
 
-  // Estymacja własności (definicja) obniża pewność bazową o ~7 pkt (jawnie, nie udajemy dokładności).
-  const pewnoscBaza = kw.nSpoleczny == null ? 45 : (kw.estymacja ? 70 : 82) - 7;
+  // Bez NSP: estymata własności obniża pewność bazową o ~7 pkt; z NSP — dane gminne, mniejsza korekta.
+  const pewnoscBaza = kw.nSpoleczny == null ? 45 : (kw.estymacja ? 70 : 82) - (nspWlasnosc ? 2 : 7);
   const pewnosc = clamp(Math.round(pewnoscBaza * (1 - wagi.zew) + atrakcyjnosc.pewnosc * wagi.zew));
   const komentarz =
     kw.nSpoleczny == null
@@ -268,7 +277,12 @@ function werdyktKomunalny(
     if (flagaPulapkaSenioralna(d))
       flagi.push("Uwaga: rosnący udział 65+ przy malejącej populacji — ryzyko utrwalania odpływu (informacyjnie, nie obniża oceny).");
   }
-  if (kw.nKomunalny != null) flagi.push("Populacja bez własnego lokalu (warunek kwalifikacji) szacowana z sygnałów — obniżona pewność.");
+  if (kw.nKomunalny != null)
+    flagi.push(
+      d.udzialGospodarstwBezWlasnosciPct != null
+        ? "Populacja bez własnego lokalu z NSP 2021 (tytuł prawny, per gmina) × skew profilu."
+        : "Populacja bez własnego lokalu szacowana z sygnałów (brak NSP) — obniżona pewność."
+    );
   const komentarz =
     kw.nKomunalny == null
       ? "Brak danych ludnościowych — skala potrzeby nieoznaczona."

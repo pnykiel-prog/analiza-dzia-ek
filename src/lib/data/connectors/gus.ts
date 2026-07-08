@@ -357,6 +357,20 @@ export const konektorGUS: Konektor = {
     dodaj("liczbaPodmiotowGosp", podmioty === null ? null : podmioty / 10);
     dodaj("saldoMigracjiMlodzi", saldo, 70); // proxy: saldo ogółem (nie tylko 25–39)
 
+    // NSP (rok spisu): udział gospodarstw BEZ tytułu własności = realna, per-gmina
+    // kalibracja „bez własnego lokalu" (definicja profili). udział bez = 1 − własność/ogółem.
+    const idGospOgolem = gus.zmienneId.gospodarstwaOgolem ?? (await idZmiennejPoFrazie(gus.zapytania.gospodarstwaOgolem));
+    const idGospWlasnosc = gus.zmienneId.gospodarstwaWlasnosc ?? (await idZmiennejPoFrazie(gus.zapytania.gospodarstwaWlasnosc));
+    if (idGospOgolem && idGospWlasnosc) {
+      const mNsp = await wartosciWielu(jednostka.id, [idGospOgolem, idGospWlasnosc], gus.nspRok);
+      const gOgolem = mNsp.get(idGospOgolem);
+      const gWlasnosc = mNsp.get(idGospWlasnosc);
+      if (gOgolem && gOgolem > 0 && gWlasnosc != null) {
+        const bezPct = Math.max(0, Math.min(100, (1 - gWlasnosc / gOgolem) * 100));
+        dodaj("udzialGospodarstwBezWlasnosciPct", bezPct, 78);
+      }
+    }
+
     // Trend (rok bazowy → bieżący) dla 65+ i ludności ogółem — profil senioralny + „pułapka seniorów".
     if (ogolem && ogolem > 0) {
       const mBaza = await wartosciWielu(jednostka.id, [P2137_OGOLEM_TOTAL, ...p65.map((p) => p.id)], gus.rokBazowyTrend);

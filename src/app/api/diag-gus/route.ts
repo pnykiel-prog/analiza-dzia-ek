@@ -58,6 +58,7 @@ export async function GET(req: Request) {
         liczbaAktywni: d?.liczbaAktywni ?? null,
         liczba65Plus: d?.liczba65Plus ?? null,
         dochodPrzecietnyGmina: d?.dochodPrzecietnyGmina ?? null,
+        udzialGospodarstwBezWlasnosciPct: d?.udzialGospodarstwBezWlasnosciPct ?? null,
         naplywZameldowanNa1000: d?.naplywZameldowanNa1000 ?? null,
         odplywMlodychNa1000: d?.odplywMlodychNa1000 ?? null,
       },
