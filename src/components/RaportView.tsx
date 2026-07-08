@@ -6,11 +6,28 @@ import { etykietaTypologii, liczba, plnMln, statusSlowny } from "@/lib/format";
 import { KONFIG_FINANSE } from "@/lib/config";
 import { zlozKolumne, rolaZeSposobu, uzbrojenieProxy, type KolumnaMontazu } from "@/lib/finanse/montaz";
 
-/** Drukowalne „Studium potencjału inwestycyjnego działki" (arkusz A4). */
-export function RaportView({ wynik, data }: { wynik: WynikAnalizy; data?: string }) {
+/**
+ * Drukowalne „Studium potencjału inwestycyjnego działki" (arkusz A4).
+ * `kosztBudowyM2` / `wartoscOdtworzeniowaM2` / `oprocPct` przychodzą z ekranu M3
+ * (suwak + jawne założenia) — dzięki temu raport liczy DOKŁADNIE to, co widać na M3.
+ */
+export function RaportView({
+  wynik,
+  data,
+  kosztBudowyM2,
+  wartoscOdtworzeniowaM2,
+  oprocPct,
+}: {
+  wynik: WynikAnalizy;
+  data?: string;
+  kosztBudowyM2?: number;
+  wartoscOdtworzeniowaM2?: number;
+  oprocPct?: number | null;
+}) {
   const { dane, poziom1: p1, poziom2: p2, poziom3: p3 } = wynik;
 
-  // Montaż finansowy = TEN SAM silnik co przekrój M3 (grant wg zasobu, wkład domykający).
+  // Montaż finansowy = TEN SAM silnik co przekrój M3 (grant wg zasobu, wkład domykający),
+  // z tymi samymi założeniami (koszt z suwaka, WO, oprocentowanie) — spójność raport↔M3.
   const profilFin = p3.analizaFinansowa?.profil ?? null;
   const rezimFin = p3.analizaFinansowa?.rezim ?? "current";
   const idxWar = Math.max(0, p2.warianty.findIndex((w) => p1.profilRekomendowany === "oba" || w.profil === p1.profilRekomendowany));
@@ -18,13 +35,14 @@ export function RaportView({ wynik, data }: { wynik: WynikAnalizy; data?: string
   const kolMontaz: KolumnaMontazu | null =
     profilFin && wariantFin
       ? zlozKolumne(profilFin, rezimFin, {
-          kosztBudowyM2: dane.kosztBudowyM2 ?? KONFIG_FINANSE.kosztBudowySuwak.domyslny,
+          kosztBudowyM2: kosztBudowyM2 ?? dane.kosztBudowyM2 ?? KONFIG_FINANSE.kosztBudowySuwak.domyslny,
           powierzchniaBudowyM2: wariantFin.pumM2 + wariantFin.powWspolneUslugoweM2,
           pumMieszkalnaM2: wariantFin.pumM2,
-          wartoscOdtworzeniowaM2: dane.wartoscOdtworzeniowaM2 ?? 7000,
+          wartoscOdtworzeniowaM2: wartoscOdtworzeniowaM2 ?? dane.wartoscOdtworzeniowaM2 ?? 7000,
           wartoscDzialkiPln: profilFin.wartoscDzialkiPln ?? dane.cenaGruntu ?? 0,
           rolaDzialki: rolaZeSposobu(profilFin.sposobWniesieniaDzialki),
           uzbrojeniePln: uzbrojenieProxy(dane.odlegloscDoSieciM),
+          oprocOverride: oprocPct != null && oprocPct > 0 ? oprocPct / 100 : undefined,
         })
       : null;
 
