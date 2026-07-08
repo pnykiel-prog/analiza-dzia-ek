@@ -141,6 +141,8 @@ export function zlozKolumne(
 
   // ── KOSZT (jedna definicja bazy, spójna z raportem) ─────────────────────────
   const budowa = Math.round(wej.kosztBudowyM2 * wej.powierzchniaBudowyM2);
+  // 5.2 Wartość działki wchodzi RAZ, wg sposobu wniesienia: zakup → koszt (tu),
+  // aport → źródło (aport, niżej), posiadana → neutralna (0). Baza grantu zawsze bez gruntu (5.1).
   const grunt = wej.rolaDzialki === "koszt" ? Math.round(wej.wartoscDzialkiPln) : 0;
   const uzbrojenie = Math.round(wej.uzbrojeniePln);
   const projekt = Math.round((budowa * z.kosztyProjektowePct) / 100);
@@ -163,7 +165,11 @@ export function zlozKolumne(
   // ── Źródła: najpierw wniesione/bezzwrotne (max), potem kredyt WYPEŁNIA lukę (maksymalizowany) ─
   const aport = wej.rolaDzialki === "zrodlo" ? Math.round(wej.wartoscDzialkiPln) : 0;
   let dostepne = Math.max(0, razem - aport);
-  const grant = grantPct != null ? Math.round(Math.min((grantPct / 100) * razem, dostepne)) : 0;
+  // 5.1 Grant liczony od kosztów KWALIFIKOWANYCH — grant NIE finansuje nabycia
+  // gruntu. Baza = RAZEM − grunt (grunt>0 tylko przy zakupie). Wcześniej grant%
+  // liczono od pełnego RAZEM (z gruntem) → dotacja zawyżona.
+  const bazaGrantu = Math.max(0, razem - grunt);
+  const grant = grantPct != null ? Math.round(Math.min((grantPct / 100) * bazaGrantu, dostepne)) : 0;
   dostepne -= grant;
   const partycypacjaNajemcow = Math.round(Math.min((partPct / 100) * razem, dostepne));
   dostepne -= partycypacjaNajemcow;

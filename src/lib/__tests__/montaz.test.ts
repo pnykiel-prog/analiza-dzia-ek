@@ -110,3 +110,15 @@ test("montaż: rola działki ze sposobu wniesienia", () => {
   assert.equal(rolaZeSposobu("APORT_GMINNY"), "zrodlo");
   assert.equal(rolaZeSposobu("JUZ_POSIADANA"), "neutralna");
 });
+
+test("montaż (5.1): grant liczony od kosztów BEZ gruntu — zakup nie zawyża dotacji", () => {
+  // Zakup na kredyt: grunt = koszt. Grant NIE finansuje gruntu → baza = RAZEM − grunt.
+  const zakup = zlozKolumne(profil({ typZasobu: "KOMUNALNY", sposobWniesieniaDzialki: "ZAKUP_KREDYT" }), "current", wej({ rolaDzialki: "koszt", wartoscDzialkiPln: 2_000_000 }));
+  assert.ok(zakup.koszt.grunt > 0, "grunt w koszcie przy zakupie");
+  const grantPct = zakup.zalozenia.grantPct / 100;
+  const bazaKwal = zakup.koszt.razem - zakup.koszt.grunt;
+  // Grant ≤ grant% × (RAZEM − grunt) (koszty kwalifikowane), z tolerancją zaokrągleń.
+  assert.ok(zakup.zrodla.grant <= Math.round(grantPct * bazaKwal) + 1, `grant ${zakup.zrodla.grant} ≤ ${Math.round(grantPct * bazaKwal)}`);
+  // Reguła realnie działa: grant jest MNIEJSZY niż gdyby liczyć od pełnego RAZEM (z gruntem).
+  assert.ok(zakup.zrodla.grant < Math.round(grantPct * zakup.koszt.razem), "grunt wyłączony z bazy grantu realnie obniża dotację");
+});
