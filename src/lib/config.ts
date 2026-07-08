@@ -11,7 +11,7 @@
  *  - Finanse P3: % grantu, kredyt, oprocentowanie, pułap, indeksy — co rok / co nowelizację
  */
 
-import type { FormaZabudowy, Profil, Rezim } from "./types";
+import type { FormaZabudowy, KluczWerdyktu, Profil, Rezim } from "./types";
 
 /**
  * Bramki środowiskowe (Natura 2000, powódź, wykluczająca ochrona, osuwiska/teren górniczy)
@@ -205,41 +205,26 @@ export interface KonfiguracjaPopytP1 {
   dochodProfil: Record<Profil, { mnoznikSredniej: number; sigma: number }>;
   /** Domyślny dochód gminy [zł/mc] gdy brak danych (baza rozkładu). */
   dochodFallback: number;
-  /** Wielkość gospodarstwa per profil — konwersja osoby → gospodarstwa. */
+  /** Wielkość gospodarstwa per profil — konwersja osoby → gospodarstwa (kafel społeczny vs mieszkania). */
   wielkoscGospodarstwa: Record<Profil, number>;
-  /** Ilu kwalifikujących się (GOSPODARSTW segmentu S) na 1 mieszkanie = pełna wystarczalność. */
+  /** Ilu GOSPODARSTW segmentu S na 1 mieszkanie = pełna wystarczalność (kafel społeczny). */
   marginesGospodarstwa: number;
-  /**
-   * DEFINICJA obu profili: brak własnego lokalu mieszkalnego (warunek kwalifikacji
-   * do budownictwa społecznego). Szacowany udział grupy wiekowej BEZ własnego
-   * lokalu — filtr populacyjny PRZED podziałem dochodowym (dotyczy obu profili,
-   * nie tylko seniorów). Zastępuje dawny mnożnik „konwersji senioralnej" (własność
-   * liczona teraz RAZ, w definicji). Estymacja z sygnałów → niższa pewność.
-   */
-  udzialBezWlasnegoLokalu: Record<Profil, number>;
   /** Próg wieku emerytalnego [lata] — linia podziału profil aktywny/senioralny (parametr). */
   progWiekuEmerytalnegoLat: number;
   /**
-   * Skew per profil nad GMINNYM udziałem gospodarstw bez własności (NSP 2021):
-   * udział profilu bez lokalu = udziałGminny × skew. Aktywni częściej najemcy
-   * (>1), seniorzy zwykle właściciele (<1). Używane, gdy dostępny udział z NSP;
-   * bez NSP model korzysta z udzialBezWlasnegoLokalu (estymata).
+   * UDZIAŁ BEZ MIESZKANIA — jedyna szczerze niepewna wielkość (założenie, obniża
+   * pewność). Per profil × segment (komunalny = najubożsi; społeczny = luka
+   * czynszowa). Udział bez własnego lokalu rośnie ku młodszym/uboższym; po 45. r.ż.
+   * większość uwłaszczona. Kalibrowalne (GUS/Eurostat/NSP).
    */
-  skewBezWlasnosci: Record<Profil, number>;
-  /** Benchmark regionalny udziału społecznego (mediana q_S). */
-  qBenchS: number;
-  /** Benchmark regionalny gęstości komunalnej na 1000 mieszk. (mediana). */
-  benchKomNa1000: number;
-  /** Wagi społeczne per profil: wewnętrzny (liczba) vs atrakcyjność migracyjna. */
-  wagiSpoleczne: Record<Profil, { wew: number; zew: number }>;
-  /** Modyfikator luki cenowej: 0.75 + 0.5×(luka/100) (tylko społeczne). */
-  mLuka: { baza: number; nachylenie: number };
-  /** Zakresy modyfikatorów napięcia i trendu (centrowane w 1,0). */
-  mNapiecie: { min: number; max: number }; // społeczne
-  mNapiecieKom: { min: number; max: number }; // komunalne — mocniej w górę
-  mTrend: { min: number; max: number }; // wspólny dla obu profili (4.2 — bez cięcia senioralnego)
-  /** Atrakcyjność migracyjna: wagi składowych + sufit skali. */
-  atrakcyjnosc: { waga2: number; waga3: number; sufit: number; naplywBenchNa1000: number; odplywBenchNa1000: number };
+  udzialBezMieszkania: Record<Profil, { komunalny: number; spoleczny: number }>;
+  /**
+   * KOREKTA MIGRACYJNA — jeden mnożnik (nie osobny popyt). M = clamp(1 + saldo/1000 × k),
+   * przyłożony z wagą per kafel (najmocniej: aktywni-społeczny; pomijalnie: seniorzy-komunalny).
+   */
+  migracja: { k: number; min: number; max: number; wagi: Record<KluczWerdyktu, number> };
+  /** Progi poziomu potrzeby KOMUNALNEJ — na BEZWZGLĘDNEJ liczbie kwalifikujących bez mieszkania (segment K). */
+  progiKomunalne: { wysoki: number; sredni: number; niski: number };
   /** Pasma werdyktu (score → kolor). */
   pasma: { zielony: number; zolty: number };
 }
@@ -255,20 +240,20 @@ export const KONFIG_POPYT_P1: KonfiguracjaPopytP1 = {
   dochodFallback: 6500,
   wielkoscGospodarstwa: { mlodzi: 2.2, seniorzy: 1.4 },
   marginesGospodarstwa: 1.5,
-  // Własność mieszkań w PL jest wysoka; bez własnego lokalu jest mniejszość. Profil
-  // aktywny obejmuje 20–64 (starsi częściej właściciele), więc udział niższy niż dla
-  // samych 20–39; seniorzy 65+ zwykle właściciele. Kalibrowalne z NSP (struktura własności).
-  udzialBezWlasnegoLokalu: { mlodzi: 0.2, seniorzy: 0.12 },
   progWiekuEmerytalnegoLat: 65,
-  skewBezWlasnosci: { mlodzi: 1.5, seniorzy: 0.6 },
-  qBenchS: 0.22,
-  benchKomNa1000: 8,
-  wagiSpoleczne: { mlodzi: { wew: 0.55, zew: 0.45 }, seniorzy: { wew: 0.85, zew: 0.15 } },
-  mLuka: { baza: 0.75, nachylenie: 0.5 },
-  mNapiecie: { min: 0.8, max: 1.2 },
-  mNapiecieKom: { min: 0.8, max: 1.4 },
-  mTrend: { min: 0.85, max: 1.15 },
-  atrakcyjnosc: { waga2: 0.6, waga3: 0.4, sufit: 100, naplywBenchNa1000: 20, odplywBenchNa1000: 15 },
+  // Udział bez mieszkania (założenie): aktywni komunalni ~co drugi, aktywni społeczni
+  // ~co trzeci; seniorzy komunalni ~1/7 (reszta uwłaszczona), seniorzy społeczni najmniej.
+  udzialBezMieszkania: {
+    mlodzi: { komunalny: 0.45, spoleczny: 0.3 },
+    seniorzy: { komunalny: 0.15, spoleczny: 0.07 },
+  },
+  migracja: {
+    k: 0.03, // saldo +5/1000 → M≈1,15; +13/1000 → sufit 1,40
+    min: 0.85,
+    max: 1.4,
+    wagi: { spolecznyMlodzi: 1.0, komunalnyMlodzi: 0.3, spolecznySeniorzy: 0.2, komunalnySeniorzy: 0.0 },
+  },
+  progiKomunalne: { wysoki: 3000, sredni: 1000, niski: 300 },
   pasma: { zielony: 65, zolty: 40 },
 };
 

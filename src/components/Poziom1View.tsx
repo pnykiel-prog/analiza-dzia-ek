@@ -139,14 +139,24 @@ function KartaWerdyktu({ w, rekomendowany }: { w: WerdyktP1; rekomendowany: bool
       </div>
       <div className="p-4">
         <div className="flex items-end justify-between">
-          <span className={`flex items-center gap-2 text-[20px] font-semibold ${KOLOR_STATUSU[w.werdykt]}`}>
-            <span className={`w-2.5 h-2.5 rounded-full ${KROPKA[w.werdykt]}`} />
-            {statusSlowny[w.werdykt]}
-          </span>
-          <span className="mono text-[34px] font-semibold leading-none text-grunt-text">
-            {w.score}
-            <span className="text-[14px] text-grunt-text-faint2">/100</span>
-          </span>
+          {w.nieoznaczony ? (
+            <span className="flex items-center gap-2 text-[18px] font-semibold text-grunt-text-muted2">
+              <span className="w-2.5 h-2.5 rounded-full bg-grunt-text-faint2" />
+              Nieoznaczona
+            </span>
+          ) : (
+            <span className={`flex items-center gap-2 text-[20px] font-semibold ${KOLOR_STATUSU[w.werdykt]}`}>
+              <span className={`w-2.5 h-2.5 rounded-full ${KROPKA[w.werdykt]}`} />
+              {statusSlowny[w.werdykt]}
+            </span>
+          )}
+          {/* Nieoznaczona: NIE pokazujemy ostrej liczby przy nieznanej podstawie (sito, nie instrument). */}
+          {!w.nieoznaczony && (
+            <span className="mono text-[34px] font-semibold leading-none text-grunt-text">
+              {w.score}
+              <span className="text-[14px] text-grunt-text-faint2">/100</span>
+            </span>
+          )}
         </div>
         <div className="text-[10px] uppercase tracking-wide text-grunt-text-faint mt-1">{natura}</div>
         <div className="mt-3"><WskaznikPewnosci pewnosc={w.pewnosc} /></div>

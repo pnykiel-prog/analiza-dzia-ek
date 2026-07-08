@@ -1,18 +1,21 @@
 /**
- * Ocena popytu na Poziomie 1 — wersja pełna (wg „wytyczne_claude_code_popyt_poziom1.md").
+ * Ocena popytu P1 — OCZYSZCZONY model (wg „wytyczne_claude_code_model_popytu_oczyszczony").
  * ================================================================================
- * Zamiast dwóch profili → SIATKA 4 WERDYKTÓW o dwóch naturach:
- *   • społeczny (młodzi / seniorzy)  — ocena PROJEKTU na działce (vs pojemność),
- *   • komunalny (młodzi / seniorzy)  — SKALA POTRZEBY w gminie (per mieszkaniec).
+ * Aplikacja to SITO — pokazuje potencjał przed płatną analizą, nie precyzyjny
+ * instrument. Prosta formuła (5 kroków), bez bram, bez osobnego modelu migracji,
+ * bez dzielenia zamieniającego brak mianownika w zero:
  *
- * Kluczowe zasady:
- *   1. Popyt wewnętrzny = LICZBA kwalifikujących się (trójdzielny podział dochodu
- *      K/S/R na rozkładzie log-normal), nie średnia odsetków.
- *   2. Popyt zewnętrzny zastąpiony WSKAŹNIKIEM ATRAKCYJNOŚCI MIGRACYJNEJ
- *      (A1 zmierzone = bramka dla A2/A3 estymowanych).
- *   3. Werdykty komunalne: per mieszkaniec vs mediana regionalna — BEZ pojemności,
- *      luki i migracji.
- *   4. Trend/pustostany/bezrobocie NIE tworzą popytu — są mnożnikami (centrowanymi w 1,0).
+ *   1. Populacja gminy (GUS)
+ *   2. → podział na PROFILE po wieku: aktywni (18–emerytura) · seniorzy
+ *   3. → ustawowy próg dochodowy dzieli na KOMUNALNY i SPOŁECZNY (qK, qS)
+ *   4. → × UDZIAŁ BEZ MIESZKANIA (tabela per profil × segment)   = POPYT ZASTANY
+ *   5. → × korekta MIGRACYJNA (jeden mnożnik, waga per kafel)     = POTENCJAŁ
+ *
+ * Werdykty:
+ *   • społeczny  — popyt segmentu S vs pojemność działki (mechanika bez zmian),
+ *   • komunalny  — ZAKOTWICZONY w BEZWZGLĘDNEJ liczbie kwalifikujących bez mieszkania
+ *                  (duża liczba = wysoki popyt, NIGDY „nie nadaje się"),
+ *   • brak danych ludnościowych → „nieoznaczony" (nie zero, nie „nie nadaje się").
  *
  * Funkcje czyste (testowalne offline).
  */
@@ -54,61 +57,75 @@ const pasmo = (score: number, cfg: KonfiguracjaPopytP1): Werdykt =>
 /** Próg luki cenowej [%], od którego flagujemy realny popyt na najem społeczny (M1). */
 const PROG_LUKI_FLAGA = 30;
 
-// ── Trójdzielny podział dochodowy (K / S / R) → liczby bezwzględne ────────────
+const FLAGA_UDZIAL = "Udział bez mieszkania to założenie (dane publiczne) — obniża pewność, nie udajemy precyzji.";
 
-function kwalifikacje(
-  d: DaneDzialki,
-  profil: Profil,
-  cfg: KonfiguracjaPopytP1
-): KwalifikacjeProfil {
-  // PROGI od DOCHODU ODNIESIENIA (nie od WO — to koszt budowy, nie dochód).
+// ── Krok 3–4: kwalifikujący × udział bez mieszkania = POPYT ZASTANY ───────────
+
+function kwalifikacje(d: DaneDzialki, profil: Profil, cfg: KonfiguracjaPopytP1): KwalifikacjeProfil {
+  // Krok 3 — ustawowy próg dochodowy dzieli grupę na komunalny (qK) i społeczny (qS).
   const odniesienie = cfg.progiDochodu.dochodOdniesienieFallback;
-  const progDolny = odniesienie * cfg.progiDochodu.komunalnyMn; // < → komunalny
-  const progGorny = odniesienie * cfg.progiDochodu.spolecznyMn; // < → społeczny; ≥ → rynek
-
-  // ROZKŁAD PER PROFIL: emerytury (seniorzy) ≠ pensje (młodzi). Średnia = dochód
-  // gminy × mnożnik profilu; σ profilowa. Progi bezwzględne → frakcja rozkładu.
+  const progDolny = odniesienie * cfg.progiDochodu.komunalnyMn;
+  const progGorny = odniesienie * cfg.progiDochodu.spolecznyMn;
   const dochodBaza = d.dochodPrzecietnyGmina ?? cfg.dochodFallback;
   const dp = cfg.dochodProfil[profil];
   const srednia = dochodBaza * dp.mnoznikSredniej;
   const qK = logNormCdf(progDolny, srednia, dp.sigma);
-  const qKGorny = logNormCdf(progGorny, srednia, dp.sigma);
-  const qS = Math.max(0, qKGorny - qK);
+  const qS = Math.max(0, logNormCdf(progGorny, srednia, dp.sigma) - qK);
   const estymacja = d.dochodPrzecietnyGmina == null;
 
-  // Liczebność grupy wiekowej [OSOBY]: liczba bezwzględna z BDL; awaryjnie z udziału % × ludność.
+  // Krok 1–2 — populacja grupy wiekowej [OSOBY]; liczba bezwzględna z BDL, awaryjnie z udziału %.
   const total = d.liczbaMieszkancowGminy ?? null;
-  let nOsoby: number | null =
-    profil === "mlodzi" ? d.liczbaAktywni ?? null : d.liczba65Plus ?? null;
+  let nOsoby: number | null = profil === "mlodzi" ? d.liczbaAktywni ?? null : d.liczba65Plus ?? null;
   if (nOsoby == null && total != null) {
     const pct = profil === "mlodzi" ? d.udzialAktywniPct : d.udzial65PlusPct;
     if (pct != null) nOsoby = (pct / 100) * total;
   }
-  // DEFINICJA PROFILU: brak własnego lokalu — filtr populacyjny PRZED dochodem,
-  // dla OBU profili. Udział bez lokalu z NSP 2021 (per gmina) × skew profilu, gdy
-  // dostępny; inaczej estymata z config. Własność liczona RAZ (nie osobny mnożnik).
-  const udzialBezLokalu =
-    d.udzialGospodarstwBezWlasnosciPct != null
-      ? clamp01((d.udzialGospodarstwBezWlasnosciPct / 100) * cfg.skewBezWlasnosci[profil])
-      : cfg.udzialBezWlasnegoLokalu[profil];
-  const nBezLokalu = nOsoby == null ? null : nOsoby * udzialBezLokalu;
-  // GOSPODARSTWA = osoby bez lokalu / wielkość gospodarstwa (do porównania z liczbą mieszkań).
-  const nGospodarstw = nBezLokalu == null ? null : nBezLokalu / cfg.wielkoscGospodarstwa[profil];
+
+  // Krok 4 — × udział bez mieszkania (tabela per profil × segment) = POPYT ZASTANY.
+  const uB = cfg.udzialBezMieszkania[profil];
+  // Komunalny: BEZWZGLĘDNA liczba osób bez mieszkania (segment K) — kotwica werdyktu komunalnego.
+  const nKomunalny = nOsoby == null ? null : Math.round(nOsoby * qK * uB.komunalny);
+  // Społeczny: gospodarstwa bez mieszkania (segment S) — do porównania z liczbą mieszkań.
+  const nSpoleczny = nOsoby == null ? null : Math.round((nOsoby * qS * uB.spoleczny) / cfg.wielkoscGospodarstwa[profil]);
 
   return {
-    // nGrupa raportowane w OSOBACH (pełna grupa wiekowa — kontekst).
     nGrupa: nOsoby == null ? null : Math.round(nOsoby),
     qK: Math.round(qK * 1000) / 1000,
     qS: Math.round(qS * 1000) / 1000,
-    // nKomunalny = OSOBY bez własnego lokalu (skala potrzeby per mieszkaniec, benchmark /1000).
-    nKomunalny: nBezLokalu == null ? null : Math.round(nBezLokalu * qK),
-    // nSpoleczny = GOSPODARSTWA bez własnego lokalu kwalifikujące dochodowo (vs liczba mieszkań).
-    nSpoleczny: nGospodarstw == null ? null : Math.round(nGospodarstw * qS),
+    nKomunalny,
+    nSpoleczny,
     estymacja,
   };
 }
 
-// ── Luka cenowa i modyfikatory (centrowane w 1,0) ────────────────────────────
+// ── Krok 5: korekta migracyjna — jeden mnożnik ───────────────────────────────
+
+interface Migracja {
+  mBazowy: number;
+  saldo1000: number | null;
+  dostepna: boolean;
+}
+
+/** M = clamp(1 + saldo_na_1000 × k). Gmina rosnąca podnosi popyt, kurcząca się obniża. */
+function korektaMigracji(d: DaneDzialki, cfg: KonfiguracjaPopytP1): Migracja {
+  const total = d.liczbaMieszkancowGminy ?? null;
+  let saldo1000: number | null = null;
+  if (d.naplywZameldowanNa1000 != null && d.odplywMlodychNa1000 != null) {
+    saldo1000 = d.naplywZameldowanNa1000 - d.odplywMlodychNa1000; // obie już na 1000
+  } else if (d.saldoMigracjiMlodzi != null && total != null && total > 0) {
+    saldo1000 = (d.saldoMigracjiMlodzi / total) * 1000;
+  }
+  const dostepna = saldo1000 != null;
+  const mBazowy = dostepna ? Math.max(cfg.migracja.min, Math.min(cfg.migracja.max, 1 + saldo1000! * cfg.migracja.k)) : 1;
+  return { mBazowy, saldo1000, dostepna };
+}
+
+/** popyt_kafla = popyt_zastany × (1 + (M − 1) × waga_kafla). */
+function zMigracja(popyt: number, mBazowy: number, waga: number): number {
+  return popyt * (1 + (mBazowy - 1) * waga);
+}
+
+// ── Werdykty ─────────────────────────────────────────────────────────────────
 
 function lukaCenowaPct(d: DaneDzialki, cfgS: KonfiguracjaScoring): number | null {
   if (d.wartoscOdtworzeniowaM2 == null || d.czynszRynkowyM2 == null || d.czynszRynkowyM2 <= 0) return null;
@@ -116,181 +133,88 @@ function lukaCenowaPct(d: DaneDzialki, cfgS: KonfiguracjaScoring): number | null
   return ((d.czynszRynkowyM2 - pulap) / d.czynszRynkowyM2) * 100;
 }
 
-/** M_luka = baza + nachylenie×(luka/100), np. 0.75..1.25. Neutralny 1.0 przy braku luki. */
-function mLuka(luka: number | null, cfg: KonfiguracjaPopytP1): number {
-  if (luka == null) return 1.0;
-  return cfg.mLuka.baza + cfg.mLuka.nachylenie * clamp01(luka / 100);
-}
-
-/** Napięcie mieszkaniowe 0..1 (niskie pustostany + rosnąca ludność). */
-function napiecie01(d: DaneDzialki): number {
-  const pustIdx = d.pustostanyPct == null ? 0.55 : clamp01((12 - d.pustostanyPct) / 10);
-  const trendIdx =
-    d.trendLudnosc == null ? 0.55 : d.trendLudnosc === "rosnaca" ? 1 : d.trendLudnosc === "stabilna" ? 0.6 : 0.2;
-  return clamp01(0.6 * pustIdx + 0.4 * trendIdx);
-}
-
-const skala = (x01: number, min: number, max: number) => min + (max - min) * clamp01(x01);
-
-/**
- * M_trend (4.2): wspólny zakres dla obu profili. NIE tłumimy realnej potrzeby
- * senioralnej dodatkowym mnożnikiem — „pułapka wyludniania" była fałszywie
- * negatywna na wsi. Ostrzeżenie o ryzyku utrwalania odpływu idzie jako FLAGA
- * (patrz `flagaPulapkaSenioralna` w werdyktKomunalny), nie jako cięcie score.
- */
-function mTrend(d: DaneDzialki, _profil: Profil, cfg: KonfiguracjaPopytP1): number {
-  const t01 = d.trendLudnosc == null ? 0.5 : d.trendLudnosc === "rosnaca" ? 1 : d.trendLudnosc === "stabilna" ? 0.55 : 0;
-  return skala(t01, cfg.mTrend.min, cfg.mTrend.max);
-}
-
-/** 4.2 — wzorzec „pułapki senioralnej": 65+ rośnie przy malejącej populacji. */
+/** 4.2 — wzorzec „pułapki senioralnej": 65+ rośnie przy malejącej populacji (flaga informacyjna). */
 function flagaPulapkaSenioralna(d: DaneDzialki): boolean {
   return d.trend65Plus === "rosnacy" && d.populacjaStabilna === false;
 }
 
-/** Pull gospodarczy 0..1 (niskie bezrobocie + gęstość podmiotów) — do atrakcyjności. */
-function pull01(d: DaneDzialki): number {
-  const bIdx = d.bezrobociePct == null ? 0.55 : clamp01((10 - d.bezrobociePct) / 8);
-  const pIdx = d.liczbaPodmiotowGosp == null ? 0.55 : clamp01((d.liczbaPodmiotowGosp - 80) / 140);
-  return clamp01(0.5 * bIdx + 0.5 * pIdx);
+/** Werdykt „nieoznaczony" — brak podstawy ludnościowej (nie zero, nie „nie nadaje się"). */
+function werdyktNieoznaczony(klucz: KluczWerdyktu, natura: "spoleczny" | "komunalny", profil: Profil): WerdyktP1 {
+  return {
+    klucz,
+    natura,
+    profil,
+    score: 0,
+    werdykt: "zolty",
+    nieoznaczony: true,
+    liczbaKwalifikujacych: null,
+    pewnosc: 25,
+    flagi: ["Brak danych ludnościowych — werdykt nieoznaczony (do potwierdzenia)."],
+    komentarz: "Nieoznaczony — brak podstawy ludnościowej.",
+  };
 }
-
-// ── Wskaźnik atrakcyjności migracyjnej (A1 zmierzone → bramka A2/A3) ──────────
-
-function atrakcyjnoscMigracyjna(
-  d: DaneDzialki,
-  luka: number | null,
-  cfg: KonfiguracjaPopytP1
-): AtrakcyjnoscMigracyjna {
-  const lukaNorm = luka == null ? 0 : clamp01(luka / 100);
-  const pull = pull01(d);
-
-  // A1 — zmierzony napływ vs benchmark (bench → 50). Proxy z salda, gdy brak napływu brutto.
-  let a1: number;
-  let fallback: boolean;
-  if (d.naplywZameldowanNa1000 != null) {
-    a1 = clamp(Math.round((d.naplywZameldowanNa1000 / cfg.atrakcyjnosc.naplywBenchNa1000) * 50));
-    fallback = false;
-  } else if (d.saldoMigracjiMlodzi != null) {
-    a1 = d.saldoMigracjiMlodzi > 0 ? 60 : d.saldoMigracjiMlodzi === 0 ? 40 : 20;
-    fallback = true;
-  } else {
-    a1 = 40;
-    fallback = true;
-  }
-
-  // Bramka wiarygodności: gdy A1≈0 i luka mała → brak „życzeniowej" migracji.
-  const brama = clamp01((a1 / 100) * 0.7 + lukaNorm * 0.3);
-  // A2 — potencjał odblokowany tańszą ofertą (luka + rynek pracy).
-  const a2 = Math.round(brama * clamp01(0.5 * lukaNorm + 0.5 * pull) * 100);
-  // A3 — zatrzymany odpływ (odpływ młodych × luka).
-  const odplywNorm = d.odplywMlodychNa1000 == null ? 0.4 : clamp01(d.odplywMlodychNa1000 / cfg.atrakcyjnosc.odplywBenchNa1000);
-  const a3 = Math.round(brama * clamp01(0.5 * odplywNorm + 0.5 * lukaNorm) * 100);
-
-  // A1 liczone RAZ (3.2): jest BRAMĄ wiarygodności (skaluje A2/A3), więc NIE dodajemy
-  // go drugi raz wprost. Wartość = potencjał odblokowany (A2) + zatrzymany odpływ (A3),
-  // już przefiltrowane przez wiarygodność A1.
-  const wartosc = clamp(Math.round(cfg.atrakcyjnosc.waga2 * a2 + cfg.atrakcyjnosc.waga3 * a3), 0, cfg.atrakcyjnosc.sufit);
-  // Pewność: zmierzony napływ (nie fallback) i wiarygodna brama → wyższa.
-  const pewnosc = clamp(Math.round((fallback ? 55 : 80) - 15 * (1 - brama)));
-  return { a1, a2, a3, wartosc, pewnosc, fallback };
-}
-
-// ── Werdykty ─────────────────────────────────────────────────────────────────
 
 function werdyktSpoleczny(
   profil: Profil,
   kw: KwalifikacjeProfil,
   pojemnoscMieszkan: number,
-  atrakcyjnosc: AtrakcyjnoscMigracyjna,
+  mig: Migracja,
   luka: number | null,
   d: DaneDzialki,
   cfg: KonfiguracjaPopytP1
 ): WerdyktP1 {
   const klucz: KluczWerdyktu = profil === "mlodzi" ? "spolecznyMlodzi" : "spolecznySeniorzy";
-  const flagi: string[] = [];
-  const fSila = clamp((kw.qS ?? 0) / cfg.qBenchS, 0.3, 1.3);
-  // Wystarczalność: GOSPODARSTWA kwalifikujące vs liczba mieszkań × margines gospodarstw.
+  if (kw.nSpoleczny == null) return werdyktNieoznaczony(klucz, "spoleczny", profil);
+
+  // Krok 5 — korekta migracyjna z wagą kafla; potem porównanie do pojemności (mechanika bez zmian).
+  const popyt = zMigracja(kw.nSpoleczny, mig.mBazowy, cfg.migracja.wagi[klucz]);
   const denom = Math.max(1, pojemnoscMieszkan * cfg.marginesGospodarstwa);
-  const fWystarcz = kw.nSpoleczny == null ? 0.5 : clamp01(kw.nSpoleczny / denom);
-  const popytWew = clamp(Math.round(100 * fWystarcz * fSila));
+  const fWystarcz = clamp01(popyt / denom);
+  const score = clamp(Math.round(100 * fWystarcz));
 
-  const wagi = cfg.wagiSpoleczne[profil];
-  // FILTR DOCHODOWY MIGRACJI (3.3): napływ zasila popyt SPOŁECZNY tylko w części
-  // kwalifikującej się dochodowo (udział K+S) — zamożny migrant nie zwiększa
-  // popytu na mieszkanie społeczne.
-  const udzialKwalif = clamp01((kw.qK ?? 0) + (kw.qS ?? 0));
-  const atrakcyjnoscFiltr = atrakcyjnosc.wartosc * udzialKwalif;
-  const baza = wagi.wew * popytWew + wagi.zew * atrakcyjnoscFiltr;
-  const score = clamp(Math.round(baza * mLuka(luka, cfg) * skala(napiecie01(d), cfg.mNapiecie.min, cfg.mNapiecie.max)));
-
-  // Luka czynszowa → sygnał popytu na najem społeczny (estymacja — miejsce w M1, nie M2).
+  const flagi: string[] = [FLAGA_UDZIAL];
   if (luka != null && luka >= PROG_LUKI_FLAGA) flagi.push(`Wysoka luka cenowa (${Math.round(luka)}%) — realny popyt na najem społeczny.`);
-  if (kw.nSpoleczny == null) flagi.push("Brak liczb ludności/dochodu — popyt społeczny szacowany (obniżona pewność).");
-  if (kw.estymacja) flagi.push("Udział dochodowy (segment społeczny) estymowany z rozkładu regionalnego — do potwierdzenia na P2.");
-  // Definicja profilu: populacja bez własnego lokalu — z NSP 2021 (per gmina) lub estymata.
-  const nspWlasnosc = d.udzialGospodarstwBezWlasnosciPct != null;
-  flagi.push(
-    nspWlasnosc
-      ? "Populacja bez własnego lokalu z NSP 2021 (tytuł prawny, per gmina) × skew profilu."
-      : "Populacja bez własnego lokalu szacowana z sygnałów (brak NSP) — obniżona pewność."
-  );
-  if (luka == null) flagi.push("Brak lokalnego czynszu rynkowego — luka i atrakcyjność szacunkowe.");
+  if (kw.estymacja) flagi.push("Dochód gminy estymowany (brak danej BDL) — podział K/S orientacyjny.");
+  if (mig.dostepna && mig.mBazowy !== 1) flagi.push(`Korekta migracyjna ×${Math.round(mig.mBazowy * 100) / 100} (saldo ${Math.round((mig.saldo1000 ?? 0) * 10) / 10}/1000).`);
 
-  // Bez NSP: estymata własności obniża pewność bazową o ~7 pkt; z NSP — dane gminne, mniejsza korekta.
-  const pewnoscBaza = kw.nSpoleczny == null ? 45 : (kw.estymacja ? 70 : 82) - (nspWlasnosc ? 2 : 7);
-  const pewnosc = clamp(Math.round(pewnoscBaza * (1 - wagi.zew) + atrakcyjnosc.pewnosc * wagi.zew));
-  const komentarz =
-    kw.nSpoleczny == null
-      ? "Brak danych ludnościowych — werdykt orientacyjny."
-      : `${kw.nSpoleczny} gospodarstw bez własnego lokalu kwalifikujących się dochodowo (segment społeczny) wobec pojemności ${pojemnoscMieszkan} mieszk. × margines ${cfg.marginesGospodarstwa}.`;
-  return { klucz, natura: "spoleczny", profil, score, werdykt: pasmo(score, cfg), liczbaKwalifikujacych: kw.nSpoleczny, pewnosc, flagi, komentarz };
+  // Pewność: założenie „udział bez mieszkania" obniża; brak danych migracyjnych/dochodu dodatkowo.
+  const pewnosc = clamp(Math.round(78 - (kw.estymacja ? 8 : 0) - (mig.dostepna ? 0 : 6)));
+  const komentarz = `${Math.round(popyt)} gospodarstw bez mieszkania (segment społeczny) wobec pojemności ${pojemnoscMieszkan} mieszk. × margines ${cfg.marginesGospodarstwa}.`;
+  return { klucz, natura: "spoleczny", profil, score, werdykt: pasmo(score, cfg), liczbaKwalifikujacych: Math.round(popyt), pewnosc, flagi, komentarz };
 }
 
-function werdyktKomunalny(
-  profil: Profil,
-  kw: KwalifikacjeProfil,
-  d: DaneDzialki,
-  cfg: KonfiguracjaPopytP1
-): WerdyktP1 {
-  const klucz: KluczWerdyktu = profil === "mlodzi" ? "komunalnyMlodzi" : "komunalnySeniorzy";
-  const flagi: string[] = [];
-  const total = d.liczbaMieszkancowGminy ?? null;
-  let score = 0;
-  if (kw.nKomunalny != null && total != null && total > 0) {
-    const gestosc = (kw.nKomunalny / total) * 1000; // na 1000 mieszk.
-    const ratio = gestosc / cfg.benchKomNa1000;
-    const scoreBase = clamp(Math.round(50 * ratio)); // ratio=1 (mediana) → 50
-    const mNap = skala(napiecie01(d), cfg.mNapiecieKom.min, cfg.mNapiecieKom.max);
-    score = clamp(Math.round(scoreBase * mNap * mTrend(d, profil, cfg)));
-  } else {
-    flagi.push("Brak liczb ludności — skala potrzeby komunalnej nieoznaczona.");
-  }
-  if (kw.estymacja) flagi.push("Podział dochodowy (segment komunalny) estymowany — obniżona pewność.");
+/** Poziom potrzeby komunalnej z BEZWZGLĘDNEJ liczby (proste progi) — nigdy zero przy realnej potrzebie. */
+function scoreKomunalny(n: number, cfg: KonfiguracjaPopytP1): number {
+  const p = cfg.progiKomunalne;
+  if (n >= p.wysoki) return 90;
+  if (n >= p.sredni) return 70;
+  if (n >= p.niski) return 50;
+  if (n > 0) return 40; // realna, choć niewielka potrzeba — „warunkowo", NIGDY „nie nadaje się"
+  return 25; // policzone zero potrzeby (dane obecne)
+}
 
-  // Pewność: komunalne niższe od społecznych; komunalny-seniorzy najniższy.
-  let pewnosc = clamp(Math.round((kw.nKomunalny == null ? 45 : 70) - (kw.estymacja ? 8 : 0)));
+function werdyktKomunalny(profil: Profil, kw: KwalifikacjeProfil, mig: Migracja, d: DaneDzialki, cfg: KonfiguracjaPopytP1): WerdyktP1 {
+  const klucz: KluczWerdyktu = profil === "mlodzi" ? "komunalnyMlodzi" : "komunalnySeniorzy";
+  if (kw.nKomunalny == null) return werdyktNieoznaczony(klucz, "komunalny", profil);
+
+  // Krok 5 — korekta migracyjna z wagą kafla (komunalny-seniorzy ≈ 0). Zakotwiczenie w LICZBIE.
+  const popyt = Math.round(zMigracja(kw.nKomunalny, mig.mBazowy, cfg.migracja.wagi[klucz]));
+  const score = scoreKomunalny(popyt, cfg);
+  const poziom = score >= 90 ? "wysoki" : score >= 70 ? "podwyższony" : score >= 50 ? "umiarkowany" : "niski";
+
+  const flagi: string[] = [FLAGA_UDZIAL];
+  if (kw.estymacja) flagi.push("Dochód gminy estymowany — podział K/S orientacyjny.");
   if (profil === "seniorzy") {
-    pewnosc = clamp(pewnosc - 10);
     flagi.push("Kierunek: mieszkania wspomagane dla seniorów (senioralne ze wsparciem).");
-    // 4.2 Ryzyko utrwalania odpływu jako FLAGA (nie cięcie score) — realna potrzeba pokazana.
     if (flagaPulapkaSenioralna(d))
       flagi.push("Uwaga: rosnący udział 65+ przy malejącej populacji — ryzyko utrwalania odpływu (informacyjnie, nie obniża oceny).");
   }
-  if (kw.nKomunalny != null)
-    flagi.push(
-      d.udzialGospodarstwBezWlasnosciPct != null
-        ? "Populacja bez własnego lokalu z NSP 2021 (tytuł prawny, per gmina) × skew profilu."
-        : "Populacja bez własnego lokalu szacowana z sygnałów (brak NSP) — obniżona pewność."
-    );
-  const komentarz =
-    kw.nKomunalny == null
-      ? "Brak danych ludnościowych — skala potrzeby nieoznaczona."
-      : `Skala potrzeby komunalnej: ${kw.nKomunalny} os. bez własnego lokalu (segment K) — porównanie per mieszkaniec do mediany regionalnej.`;
-  return { klucz, natura: "komunalny", profil, score, werdykt: pasmo(score, cfg), liczbaKwalifikujacych: kw.nKomunalny, pewnosc, flagi, komentarz };
+  const pewnosc = clamp(Math.round((profil === "seniorzy" ? 60 : 68) - (kw.estymacja ? 8 : 0)));
+  const komentarz = `Skala potrzeby komunalnej: ${popyt} os. bez mieszkania (segment K) — poziom ${poziom} (liczba bezwzględna).`;
+  return { klucz, natura: "komunalny", profil, score, werdykt: pasmo(score, cfg), liczbaKwalifikujacych: popyt, pewnosc, flagi, komentarz };
 }
 
-// ── Główna: pełna ocena popytu P1 ────────────────────────────────────────────
+// ── Główna: oczyszczona ocena popytu P1 ──────────────────────────────────────
 
 export function ocenPopytP1(
   d: DaneDzialki,
@@ -299,29 +223,38 @@ export function ocenPopytP1(
   cfgS: KonfiguracjaScoring = KONFIG_SCORING
 ): OcenaPopytuP1 {
   const luka = lukaCenowaPct(d, cfgS);
+  const mig = korektaMigracji(d, cfg);
   const kwMlodzi = kwalifikacje(d, "mlodzi", cfg);
   const kwSeniorzy = kwalifikacje(d, "seniorzy", cfg);
-  const atrakcyjnosc = atrakcyjnoscMigracyjna(d, luka, cfg);
 
   const werdykty: Record<KluczWerdyktu, WerdyktP1> = {
-    spolecznyMlodzi: werdyktSpoleczny("mlodzi", kwMlodzi, pojemnosc.mlodzi, atrakcyjnosc, luka, d, cfg),
-    spolecznySeniorzy: werdyktSpoleczny("seniorzy", kwSeniorzy, pojemnosc.seniorzy, atrakcyjnosc, luka, d, cfg),
-    komunalnyMlodzi: werdyktKomunalny("mlodzi", kwMlodzi, d, cfg),
-    komunalnySeniorzy: werdyktKomunalny("seniorzy", kwSeniorzy, d, cfg),
+    spolecznyMlodzi: werdyktSpoleczny("mlodzi", kwMlodzi, pojemnosc.mlodzi, mig, luka, d, cfg),
+    spolecznySeniorzy: werdyktSpoleczny("seniorzy", kwSeniorzy, pojemnosc.seniorzy, mig, luka, d, cfg),
+    komunalnyMlodzi: werdyktKomunalny("mlodzi", kwMlodzi, mig, d, cfg),
+    komunalnySeniorzy: werdyktKomunalny("seniorzy", kwSeniorzy, mig, d, cfg),
   };
 
-  // 4.1 Rekomendacja DZIAŁKI wybierana spośród werdyktów SPOŁECZNYCH (ocena projektu
-  // na działce). Kafle komunalne to „potrzeba gminy" (skala per mieszkaniec, bez
-  // pojemności/lokalizacji) — nie mogą samodzielnie rekomendować konkretnej działki.
+  // Rekomendacja DZIAŁKI wybierana spośród werdyktów SPOŁECZNYCH (ocena projektu vs
+  // pojemność). Kafle komunalne to „potrzeba gminy" — nie rekomendują konkretnej działki.
   const spoleczne = [werdykty.spolecznyMlodzi, werdykty.spolecznySeniorzy];
   const rekomendowany = spoleczne.reduce((a, b) => (b.score > a.score ? b : a));
-  const pewnoscOgolna = rekomendowany.pewnosc;
+
+  // Zgodność wsteczna: pole atrakcyjności = sygnał migracyjny (0–100) z jednego mnożnika.
+  const sygnalMigracji = clamp(Math.round(((mig.mBazowy - 1) / (cfg.migracja.max - 1)) * 100), 0, 100);
+  const atrakcyjnoscMigracyjna: AtrakcyjnoscMigracyjna = {
+    a1: 0,
+    a2: 0,
+    a3: 0,
+    wartosc: sygnalMigracji,
+    pewnosc: mig.dostepna ? 75 : 45,
+    fallback: !mig.dostepna,
+  };
 
   return {
     kwalifikacje: { mlodzi: kwMlodzi, seniorzy: kwSeniorzy },
-    atrakcyjnoscMigracyjna: atrakcyjnosc,
+    atrakcyjnoscMigracyjna,
     werdykty,
     rekomendowanyKierunek: rekomendowany.klucz,
-    pewnoscOgolna,
+    pewnoscOgolna: rekomendowany.pewnosc,
   };
 }

@@ -291,6 +291,8 @@ export interface WerdyktP1 {
   pewnosc: number; // 0–100
   flagi: string[];
   komentarz: string;
+  /** true = brak podstawy ludnościowej → werdykt „nieoznaczony" (szary, niska pewność, nie zero/„nie nadaje się"). */
+  nieoznaczony?: boolean;
 }
 
 /** Pełna ocena popytu P1 — siatka 4 werdyktów + kwalifikacje + atrakcyjność. */
