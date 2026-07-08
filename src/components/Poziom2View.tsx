@@ -195,8 +195,8 @@ export function Poziom2View({
 
       {p2.dostepnosc?.pozycje?.length ? (
       <Karta
-        tytul="Dostępność (odległości pieszo)"
-        podtytul="Usługi (kanał A — mogą dyskwalifikować) i otoczenie (jakość życia — tylko bonus). Braki nie dyskwalifikują."
+        tytul="Dostępność (usługi i otoczenie)"
+        podtytul="Usługi (kanał A — mogą dyskwalifikować) i otoczenie (jakość życia — tylko bonus). Znacznik pieszo/dojazdem pokazuje realną skalę dostępu. Braki nie dyskwalifikują."
       >
         <div className="space-y-1.5">
           {p2.dostepnosc.pozycje.map((u) => {
@@ -232,7 +232,12 @@ export function Poziom2View({
                   <span className="text-[11px] text-grunt-text-faint2 ml-2">{meta}</span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="mono text-[13px] text-grunt-text">{u.m != null ? `${u.m} m` : "—"}</span>
+                  <span className="mono text-[13px] text-grunt-text">
+                    {u.m != null ? `${u.m} m` : "—"}
+                    {u.skalaDostepu && (
+                      <span className="text-[10px] text-grunt-text-faint2 ml-1">{u.skalaDostepu === "pieszo" ? "pieszo" : "dojazdem"}</span>
+                    )}
+                  </span>
                   <span className={`badge ${kl}`}>{etykietaStatus}</span>
                 </div>
               </div>
