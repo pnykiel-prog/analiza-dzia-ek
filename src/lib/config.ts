@@ -491,6 +491,16 @@ export interface KonfiguracjaM2 {
     wagi: Record<"mlodzi" | "seniorzy", Record<string, number>>; // waga per kategoria (suma ≈ 1)
     etykiety: Record<string, string>; // do sygnałów w raporcie
   };
+  /**
+   * 7.1 Uciążliwości otoczenia (OSM) — ŁAGODNA KARA w kanale O, symetrycznie do
+   * bonusów; NIE bramka. Brak danych → neutralnie (bez kary). Próg per typ [m]:
+   * bliżej progu → większa kara (do `maxKara`).
+   */
+  uciazliwosci: {
+    maxKara: number; // maks. kara (np. 0.10 → do ×0,90)
+    progiM: Record<string, number>; // klucz typu (uc_*) → próg [m]
+    etykiety: Record<string, string>;
+  };
   /** Kanał B — koszt uzbrojenia (odległość do sieci → przydatność ekonomiczna). */
   kosztUzbrojenia: { odlegloscKomfortM: number; odlegloscDrogaM: number; karaSpadekPct: number };
   /** Kanał C — modyfikatory popytu (aglomeracja, potencjał, pustostany). */
@@ -541,6 +551,17 @@ export const KONFIG_M2: KonfiguracjaM2 = {
       seniorzy: { zielen: 0.35, plac_zabaw: 0.0, poczta: 0.35, bank: 0.3 },
     },
     etykiety: { zielen: "Tereny zielone / park", plac_zabaw: "Plac zabaw", poczta: "Poczta", bank: "Bank / bankomat" },
+  },
+  uciazliwosci: {
+    maxKara: 0.1,
+    progiM: { uc_przemysl: 300, uc_kolej: 150, uc_droga: 200, uc_wysypisko: 500, uc_lotnisko: 1500 },
+    etykiety: {
+      uc_przemysl: "Przemysł / zakład",
+      uc_kolej: "Linia kolejowa",
+      uc_droga: "Droga szybkiego ruchu",
+      uc_wysypisko: "Wysypisko / oczyszczalnia",
+      uc_lotnisko: "Lotnisko",
+    },
   },
   kosztUzbrojenia: { odlegloscKomfortM: 50, odlegloscDrogaM: 500, karaSpadekPct: 8 },
   modyfikatorPopytu: {

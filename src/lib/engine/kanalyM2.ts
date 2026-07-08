@@ -126,6 +126,29 @@ export function modyfikatorOtoczenia(d: DaneDzialki, profil: Profil, cfg: Konfig
   return { mnoznik, powody };
 }
 
+/**
+ * 7.1 Uciążliwości otoczenia — ŁAGODNA KARA per działka (kanał O), symetrycznie
+ * do bonusów. NIE bramka i NIGDY nie zeruje: bliska uciążliwość (< próg typu)
+ * obniża jakość otoczenia proporcjonalnie do bliskości; brak danych → mnożnik 1,0
+ * (neutralnie, bez kary). Dominuje najgorsza uciążliwość (max bliskości).
+ */
+export function modyfikatorUciazliwosci(d: DaneDzialki, cfg: KonfiguracjaM2 = KONFIG_M2): { mnoznik: number; powody: string[] } {
+  const c = cfg.uciazliwosci;
+  let najgorsza = 0;
+  const bliskie: string[] = [];
+  for (const [typ, prog] of Object.entries(c.progiM)) {
+    const m = d.odleglosciM2?.[typ];
+    if (m == null || prog <= 0) continue; // brak → neutralnie
+    const bliskosc = clampBonus((prog - m) / prog); // 1 przy 0 m, 0 na progu i dalej
+    if (bliskosc <= 0) continue;
+    if (bliskosc > najgorsza) najgorsza = bliskosc;
+    bliskie.push(`${c.etykiety[typ] ?? typ} ~${m} m`);
+  }
+  const mnoznik = Math.round((1 - c.maxKara * clampBonus(najgorsza)) * 100) / 100;
+  const powody = mnoznik < 1 ? [`Uciążliwości: ${bliskie.join(", ")} → −${Math.round((1 - mnoznik) * 100)}% (jakość otoczenia, nie bramka).`] : [];
+  return { mnoznik, powody };
+}
+
 /** Pozytywne sygnały otoczenia (do raportu): obiekty jakości życia w zasięgu spaceru. */
 export function sygnalyOtoczenia(d: DaneDzialki, cfg: KonfiguracjaM2 = KONFIG_M2): string[] {
   const c = cfg.otoczenie;
@@ -248,10 +271,11 @@ export function ocenM2(d: DaneDzialki, p1: WynikPoziom1, dopuszczalnosc: StatusB
     const C = modyfikatorPopytuC(d, profil, cfg);
     const T = modyfikatorTransportu(d, profil, cfg); // łagodny bonus jakości transportu (nie bramka)
     const O = modyfikatorOtoczenia(d, profil, cfg); // łagodny bonus jakości otoczenia (nie bramka)
-    const popytRealizowalny = clamp(Math.round(popytM1 * A.mnoznik * C.mnoznik * T.mnoznik * O.mnoznik));
+    const U = modyfikatorUciazliwosci(d, cfg); // 7.1 łagodna KARA uciążliwości (nie bramka), per działka
+    const popytRealizowalny = clamp(Math.round(popytM1 * A.mnoznik * C.mnoznik * T.mnoznik * O.mnoznik * U.mnoznik));
     const ekonFaktor = 0.7 + 0.3 * (przydat.wartosc / 100); // B skaluje, nie zeruje
     let score = clamp(Math.round(popytRealizowalny * ekonFaktor));
-    const powody = [...A.powody, ...C.powody, ...T.powody, ...O.powody, ...przydat.powody];
+    const powody = [...A.powody, ...C.powody, ...T.powody, ...O.powody, ...U.powody, ...przydat.powody];
     if (!A.obsluzalny) {
       score = 0;
       powody.unshift("Profil nieobsługiwalny — usługi poza zasięgiem (kanał A).");

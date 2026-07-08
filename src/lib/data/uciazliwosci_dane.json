@@ -1,0 +1,10 @@
+{
+  "meta": {
+    "opis": "Statyczna warstwa uciążliwości otoczenia (kanał O — łagodna kara). Import z OSM (Overpass).",
+    "data_importu": null,
+    "zrodla": ["OSM"],
+    "liczby": {},
+    "uwaga": "SEED — pusta warstwa. Pełne dane wgrywa tools/uciazliwosci/import.ts (Overpass). Brak danych → kanał O neutralny (bez kary)."
+  },
+  "rekordy": []
+}

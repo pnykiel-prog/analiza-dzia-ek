@@ -27,6 +27,7 @@ import { kandydaciStale } from "../uslugiStale";
 import { kandydaciApteka } from "../apteki";
 import { kandydaciSklep } from "../sklepy";
 import { najblizszeOtoczenie } from "../otoczenie";
+import { najblizszeUciazliwosci } from "../uciazliwosci";
 
 export type { Kandydat } from "./geoUslugi";
 export { haversineM, minZDystansow } from "./geoUslugi";
@@ -219,7 +220,9 @@ export const konektorOdleglosci: Konektor = {
     const zrodloOpis = kandOsm.length ? "warstwa stała + OSM" : "warstwa stała";
     // Otoczenie / jakość życia (zieleń, plac zabaw, poczta, bank) — miękki modyfikator, linia prosta.
     const otocz = najblizszeOtoczenie(lat, lon, cfg.promienM);
-    const odleglosciM2 = { ...odleglosciUslug, ...otocz };
+    // Uciążliwości (7.1): najbliższa odległość per typ (przemysł/kolej/droga/…) → łagodna kara kanału O.
+    const uciazl = najblizszeUciazliwosci(lat, lon, cfg.promienM);
+    const odleglosciM2 = { ...odleglosciUslug, ...otocz, ...uciazl };
     logDebug(`Odległości (${zrodloOpis}, ${metoda}) → ${JSON.stringify(odleglosciM2)}`);
 
     const dane: Partial<DaneDzialki> = { odleglosciM2, ...proxyZOdleglosci(odleglosciUslug) };
