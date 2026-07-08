@@ -155,13 +155,13 @@ export interface DaneDzialki {
   wysokoscOkolicyPieter?: Maybe<number>;
 
   // F. Demografia i rynek pracy (GUS BDL)
-  udzial2039Pct: Maybe<number>;
-  mediana2039Woj: Maybe<number>;
+  udzialAktywniPct: Maybe<number>;
+  medianaAktywniWoj: Maybe<number>;
   saldoMigracjiMlodzi: Maybe<number>; // dodatnie/zero/ujemne
   udzial65PlusPct: Maybe<number>;
   // F2. Liczby bezwzględne i dochód (popyt P1 — trójdzielny podział, benchmarki per mieszkaniec)
   liczbaMieszkancowGminy?: Maybe<number>; // ludność ogółem gminy
-  liczba2039?: Maybe<number>; // liczebność 20–39 (nie %)
+  liczbaAktywni?: Maybe<number>; // liczebność 20–64 aktywni, poniżej wieku emerytalnego (nie %)
   liczba65Plus?: Maybe<number>; // liczebność 65+ (nie %)
   dochodPrzecietnyGmina?: Maybe<number>; // proxy dochodu gosp. (wynagrodzenie/dochód gminy), miesięcznie
   naplywZameldowanNa1000?: Maybe<number>; // napływ zameldowań (śr. 3–5 lat) na 1000 mieszk. — A1

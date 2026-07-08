@@ -23,7 +23,7 @@ export interface KonfiguracjaKonektorow {
     zapytania: {
       ludnoscOgolem: string;
       ludnosc65: string;
-      ludnosc2039: string;
+      ludnoscAktywni: string;
       bezrobocie: string;
       podmiotyNa10k: string;
       saldoMigracji: string;
@@ -38,7 +38,7 @@ export interface KonfiguracjaKonektorow {
     /** Opcjonalne nadpisanie ID (pomija auto-dobór, gdy ustawione). */
     zmienneId: Partial<Record<keyof KonfiguracjaKonektorow["gus"]["zapytania"], string>>;
     /** Krajowa mediana odniesienia udziału 20–39 lat [%] — fallback, gdy brak danych wojewódzkich. */
-    medianaWiek2039Pct: number;
+    medianaWiekAktywniPct: number;
     /** Rok bazowy do liczenia trendów (65+, ludność) — porównanie z rokiem bieżącym. */
     rokBazowyTrend: number;
     /** ID zmiennych „stopa bezrobocia rejestrowanego" (miesięczne, poziom powiatu) — próba po kolei. */
@@ -91,7 +91,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
     zapytania: {
       ludnoscOgolem: "ludność ogółem",
       ludnosc65: "ludność w wieku 65 lat i więcej",
-      ludnosc2039: "ludność w wieku 20-39",
+      ludnoscAktywni: "ludność w wieku 20-64 (aktywni, poniżej wieku emerytalnego)",
       bezrobocie: "udział bezrobotnych zarejestrowanych w liczbie ludności w wieku produkcyjnym",
       podmiotyNa10k: "podmioty wpisane do rejestru REGON na 10 tys. ludności",
       saldoMigracji: "saldo migracji",
@@ -110,7 +110,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
     // Potwierdzone diagnostyką /api/diag-gus?vars=… (poziom gminy, „· ogółem"):
     //   zameldowania (napływ) = 80121 [osoba]; wymeldowania (odpływ) = 80123 [osoba].
     zmienneId: { podmiotyNa10k: "60530", saldoMigracji: "1365234", wynagrodzenie: "64429", zameldowania: "80121", wymeldowania: "80123" },
-    medianaWiek2039Pct: 25,
+    medianaWiekAktywniPct: 25,
     rokBazowyTrend: 2015,
     // „grudzień" i „czerwiec" stopy bezrobocia rejestrowanego (poziom powiatu).
     stopaBezrobociaIds: ["461691", "461685"],

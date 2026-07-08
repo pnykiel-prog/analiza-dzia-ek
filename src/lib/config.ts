@@ -248,9 +248,10 @@ export const KONFIG_POPYT_P1: KonfiguracjaPopytP1 = {
   dochodFallback: 6500,
   wielkoscGospodarstwa: { mlodzi: 2.2, seniorzy: 1.4 },
   marginesGospodarstwa: 1.5,
-  // Własność mieszkań w PL jest wysoka; bez własnego lokalu jest mniejszość, większa
-  // wśród aktywnych (na dorobku / u rodziców / najem) niż seniorów (zwykle właściciele).
-  udzialBezWlasnegoLokalu: { mlodzi: 0.3, seniorzy: 0.12 },
+  // Własność mieszkań w PL jest wysoka; bez własnego lokalu jest mniejszość. Profil
+  // aktywny obejmuje 20–64 (starsi częściej właściciele), więc udział niższy niż dla
+  // samych 20–39; seniorzy 65+ zwykle właściciele. Kalibrowalne z NSP (struktura własności).
+  udzialBezWlasnegoLokalu: { mlodzi: 0.2, seniorzy: 0.12 },
   progWiekuEmerytalnegoLat: 65,
   qBenchS: 0.22,
   benchKomNa1000: 8,

@@ -6,7 +6,7 @@
  * nadpisać w konfiguracji `zmienneId`). Następnie:
  *  - units/search → jednostka gminy,
  *  - data/by-unit → wartości zmiennych,
- *  - wyliczenie udziałów (65+, 20–39) z liczebności / ludności ogółem.
+ *  - wyliczenie udziałów (65+, 20–64 aktywni) z liczebności / ludności ogółem.
  *
  * Funkcje parsujące są czyste (testowane offline). Brak danych → status „brak".
  */
@@ -196,7 +196,7 @@ function sumaPasm(pasma: PasmoWieku[], m: Map<string, number | null>): number | 
   return suma;
 }
 
-// ── Regionalna baza odniesienia (mediana wojewódzka 20–39) ───────────────────
+// ── Regionalna baza odniesienia (mediana wojewódzka 20–64 aktywni) ───────────────────
 
 const norm = (s: string) => s.toLowerCase().trim();
 
@@ -220,19 +220,19 @@ async function jednostkaWojewodztwa(wojNazwa: string): Promise<string | null> {
   return null;
 }
 
-/** Cache: nazwa województwa → udział 20–39 [%] (regionalna baza odniesienia). */
+/** Cache: nazwa województwa → udział 20–64 [%] (regionalna baza odniesienia). */
 const cacheMediana = new Map<string, number>();
 
-/** Udział 20–39 dla województwa (dane BDL). Fallback do stałej krajowej, gdy brak. */
-async function medianaWoj2039(wojNazwa: string, p2039: PasmoWieku[]): Promise<number | null> {
-  if (!wojNazwa || p2039.length === 0) return null;
+/** Udział 20–64 (aktywni) dla województwa (dane BDL). Fallback do stałej krajowej, gdy brak. */
+async function medianaWojAktywni(wojNazwa: string, pAktywni: PasmoWieku[]): Promise<number | null> {
+  if (!wojNazwa || pAktywni.length === 0) return null;
   const klucz = norm(wojNazwa);
   if (cacheMediana.has(klucz)) return cacheMediana.get(klucz)!;
   const wojId = await jednostkaWojewodztwa(wojNazwa);
   if (!wojId) return null;
-  const m = await wartosciWielu(wojId, [P2137_OGOLEM_TOTAL, ...p2039.map((p) => p.id)]);
+  const m = await wartosciWielu(wojId, [P2137_OGOLEM_TOTAL, ...pAktywni.map((p) => p.id)]);
   const ogolem = m.get(P2137_OGOLEM_TOTAL);
-  const suma = sumaPasm(p2039, m);
+  const suma = sumaPasm(pAktywni, m);
   if (!ogolem || ogolem <= 0 || suma === null) return null;
   const udzial = Math.round((suma / ogolem) * 1000) / 10;
   cacheMediana.set(klucz, udzial);
@@ -299,7 +299,7 @@ export const konektorGUS: Konektor = {
     };
 
     // Demografia — pobieramy TYLKO potrzebne zmienne (jedna paczka, bez ryzyka dławienia):
-    //  20–39 = 20-24…35-39 (4 pasma); 65+ = 65-69 + „70 i więcej" (agregat) — 2 pasma,
+    //  20–64 (aktywni) = 20-24…60-64 (9 pasm); 65+ = 65-69 + „70 i więcej" (agregat) — 2 pasma,
     //  odporne (nie wymaga kompletu 13 pasm 0–64). Plus ludność ogółem, podmioty, saldo.
     const idPodmioty = gus.zmienneId.podmiotyNa10k ?? "60530";
     const idSaldo = gus.zmienneId.saldoMigracji ?? "1365234";
@@ -309,11 +309,11 @@ export const konektorGUS: Konektor = {
     const idWymel = gus.wymeldowaniaId ?? (await idZmiennejPoFrazie(gus.zapytania.wymeldowania));
     const opcjonalne = [idDochod, idZamel, idWymel].filter(Boolean) as string[];
     const pasma = await pasmaWiekuOgolem();
-    const p2039 = pasma.filter((p) => p.lo >= 20 && p.hi <= 39 && p.hi - p.lo === 4);
+    const pAktywni = pasma.filter((p) => p.lo >= 20 && p.hi <= 64 && p.hi - p.lo === 4);
     const p65_69 = pasma.find((p) => p.lo === 65 && p.hi === 69);
     const p70plus = pasma.find((p) => p.lo === 70 && p.hi === Infinity); // agregat „70 i więcej"
     const p65 = [p65_69, p70plus].filter(Boolean) as PasmoWieku[];
-    const potrzebne = [...new Set([P2137_OGOLEM_TOTAL, ...p2039.map((p) => p.id), ...p65.map((p) => p.id), idPodmioty, idSaldo, ...opcjonalne])];
+    const potrzebne = [...new Set([P2137_OGOLEM_TOTAL, ...pAktywni.map((p) => p.id), ...p65.map((p) => p.id), idPodmioty, idSaldo, ...opcjonalne])];
     const m = await wartosciWielu(jednostka.id, potrzebne);
     if ([...m.values()].every((v) => v === null)) {
       return brakWyniku(
@@ -324,7 +324,7 @@ export const konektorGUS: Konektor = {
       );
     }
     const ogolem = m.get(P2137_OGOLEM_TOTAL) ?? null;
-    const pop2039 = sumaPasm(p2039, m);
+    const popAktywni = sumaPasm(pAktywni, m);
     const pop65 = p65.length === 2 ? sumaPasm(p65, m) : null; // 65-69 + 70+
     const podmioty = m.get(idPodmioty) ?? null;
     const saldo = m.get(idSaldo) ?? null;
@@ -332,7 +332,7 @@ export const konektorGUS: Konektor = {
     const udzial65 = ogolem && ogolem > 0 && pop65 !== null ? (pop65 / ogolem) * 100 : null;
     // Liczby bezwzględne (popyt P1: trójdzielny podział + benchmarki per mieszkaniec).
     if (ogolem && ogolem > 0) dodaj("liczbaMieszkancowGminy", ogolem, 85);
-    if (pop2039 !== null) dodaj("liczba2039", pop2039, 80);
+    if (popAktywni !== null) dodaj("liczbaAktywni", popAktywni, 80);
     if (pop65 !== null) dodaj("liczba65Plus", pop65, 80);
     // Dochód i migracje brutto — tylko gdy skonfigurowano ID zmiennych BDL (inaczej fallback w modelu).
     if (idDochod) dodaj("dochodPrzecietnyGmina", m.get(idDochod) ?? null, 70);
@@ -346,11 +346,11 @@ export const konektorGUS: Konektor = {
     }
     if (ogolem && ogolem > 0) {
       if (udzial65 !== null) dodaj("udzial65PlusPct", udzial65, 80);
-      if (pop2039 !== null) {
-        dodaj("udzial2039Pct", (pop2039 / ogolem) * 100, 80);
-        // Baza odniesienia „młodych": realna mediana wojewódzka (BDL) albo krajowy fallback.
-        const medWoj = await medianaWoj2039(teren.wojewodztwo, p2039);
-        dodaj("mediana2039Woj", medWoj ?? gus.medianaWiek2039Pct, medWoj !== null ? 75 : 55);
+      if (popAktywni !== null) {
+        dodaj("udzialAktywniPct", (popAktywni / ogolem) * 100, 80);
+        // Baza odniesienia „aktywnych": realna mediana wojewódzka (BDL) albo krajowy fallback.
+        const medWoj = await medianaWojAktywni(teren.wojewodztwo, pAktywni);
+        dodaj("medianaAktywniWoj", medWoj ?? gus.medianaWiekAktywniPct, medWoj !== null ? 75 : 55);
       }
     }
     // BDL 60530 to podmioty „na 10 tys." — model/UI używa „na 1000", więc /10.
