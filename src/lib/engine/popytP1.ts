@@ -76,7 +76,7 @@ function kwalifikacje(
   const qS = Math.max(0, qKGorny - qK);
   const estymacja = d.dochodPrzecietnyGmina == null;
 
-  // Liczebność grupy [OSOBY]: liczba bezwzględna z BDL; awaryjnie z udziału % × ludność.
+  // Liczebność grupy wiekowej [OSOBY]: liczba bezwzględna z BDL; awaryjnie z udziału % × ludność.
   const total = d.liczbaMieszkancowGminy ?? null;
   let nOsoby: number | null =
     profil === "mlodzi" ? d.liczba2039 ?? null : d.liczba65Plus ?? null;
@@ -84,22 +84,22 @@ function kwalifikacje(
     const pct = profil === "mlodzi" ? d.udzial2039Pct : d.udzial65PlusPct;
     if (pct != null) nOsoby = (pct / 100) * total;
   }
-  // GOSPODARSTWA = osoby / wielkość gospodarstwa profilu (do porównania z liczbą mieszkań).
-  const nGospodarstw = nOsoby == null ? null : nOsoby / cfg.wielkoscGospodarstwa[profil];
-  // Konwersja senioralna: reduktor realnej skłonności 65+ do najmu społecznego
-  // (własność, wiek). Dotyczy STRUMIENIA SPOŁECZNEGO; skala potrzeby komunalnej
-  // (kanał gminny) pozostaje pełna — patrz sekcja 4.2 wytycznych.
-  const konw = profil === "seniorzy" ? cfg.konwersjaSenior : 1;
+  // DEFINICJA PROFILU: brak własnego lokalu — filtr populacyjny PRZED dochodem,
+  // dla OBU profili (nie tylko seniorów). Odcina właścicieli u źródła; własność
+  // liczona RAZ (nie jako osobny mnożnik). Estymacja → niższa pewność (flaga w werdykcie).
+  const nBezLokalu = nOsoby == null ? null : nOsoby * cfg.udzialBezWlasnegoLokalu[profil];
+  // GOSPODARSTWA = osoby bez lokalu / wielkość gospodarstwa (do porównania z liczbą mieszkań).
+  const nGospodarstw = nBezLokalu == null ? null : nBezLokalu / cfg.wielkoscGospodarstwa[profil];
 
   return {
-    // nGrupa raportowane w OSOBACH (liczebność grupy wiekowej).
+    // nGrupa raportowane w OSOBACH (pełna grupa wiekowa — kontekst).
     nGrupa: nOsoby == null ? null : Math.round(nOsoby),
     qK: Math.round(qK * 1000) / 1000,
     qS: Math.round(qS * 1000) / 1000,
-    // nKomunalny = OSOBY (skala potrzeby per mieszkaniec, benchmark /1000 mieszk.).
-    nKomunalny: nOsoby == null ? null : Math.round(nOsoby * qK),
-    // nSpoleczny = GOSPODARSTWA kwalifikujące (do porównania z liczbą mieszkań), z konwersją senioralną.
-    nSpoleczny: nGospodarstw == null ? null : Math.round(nGospodarstw * qS * konw),
+    // nKomunalny = OSOBY bez własnego lokalu (skala potrzeby per mieszkaniec, benchmark /1000).
+    nKomunalny: nBezLokalu == null ? null : Math.round(nBezLokalu * qK),
+    // nSpoleczny = GOSPODARSTWA bez własnego lokalu kwalifikujące dochodowo (vs liczba mieszkań).
+    nSpoleczny: nGospodarstw == null ? null : Math.round(nGospodarstw * qS),
     estymacja,
   };
 }
@@ -224,14 +224,17 @@ function werdyktSpoleczny(
   if (luka != null && luka >= PROG_LUKI_FLAGA) flagi.push(`Wysoka luka cenowa (${Math.round(luka)}%) — realny popyt na najem społeczny.`);
   if (kw.nSpoleczny == null) flagi.push("Brak liczb ludności/dochodu — popyt społeczny szacowany (obniżona pewność).");
   if (kw.estymacja) flagi.push("Udział dochodowy (segment społeczny) estymowany z rozkładu regionalnego — do potwierdzenia na P2.");
+  // Definicja profilu: populacja bez własnego lokalu estymowana z sygnałów (udział własności) → niższa pewność.
+  flagi.push("Populacja bez własnego lokalu (warunek kwalifikacji) szacowana z sygnałów — obniżona pewność.");
   if (luka == null) flagi.push("Brak lokalnego czynszu rynkowego — luka i atrakcyjność szacunkowe.");
 
-  const pewnoscBaza = kw.nSpoleczny == null ? 45 : kw.estymacja ? 70 : 82;
+  // Estymacja własności (definicja) obniża pewność bazową o ~7 pkt (jawnie, nie udajemy dokładności).
+  const pewnoscBaza = kw.nSpoleczny == null ? 45 : (kw.estymacja ? 70 : 82) - 7;
   const pewnosc = clamp(Math.round(pewnoscBaza * (1 - wagi.zew) + atrakcyjnosc.pewnosc * wagi.zew));
   const komentarz =
     kw.nSpoleczny == null
       ? "Brak danych ludnościowych — werdykt orientacyjny."
-      : `${kw.nSpoleczny} gospodarstw kwalifikujących się (segment społeczny) wobec pojemności ${pojemnoscMieszkan} mieszk. × margines ${cfg.marginesGospodarstwa}.`;
+      : `${kw.nSpoleczny} gospodarstw bez własnego lokalu kwalifikujących się dochodowo (segment społeczny) wobec pojemności ${pojemnoscMieszkan} mieszk. × margines ${cfg.marginesGospodarstwa}.`;
   return { klucz, natura: "spoleczny", profil, score, werdykt: pasmo(score, cfg), liczbaKwalifikujacych: kw.nSpoleczny, pewnosc, flagi, komentarz };
 }
 
@@ -265,10 +268,11 @@ function werdyktKomunalny(
     if (flagaPulapkaSenioralna(d))
       flagi.push("Uwaga: rosnący udział 65+ przy malejącej populacji — ryzyko utrwalania odpływu (informacyjnie, nie obniża oceny).");
   }
+  if (kw.nKomunalny != null) flagi.push("Populacja bez własnego lokalu (warunek kwalifikacji) szacowana z sygnałów — obniżona pewność.");
   const komentarz =
     kw.nKomunalny == null
       ? "Brak danych ludnościowych — skala potrzeby nieoznaczona."
-      : `Skala potrzeby komunalnej: ${kw.nKomunalny} os. (segment K) — porównanie per mieszkaniec do mediany regionalnej.`;
+      : `Skala potrzeby komunalnej: ${kw.nKomunalny} os. bez własnego lokalu (segment K) — porównanie per mieszkaniec do mediany regionalnej.`;
   return { klucz, natura: "komunalny", profil, score, werdykt: pasmo(score, cfg), liczbaKwalifikujacych: kw.nKomunalny, pewnosc, flagi, komentarz };
 }
 

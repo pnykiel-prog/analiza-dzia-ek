@@ -3,11 +3,13 @@ import { Karta, Statystyka } from "./ui";
 import { WskaznikPewnosci } from "./grunt";
 import { liczba, statusSlowny } from "@/lib/format";
 
+// Oba profile definiuje wspólny warunek: brak własnego lokalu (kwalifikacja do
+// budownictwa społecznego). Wiek jedynie je rozdziela: aktywni (18–wiek emer.) / seniorzy.
 const ETYK_WERDYKT: Record<KluczWerdyktu, string> = {
-  spolecznyMlodzi: "Społeczny — młodzi",
-  spolecznySeniorzy: "Społeczny — seniorzy",
-  komunalnyMlodzi: "Komunalny — młodzi",
-  komunalnySeniorzy: "Komunalny — seniorzy",
+  spolecznyMlodzi: "Społeczny — aktywni (bez własnego M)",
+  spolecznySeniorzy: "Społeczny — seniorzy (bez własnego M)",
+  komunalnyMlodzi: "Komunalny — aktywni (bez własnego M)",
+  komunalnySeniorzy: "Komunalny — seniorzy (bez własnego M)",
 };
 
 const KOLOR_STATUSU: Record<Werdykt, string> = {
@@ -101,7 +103,7 @@ export function Poziom1View({ p1, pelny = true, pokazRekomendacje = true }: { p1
               const k = ocena.kwalifikacje[p];
               return (
                 <div key={p} className="rounded-panel border border-grunt-border p-4">
-                  <div className="text-[13px] font-semibold text-grunt-text mb-2">{p === "mlodzi" ? "Młodzi (20–39)" : "Seniorzy (65+)"}</div>
+                  <div className="text-[13px] font-semibold text-grunt-text mb-2">{p === "mlodzi" ? "Aktywni bez własnego lokalu (20–39)" : "Seniorzy bez własnego lokalu (65+)"}</div>
                   <div className="grid grid-cols-3 gap-2 text-[11px]">
                     <MiniStat e="Grupa (N)" v={k.nGrupa == null ? "brak" : liczba(k.nGrupa)} />
                     <MiniStat e="Komunalny (K)" v={k.nKomunalny == null ? "brak" : liczba(k.nKomunalny)} />

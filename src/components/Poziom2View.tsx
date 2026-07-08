@@ -38,7 +38,7 @@ function WerdyktM2Karta({ ocena }: { ocena: OcenaM2 }) {
         brak ? (
           <span className="badge bg-grunt-red-bg text-grunt-red">BRAK — lokalizacja nieodpowiednia</span>
         ) : (
-          <span className="badge bg-grunt-ink text-white">Rekomendacja: {ocena.rekomendacja === "seniorzy" ? "seniorzy" : "młodzi"}</span>
+          <span className="badge bg-grunt-ink text-white">Rekomendacja: {ocena.rekomendacja === "seniorzy" ? "seniorzy (bez własnego M)" : "aktywni (bez własnego M)"}</span>
         )
       }
     >
@@ -374,7 +374,7 @@ function KartaWariantu({
         <span className="text-grunt-text-muted2">Profil docelowy:</span>
         <span className="flex items-center gap-1.5 font-medium text-grunt-text">
           <span className={`w-2.5 h-2.5 rounded-full ${dotProfil}`} />
-          {w.profil === "mlodzi" ? "Młodzi" : "Seniorzy"}
+          {w.profil === "mlodzi" ? "Aktywni (bez własnego M)" : "Seniorzy (bez własnego M)"}
         </span>
       </div>
 

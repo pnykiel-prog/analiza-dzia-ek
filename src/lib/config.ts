@@ -210,10 +210,15 @@ export interface KonfiguracjaPopytP1 {
   /** Ilu kwalifikujących się (GOSPODARSTW segmentu S) na 1 mieszkanie = pełna wystarczalność. */
   marginesGospodarstwa: number;
   /**
-   * Reduktor realnej skłonności 65+ do najmu społecznego (własność mieszkania,
-   * wiek, dochód). Sama liczba 65+ zawyża popyt — nie każdy senior szuka najmu.
+   * DEFINICJA obu profili: brak własnego lokalu mieszkalnego (warunek kwalifikacji
+   * do budownictwa społecznego). Szacowany udział grupy wiekowej BEZ własnego
+   * lokalu — filtr populacyjny PRZED podziałem dochodowym (dotyczy obu profili,
+   * nie tylko seniorów). Zastępuje dawny mnożnik „konwersji senioralnej" (własność
+   * liczona teraz RAZ, w definicji). Estymacja z sygnałów → niższa pewność.
    */
-  konwersjaSenior: number;
+  udzialBezWlasnegoLokalu: Record<Profil, number>;
+  /** Próg wieku emerytalnego [lata] — linia podziału profil aktywny/senioralny (parametr). */
+  progWiekuEmerytalnegoLat: number;
   /** Benchmark regionalny udziału społecznego (mediana q_S). */
   qBenchS: number;
   /** Benchmark regionalny gęstości komunalnej na 1000 mieszk. (mediana). */
@@ -243,7 +248,10 @@ export const KONFIG_POPYT_P1: KonfiguracjaPopytP1 = {
   dochodFallback: 6500,
   wielkoscGospodarstwa: { mlodzi: 2.2, seniorzy: 1.4 },
   marginesGospodarstwa: 1.5,
-  konwersjaSenior: 0.45,
+  // Własność mieszkań w PL jest wysoka; bez własnego lokalu jest mniejszość, większa
+  // wśród aktywnych (na dorobku / u rodziców / najem) niż seniorów (zwykle właściciele).
+  udzialBezWlasnegoLokalu: { mlodzi: 0.3, seniorzy: 0.12 },
+  progWiekuEmerytalnegoLat: 65,
   qBenchS: 0.22,
   benchKomNa1000: 8,
   wagiSpoleczne: { mlodzi: { wew: 0.55, zew: 0.45 }, seniorzy: { wew: 0.85, zew: 0.15 } },

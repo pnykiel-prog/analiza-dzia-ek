@@ -80,8 +80,8 @@ export function RaportView({
         return (
           <SekcjaRap numer="01" tytul="Werdykt przydatności — budownictwo społeczne (Poziom 2)">
             <div className="grid grid-cols-2 gap-4">
-              <WerdyktMini nazwa="Młodzi" profil="mlodzi" score={wm.score} werdykt={wm.werdykt} pewnosc={p1.pewnosc} rek={om2.rekomendacja === "mlodzi"} />
-              <WerdyktMini nazwa="Seniorzy" profil="seniorzy" score={ws.score} werdykt={ws.werdykt} pewnosc={p1.pewnosc} rek={om2.rekomendacja === "seniorzy"} />
+              <WerdyktMini nazwa="Aktywni (bez własnego M)" profil="mlodzi" score={wm.score} werdykt={wm.werdykt} pewnosc={p1.pewnosc} rek={om2.rekomendacja === "mlodzi"} />
+              <WerdyktMini nazwa="Seniorzy (bez własnego M)" profil="seniorzy" score={ws.score} werdykt={ws.werdykt} pewnosc={p1.pewnosc} rek={om2.rekomendacja === "seniorzy"} />
             </div>
           </SekcjaRap>
         );
