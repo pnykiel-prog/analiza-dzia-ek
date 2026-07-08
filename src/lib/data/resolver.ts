@@ -9,7 +9,7 @@
 
 import type { DaneDzialki } from "../types";
 import { DZIALKI_PRZYKLADOWE } from "./sample";
-import { skomponujId, odwrotnyTeryt, type PozycjaDzialki } from "../teryt";
+import { skomponujId, odwrotnyTeryt, kodTerytZId, type PozycjaDzialki } from "../teryt";
 import { statusRynkowy } from "../fieldModes";
 import { pobierzDzialkePoId } from "./uldk";
 import { centroid, centroid4326ZWkt, czyPrzylegaja, konturSvg, konturGeo, zwartoscKsztaltu, minSzerokoscKsztaltu } from "../geo";
@@ -247,7 +247,10 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
     const centroid4326 = wkt0 ? centroid4326ZWkt(wkt0) : null;
     const teren: Teren = {
       id: dane.id,
-      teryt: pozycje[0]?.gminaTeryt ?? dane.teryt ?? "",
+      // Zawsze przekazujemy kod gminy — z kaskady ULDK, a w trybie ID-only wprost
+      // z prefiksu identyfikatora (WWPPGG). Konektor GUS użyje go do zakotwiczenia
+      // jednostki BDL po TERYT, nie tylko po (niejednoznacznej) nazwie gminy.
+      teryt: pozycje[0]?.gminaTeryt || dane.teryt || kodTerytZId(dane.id) || "",
       wojewodztwo: dane.wojewodztwo,
       powiat: dane.powiat,
       gmina: dane.gmina,

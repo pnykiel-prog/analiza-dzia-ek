@@ -29,8 +29,18 @@ function jednostkaHistoryczna(name: string): boolean {
   return /\bdo\s+(19|20)\d{2}\b/i.test(name); // „do 2001", „do 1998" itp.
 }
 
-/** Wybiera aktualną jednostkę BDL pasującą nazwą; pomija jednostki archiwalne („…do 2001"). */
-export function wybierzJednostke(json: unknown, nazwa: string): JednostkaBDL | null {
+/**
+ * Wybiera aktualną jednostkę BDL; pomija jednostki archiwalne („…do 2001").
+ *
+ * Zakotwiczenie po TERYT (gdy podano `teryt` = WWPPGG): id jednostki BDL zawiera
+ * kod TERYT gminy, więc kandydat, którego id zawiera ten kod, to NA PEWNO właściwa
+ * gmina — nawet gdy w Polsce istnieje kilka gmin o tej samej nazwie w różnych
+ * województwach (np. „Brzeziny", „Kamień"). Bez tej kotwicy dobór po samej nazwie
+ * mógł trafić w duplikat z innego regionu (błąd „dane innej gminy niż działka").
+ * Gdy żaden kandydat nie zawiera kodu (nietypowy format id) — schodzimy do doboru
+ * po nazwie, więc zmiana nie może pogorszyć dotychczasowego zachowania.
+ */
+export function wybierzJednostke(json: unknown, nazwa: string, teryt?: string): JednostkaBDL | null {
   const wyniki = (json as { results?: JednostkaBDL[] })?.results;
   if (!Array.isArray(wyniki) || wyniki.length === 0) return null;
   const dopasuj = (s: string) => s.toLowerCase().trim();
@@ -39,11 +49,17 @@ export function wybierzJednostke(json: unknown, nazwa: string): JednostkaBDL | n
   // innego wyszukiwania (np. bez filtra poziomu) i znalazł aktualną jednostkę.
   const aktualne = wyniki.filter((u) => !jednostkaHistoryczna(u.name));
   if (aktualne.length === 0) return null;
-  // Preferencja: dokładna nazwa → nazwa zawierająca szukaną (np. „Powiat m.st. Warszawa") → pierwsza.
+  const kod = (teryt ?? "").replace(/\D/g, "").slice(0, 6);
+  // KOTWICA TERYT: spośród kandydatów bierzemy tych, których id zawiera kod gminy.
+  const poTeryt = kod.length === 6 ? aktualne.filter((u) => (u.id ?? "").includes(kod)) : [];
+  const pula = poTeryt.length > 0 ? poTeryt : aktualne;
+  // Preferencja w obrębie puli: dokładna nazwa → nazwa zawierająca szukaną
+  // (np. „Powiat m.st. Warszawa") → pierwsza. Gdy kotwica TERYT zadziałała, pula
+  // ma już właściwą gminę, więc „pierwsza" jest bezpieczna.
   return (
-    aktualne.find((u) => dopasuj(u.name) === dopasuj(nazwa)) ??
-    aktualne.find((u) => dopasuj(u.name).includes(dopasuj(nazwa))) ??
-    aktualne[0]
+    pula.find((u) => dopasuj(u.name) === dopasuj(nazwa)) ??
+    pula.find((u) => dopasuj(u.name).includes(dopasuj(nazwa))) ??
+    pula[0]
   );
 }
 
@@ -267,10 +283,10 @@ export const konektorGUS: Konektor = {
       naglowki: naglowki(),
     });
     if (jedn === null) return brakWyniku(this.klucz, this.zrodlo, czas, "BDL nieosiągalny (units/search) — sieć/egress.");
-    let jednostka = wybierzJednostke(jedn, teren.gmina);
+    let jednostka = wybierzJednostke(jedn, teren.gmina, teren.teryt);
     if (!jednostka) {
       const jedn2 = await fetchJson(url("units/search", { name: teren.gmina }), { ...KONFIG_KONEKTORY.siec, naglowki: naglowki() });
-      jednostka = wybierzJednostke(jedn2, teren.gmina);
+      jednostka = wybierzJednostke(jedn2, teren.gmina, teren.teryt);
     }
     if (!jednostka) return brakWyniku(this.klucz, this.zrodlo, czas, `Nie znaleziono jednostki BDL dla gminy „${teren.gmina}".`);
 
