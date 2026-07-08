@@ -1,0 +1,15 @@
+{
+  "meta": {
+    "opis": "Warstwy środowiskowe (bramka E) — przecięcie geometrii działki ze strefą. Import z WFS (ISOK powódź, GDOŚ ochrona przyrody, [SOPO osuwiska]).",
+    "data_importu": null,
+    "zrodla": ["ISOK/Wody Polskie (WFS)", "GDOŚ Geoserwis (WFS)", "PIG-PIB/SOPO (WFS)"],
+    "uwaga": "SEED — puste warstwy. Pełne dane wgrywa tools/srodowisko/import.ts (WFS). Warstwa niezaładowana → brak = krytyczny (do weryfikacji, CAP na warunkową). Wynik = flaga przesiewowa, NIE rozstrzygnięcie prawne."
+  },
+  "warstwy": {
+    "powodz_q10": { "type": "FeatureCollection", "features": [] },
+    "powodz_q1": { "type": "FeatureCollection", "features": [] },
+    "powodz_q02": { "type": "FeatureCollection", "features": [] },
+    "ochrona_przyrody": { "type": "FeatureCollection", "features": [] },
+    "osuwiska": { "type": "FeatureCollection", "features": [] }
+  }
+}
