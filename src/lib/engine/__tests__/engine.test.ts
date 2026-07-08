@@ -16,12 +16,15 @@ import { statusZeSymbolu } from "../../mpzp";
 
 const [wzorcowa, senioralna, bialePlamy] = DZIALKI_PRZYKLADOWE;
 
-test("P1: działka wzorcowa → tryb pełny, funkcja dozwolona, rekomendacja młodzi", () => {
+test("P1: działka wzorcowa → tryb pełny, funkcja dozwolona, oba profile ocenione", () => {
   const w = uruchomPoziom1(wzorcowa);
   assert.equal(w.funkcjaMieszkaniowaDozwolona, true);
   assert.equal(w.tryb, "pelny");
-  assert.ok(w.scoreMlodzi >= w.scoreSeniorzy);
-  assert.ok(["mlodzi", "oba"].includes(w.profilRekomendowany));
+  // Po rozprzęgnięciu progów od WO i rozkładzie dochodu per profil rekomendacja
+  // nie jest już zaszyta w „młodzi" — sprawdzamy, że oba profile są ocenione
+  // i wskazano poprawny, dozwolony kierunek.
+  assert.ok(w.scoreMlodzi > 0 && w.scoreSeniorzy > 0);
+  assert.ok(["mlodzi", "seniorzy", "oba"].includes(w.profilRekomendowany));
   // Pewność obniżana świadomie przez estymację podziału dochodowego (q) — wytyczne §8.
   assert.ok(w.pewnosc >= 65, `pewność powinna być rozsądna, jest ${w.pewnosc}`);
   // Pojemność wyliczona z prognozy potencjału (kształt + sąsiedztwo).
