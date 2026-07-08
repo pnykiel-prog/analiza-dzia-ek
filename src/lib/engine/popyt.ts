@@ -95,9 +95,9 @@ function napiecieMieszkaniowe(d: DaneDzialki, cfg: KonfiguracjaPopyt): { idx: nu
 /** Baza grupy docelowej (0–1) — intensywność grupy z korektą trendu (seniorzy). */
 function grupaDocelowa(d: DaneDzialki, profil: Profil): { idx: number; opis: string; fallback: boolean } {
   if (profil === "mlodzi") {
-    if (d.udzial2039Pct === null || d.mediana2039Woj === null) return { idx: 0.5, opis: "brak danych", fallback: true };
-    const idx = liniowo(d.udzial2039Pct, d.mediana2039Woj * 0.6, d.mediana2039Woj * 1.15, 0.35, 1);
-    return { idx: c01(idx), opis: `${d.udzial2039Pct}% (mediana ${d.mediana2039Woj}%)`, fallback: false };
+    if (d.udzialAktywniPct === null || d.medianaAktywniWoj === null) return { idx: 0.5, opis: "brak danych", fallback: true };
+    const idx = liniowo(d.udzialAktywniPct, d.medianaAktywniWoj * 0.6, d.medianaAktywniWoj * 1.15, 0.35, 1);
+    return { idx: c01(idx), opis: `${d.udzialAktywniPct}% (mediana ${d.medianaAktywniWoj}%)`, fallback: false };
   }
   if (d.udzial65PlusPct === null || d.trend65Plus === null) return { idx: 0.5, opis: "brak danych", fallback: true };
   const baza = liniowo(d.udzial65PlusPct, 12, 26, 0.4, 1);

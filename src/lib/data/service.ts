@@ -32,7 +32,7 @@ const POLA_DANYCH: (keyof DaneDzialki)[] = [
   "uslugiPodstawowePieszo",
   "pozWZasiegu",
   "zlobkiSzkolyWZasiegu",
-  "udzial2039Pct",
+  "udzialAktywniPct",
   "saldoMigracjiMlodzi",
   "udzial65PlusPct",
   "trendLudnosc",

@@ -79,9 +79,9 @@ function kwalifikacje(
   // Liczebność grupy wiekowej [OSOBY]: liczba bezwzględna z BDL; awaryjnie z udziału % × ludność.
   const total = d.liczbaMieszkancowGminy ?? null;
   let nOsoby: number | null =
-    profil === "mlodzi" ? d.liczba2039 ?? null : d.liczba65Plus ?? null;
+    profil === "mlodzi" ? d.liczbaAktywni ?? null : d.liczba65Plus ?? null;
   if (nOsoby == null && total != null) {
-    const pct = profil === "mlodzi" ? d.udzial2039Pct : d.udzial65PlusPct;
+    const pct = profil === "mlodzi" ? d.udzialAktywniPct : d.udzial65PlusPct;
     if (pct != null) nOsoby = (pct / 100) * total;
   }
   // DEFINICJA PROFILU: brak własnego lokalu — filtr populacyjny PRZED dochodem,

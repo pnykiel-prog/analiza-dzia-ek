@@ -49,13 +49,13 @@ export async function GET(req: Request) {
       rozpoznaneWojewodztwo: d?.wojewodztwo || "(puste!)",
       powierzchniaM2: d?.powierzchniaM2 ?? null,
       demografia: {
-        udzial2039Pct: d?.udzial2039Pct ?? null,
+        udzialAktywniPct: d?.udzialAktywniPct ?? null,
         udzial65PlusPct: d?.udzial65PlusPct ?? null,
-        mediana2039Woj: d?.mediana2039Woj ?? null,
+        medianaAktywniWoj: d?.medianaAktywniWoj ?? null,
         bezrobociePct: d?.bezrobociePct ?? null,
         saldoMigracjiMlodzi: d?.saldoMigracjiMlodzi ?? null,
         liczbaMieszkancowGminy: d?.liczbaMieszkancowGminy ?? null,
-        liczba2039: d?.liczba2039 ?? null,
+        liczbaAktywni: d?.liczbaAktywni ?? null,
         liczba65Plus: d?.liczba65Plus ?? null,
         dochodPrzecietnyGmina: d?.dochodPrzecietnyGmina ?? null,
         naplywZameldowanNa1000: d?.naplywZameldowanNa1000 ?? null,
@@ -63,7 +63,7 @@ export async function GET(req: Request) {
       },
       gusRaport: gusRaport ?? "(konektor GUS nie w raporcie)",
       wniosek:
-        d?.udzial2039Pct != null
+        d?.udzialAktywniPct != null
           ? "✅ Resolver ma demografię — aplikacja powinna pokazać zróżnicowany werdykt."
           : `❌ Resolver NIE ma demografii. Rozpoznana gmina: „${d?.gmina || ""}". Powód z GUS: ${gusRaport?.debug ?? gusRaport?.status ?? "brak"}.`,
     });
@@ -96,7 +96,7 @@ export async function GET(req: Request) {
     rok: gus.rok,
     status: wynik.status,
     liczbaPolDanych: liczbaPol,
-    dane, // udzial2039Pct, udzial65PlusPct, bezrobociePct, trend65Plus, trendLudnosc, saldoMigracjiMlodzi, …
+    dane, // udzialAktywniPct, udzial65PlusPct, bezrobociePct, trend65Plus, trendLudnosc, saldoMigracjiMlodzi, …
     debug: wynik.debug ?? null,
     wniosek,
   };
