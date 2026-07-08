@@ -159,6 +159,9 @@ export interface DaneDzialki {
   medianaAktywniWoj: Maybe<number>;
   saldoMigracjiMlodzi: Maybe<number>; // dodatnie/zero/ujemne
   udzial65PlusPct: Maybe<number>;
+  /** NSP 2021: udział gospodarstw BEZ tytułu własności [%] (najem/lokatorskie/użyczenie) —
+   *  per gmina, kalibracja „bez własnego lokalu" (definicja profili). Null → estymata z config. */
+  udzialGospodarstwBezWlasnosciPct?: Maybe<number>;
   // F2. Liczby bezwzględne i dochód (popyt P1 — trójdzielny podział, benchmarki per mieszkaniec)
   liczbaMieszkancowGminy?: Maybe<number>; // ludność ogółem gminy
   liczbaAktywni?: Maybe<number>; // liczebność 20–64 aktywni, poniżej wieku emerytalnego (nie %)

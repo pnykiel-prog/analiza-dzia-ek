@@ -219,6 +219,13 @@ export interface KonfiguracjaPopytP1 {
   udzialBezWlasnegoLokalu: Record<Profil, number>;
   /** Próg wieku emerytalnego [lata] — linia podziału profil aktywny/senioralny (parametr). */
   progWiekuEmerytalnegoLat: number;
+  /**
+   * Skew per profil nad GMINNYM udziałem gospodarstw bez własności (NSP 2021):
+   * udział profilu bez lokalu = udziałGminny × skew. Aktywni częściej najemcy
+   * (>1), seniorzy zwykle właściciele (<1). Używane, gdy dostępny udział z NSP;
+   * bez NSP model korzysta z udzialBezWlasnegoLokalu (estymata).
+   */
+  skewBezWlasnosci: Record<Profil, number>;
   /** Benchmark regionalny udziału społecznego (mediana q_S). */
   qBenchS: number;
   /** Benchmark regionalny gęstości komunalnej na 1000 mieszk. (mediana). */
@@ -253,6 +260,7 @@ export const KONFIG_POPYT_P1: KonfiguracjaPopytP1 = {
   // samych 20–39; seniorzy 65+ zwykle właściciele. Kalibrowalne z NSP (struktura własności).
   udzialBezWlasnegoLokalu: { mlodzi: 0.2, seniorzy: 0.12 },
   progWiekuEmerytalnegoLat: 65,
+  skewBezWlasnosci: { mlodzi: 1.5, seniorzy: 0.6 },
   qBenchS: 0.22,
   benchKomNa1000: 8,
   wagiSpoleczne: { mlodzi: { wew: 0.55, zew: 0.45 }, seniorzy: { wew: 0.85, zew: 0.15 } },

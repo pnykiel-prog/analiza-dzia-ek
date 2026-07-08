@@ -111,6 +111,18 @@ test("profil bez własnego lokalu: filtr własności skaluje populację obu prof
   assert.ok(bazowy.werdykty.spolecznyMlodzi.flagi.some((f) => f.includes("bez własnego lokalu")));
 });
 
+test("bez własnego lokalu: NSP per gmina (udział bez własności) nadpisuje estymatę z config", () => {
+  // NSP: 40% gospodarstw bez własności → aktywni ×skew(1,5)=0,60; seniorzy ×skew(0,6)=0,24.
+  const zNsp: DaneDzialki = { ...wzorcowa, udzialGospodarstwBezWlasnosciPct: 40 };
+  const bez = ocenPopytP1(wzorcowa, POJ); // estymata config (aktywni 0,20)
+  const z = ocenPopytP1(zNsp, POJ);
+  // Wyższy udział bez własności (0,60 > 0,20) → więcej gospodarstw kwalifikujących.
+  assert.ok(z.kwalifikacje.mlodzi.nSpoleczny! > bez.kwalifikacje.mlodzi.nSpoleczny!);
+  // Flaga wskazuje źródło NSP, nie estymatę.
+  assert.ok(z.werdykty.spolecznyMlodzi.flagi.some((f) => f.includes("NSP 2021")));
+  assert.ok(bez.werdykty.spolecznyMlodzi.flagi.some((f) => f.includes("szacowana z sygnałów")));
+});
+
 test("popytP1 (4.1): rekomendacja działki wybierana TYLKO spośród werdyktów społecznych", () => {
   const o = ocenPopytP1(wzorcowa, POJ);
   // Kafle komunalne = „potrzeba gminy", nie rekomendacja konkretnej działki.
