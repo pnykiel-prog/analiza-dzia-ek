@@ -193,6 +193,11 @@ async function pasmaWiekuOgolem(): Promise<PasmoWieku[]> {
   return out;
 }
 
+/** Pełna, nienakładająca się partycja wieku: 5-letnie pasma (0-4…80-84) + otwarte „85 i więcej". */
+function partycjaWieku(pasma: PasmoWieku[]): PasmoWieku[] {
+  return pasma.filter((p) => p.hi - p.lo === 4 || (p.lo === 85 && p.hi === Infinity));
+}
+
 /** Suma wartości wybranych pasm (null, gdy któregokolwiek brak — nie zaniżamy udziału). */
 function sumaPasm(pasma: PasmoWieku[], m: Map<string, number | null>): number | null {
   if (pasma.length === 0) return null;
@@ -240,8 +245,9 @@ async function medianaWojAktywni(wojNazwa: string, pAktywni: PasmoWieku[]): Prom
   const wojId = await jednostkaWojewodztwa(wojNazwa);
   if (!wojId) return null;
   const idTotal = totalIdWieku();
-  const m = await wartosciWielu(wojId, [idTotal, P2137_OGOLEM_TOTAL, ...pAktywni.map((p) => p.id)]);
-  const ogolem = m.get(idTotal) ?? m.get(P2137_OGOLEM_TOTAL);
+  const pPartycja = partycjaWieku(cachePasma ?? pAktywni);
+  const m = await wartosciWielu(wojId, [idTotal, P2137_OGOLEM_TOTAL, ...pAktywni.map((p) => p.id), ...pPartycja.map((p) => p.id)]);
+  const ogolem = m.get(idTotal) ?? m.get(P2137_OGOLEM_TOTAL) ?? sumaPasm(pPartycja, m);
   const suma = sumaPasm(pAktywni, m);
   if (!ogolem || ogolem <= 0 || suma === null) return null;
   const udzial = Math.round((suma / ogolem) * 1000) / 10;
@@ -325,7 +331,10 @@ export const konektorGUS: Konektor = {
     const p65agg = [pasma.find((p) => p.lo === 65 && p.hi === 69), pasma.find((p) => p.lo === 70 && p.hi === Infinity)].filter(Boolean) as PasmoWieku[];
     const p65gran = pasma.filter((p) => p.lo >= 65 && (p.hi - p.lo === 4 || (p.lo >= 85 && p.hi === Infinity)));
     const idsWieku65 = [...new Set([...p65agg, ...p65gran].map((p) => p.id))];
-    const potrzebne = [...new Set([idTotal, P2137_OGOLEM_TOTAL, ...pAktywni.map((p) => p.id), ...idsWieku65, idPodmioty, idSaldo, ...opcjonalne])];
+    // Pełna, nienakładająca się partycja wieku (0-4…80-84 + 85+) — suma = ludność ogółem,
+    // gdy zmienna „ogółem" nie zwraca wartości (obserwowane dla części jednostek).
+    const pPartycja = partycjaWieku(pasma);
+    const potrzebne = [...new Set([idTotal, P2137_OGOLEM_TOTAL, ...pAktywni.map((p) => p.id), ...idsWieku65, ...pPartycja.map((p) => p.id), idPodmioty, idSaldo, ...opcjonalne])];
     const m = await wartosciWielu(jednostka.id, potrzebne);
     if ([...m.values()].every((v) => v === null)) {
       return brakWyniku(
@@ -338,7 +347,7 @@ export const konektorGUS: Konektor = {
     // Ludność ogółem: dynamiczne ID → stałe ID → suma pasm aktywni+65+ (ostatnia deska ratunku).
     const popAktywni = sumaPasm(pAktywni, m);
     const pop65 = (p65agg.length === 2 ? sumaPasm(p65agg, m) : null) ?? (p65gran.length > 0 ? sumaPasm(p65gran, m) : null);
-    const ogolem = m.get(idTotal) ?? m.get(P2137_OGOLEM_TOTAL) ?? null;
+    const ogolem = m.get(idTotal) ?? m.get(P2137_OGOLEM_TOTAL) ?? sumaPasm(pPartycja, m);
     const podmioty = m.get(idPodmioty) ?? null;
     const saldo = m.get(idSaldo) ?? null;
 
@@ -386,8 +395,8 @@ export const konektorGUS: Konektor = {
 
     // Trend (rok bazowy → bieżący) dla 65+ i ludności ogółem — profil senioralny + „pułapka seniorów".
     if (ogolem && ogolem > 0) {
-      const mBaza = await wartosciWielu(jednostka.id, [idTotal, P2137_OGOLEM_TOTAL, ...idsWieku65], gus.rokBazowyTrend);
-      const ogolemBaza = mBaza.get(idTotal) ?? mBaza.get(P2137_OGOLEM_TOTAL);
+      const mBaza = await wartosciWielu(jednostka.id, [idTotal, P2137_OGOLEM_TOTAL, ...idsWieku65, ...pPartycja.map((p) => p.id)], gus.rokBazowyTrend);
+      const ogolemBaza = mBaza.get(idTotal) ?? mBaza.get(P2137_OGOLEM_TOTAL) ?? sumaPasm(pPartycja, mBaza);
       const pop65Baza = (p65agg.length === 2 ? sumaPasm(p65agg, mBaza) : null) ?? (p65gran.length > 0 ? sumaPasm(p65gran, mBaza) : null);
       if (ogolemBaza && ogolemBaza > 0) {
         // Trend ludności → trendLudnosc + populacjaStabilna.
