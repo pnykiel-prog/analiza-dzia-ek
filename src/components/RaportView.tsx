@@ -69,13 +69,23 @@ export function RaportView({
         </div>
       </div>
 
-      {/* 01 Werdykt przesiewu */}
-      <SekcjaRap numer="01" tytul="Werdykt przesiewu">
-        <div className="grid grid-cols-2 gap-4">
-          <WerdyktMini nazwa="Młodzi" profil="mlodzi" score={p1.scoreMlodzi} werdykt={p1.werdyktMlodzi} pewnosc={p1.pewnosc} rek={p1.profilRekomendowany === "mlodzi" || p1.profilRekomendowany === "oba"} />
-          <WerdyktMini nazwa="Seniorzy" profil="seniorzy" score={p1.scoreSeniorzy} werdykt={p1.werdyktSeniorzy} pewnosc={p1.pewnosc} rek={p1.profilRekomendowany === "seniorzy" || p1.profilRekomendowany === "oba"} />
-        </div>
-      </SekcjaRap>
+      {/* 01 Werdykt przydatności — bierzemy pełny werdykt M2 (Poziom 2), a nie sam
+          przesiew M1. To ten sam wynik, który widać na ekranie M2 (przydatność
+          działki). Pytanie „kto buduje" (M3) nie wpływa na przydatność działki,
+          więc raport musi zgadzać się z M2. */}
+      {(() => {
+        const om2 = p2.ocenaM2;
+        const wm = om2.werdykty.mlodzi;
+        const ws = om2.werdykty.seniorzy;
+        return (
+          <SekcjaRap numer="01" tytul="Werdykt przydatności — budownictwo społeczne (Poziom 2)">
+            <div className="grid grid-cols-2 gap-4">
+              <WerdyktMini nazwa="Młodzi" profil="mlodzi" score={wm.score} werdykt={wm.werdykt} pewnosc={p1.pewnosc} rek={om2.rekomendacja === "mlodzi"} />
+              <WerdyktMini nazwa="Seniorzy" profil="seniorzy" score={ws.score} werdykt={ws.werdykt} pewnosc={p1.pewnosc} rek={om2.rekomendacja === "seniorzy"} />
+            </div>
+          </SekcjaRap>
+        );
+      })()}
 
       {/* 02 Popyt i dopasowanie (Poziom 1) — bez orientacyjnej prognozy pojemności
           (PUM/mieszkań); pojemność wyznacza Poziom 2. */}
