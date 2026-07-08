@@ -69,6 +69,19 @@ export function odwrotnyTeryt(kodLubId: string): { wojewodztwo: string; powiat: 
   return null;
 }
 
+/**
+ * Wyciąga 6-cyfrowy kod TERYT gminy (WWPPGG) z identyfikatora działki lub kodu
+ * gminy. To ten sam kod, którego BDL/GUS używa w id jednostki — służy do
+ * zakotwiczenia wyboru jednostki po TERYT (a nie tylko po nazwie, która w Polsce
+ * bywa niejednoznaczna: dziesiątki gmin ma identyczne nazwy). Zwraca null, gdy
+ * w wejściu nie ma co najmniej 6 cyfr.
+ */
+export function kodTerytZId(kodLubId: string): string | null {
+  const kodGminy = kodLubId.trim().split(".")[0];
+  const szescCyfr = kodGminy.replace(/\D/g, "").slice(0, 6);
+  return szescCyfr.length === 6 ? szescCyfr : null;
+}
+
 /** Dane jednej pozycji identyfikacyjnej z formularza. */
 export interface PozycjaDzialki {
   wojewodztwo: string;

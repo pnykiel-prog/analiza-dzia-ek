@@ -11,7 +11,7 @@ import type { Teren } from "../../data/connectors/types";
 import { DZIALKI_PRZYKLADOWE } from "../../data/sample";
 import { ocenOdpowiedzWms, znajdzWarstwe } from "../../data/connectors/wms";
 import { klasyfikujPoi } from "../../data/connectors/overpass";
-import { terytGminy, powiaty } from "../../teryt";
+import { terytGminy, powiaty, kodTerytZId } from "../../teryt";
 import { wartoscOdtworzeniowaDla, medianaRynkowa, drabinaRynkowa, pewnoscOfert } from "../../config-rynek";
 
 const KW = (x0: number, y0: number, b: number) =>
@@ -35,6 +35,33 @@ test("gus: wybór jednostki po nazwie (dokładne dopasowanie)", () => {
   const json = { results: [{ id: "1", name: "Kórnik" }, { id: "2", name: "Kórnik - obszar wiejski" }] };
   assert.equal(wybierzJednostke(json, "Kórnik")!.id, "1");
   assert.equal(wybierzJednostke({ results: [] }, "X"), null);
+});
+
+test("teryt: kodTerytZId wyciąga WWPPGG z identyfikatora działki i kodu gminy", () => {
+  assert.equal(kodTerytZId("246901_1.0003.AR_5.18/4"), "246901"); // Katowice
+  assert.equal(kodTerytZId("186301_1.0001.100/1"), "186301"); // Rzeszów
+  assert.equal(kodTerytZId("146501"), "146501");
+  assert.equal(kodTerytZId("Kórnik/12"), null); // brak 6 cyfr
+});
+
+test("gus: KOTWICA TERYT — przy duplikacie nazwy gminy bierze jednostkę z właściwego regionu", () => {
+  // Dwie gminy „Brzeziny" w różnych województwach; id jednostki BDL zawiera TERYT.
+  // Bez kotwicy dobór po nazwie wziąłby PIERWSZĄ (tu: obcą 300701).
+  const json = {
+    results: [
+      { id: "003007010000", name: "Brzeziny" }, // inny region (WWPPGG 300701) — pierwsza
+      { id: "001002010000", name: "Brzeziny" }, // właściwa (WWPPGG 100201)
+    ],
+  };
+  assert.equal(wybierzJednostke(json, "Brzeziny", "100201")!.id, "001002010000");
+  // Bez kotwicy (brak TERYT) — zachowanie dotychczasowe: pierwsza pasująca nazwą.
+  assert.equal(wybierzJednostke(json, "Brzeziny")!.id, "003007010000");
+});
+
+test("gus: KOTWICA TERYT — gdy żaden id nie zawiera kodu, schodzi do doboru po nazwie (bez regresji)", () => {
+  const json = { results: [{ id: "1", name: "Kórnik" }, { id: "2", name: "Kórnik - obszar wiejski" }] };
+  // TERYT nie występuje w id (nietypowy/syntetyczny format) → dobór po nazwie jak dotąd.
+  assert.equal(wybierzJednostke(json, "Kórnik", "302011")!.id, "1");
 });
 
 test("gus: pomija jednostkę archiwalną „…do 2001\" (Warszawa) i bierze aktualną", () => {
