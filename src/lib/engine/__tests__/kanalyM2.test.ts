@@ -2,7 +2,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { dostepnoscA, przydatnoscEkonomicznaB, modyfikatorPopytuC, modyfikatorTransportu, ocenM2, flagiTransportu, liczDostepnosc } from "../kanalyM2";
+import { dostepnoscA, przydatnoscEkonomicznaB, modyfikatorPopytuC, modyfikatorTransportu, modyfikatorUciazliwosci, ocenM2, flagiTransportu, liczDostepnosc } from "../kanalyM2";
 import { uruchomPoziom1 } from "../poziom1";
 import { DZIALKI_PRZYKLADOWE } from "../../data/sample";
 import type { DaneDzialki } from "../../types";
@@ -99,6 +99,16 @@ test("DOMKNIĘCIE: ekstremalna odległość usług ZMIENIA werdykt i rekomendacj
   assert.notEqual(oB.rekomendacja, "brak");
   assert.equal(oD.rekomendacja, "brak"); // oba profile poza zasięgiem → BRAK
   assert.ok(oB.werdykty.seniorzy.score > oD.werdykty.seniorzy.score); // wejście realnie rusza wynik
+});
+
+test("kanal O (7.1): uciazliwosci — bliski przemysl daje lagodna kare, brak danych neutralnie", () => {
+  const brak = modyfikatorUciazliwosci({ ...baza, odleglosciM2: {} } as DaneDzialki);
+  assert.equal(brak.mnoznik, 1); // brak danych → bez kary
+  const blisko = modyfikatorUciazliwosci({ ...baza, odleglosciM2: { uc_przemysl: 100 } } as DaneDzialki);
+  assert.ok(blisko.mnoznik < 1 && blisko.mnoznik >= 0.9, `kara łagodna (≤10%), jest ${blisko.mnoznik}`);
+  assert.ok(blisko.powody.length > 0);
+  const naProgu = modyfikatorUciazliwosci({ ...baza, odleglosciM2: { uc_przemysl: 300 } } as DaneDzialki);
+  assert.equal(naProgu.mnoznik, 1); // na progu i dalej → bez kary
 });
 
 test("liczDostepnosc (7.3): skala dostepu — bliska usluga pieszo, daleka dojazdem (bez zmiany bramki)", () => {
