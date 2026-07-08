@@ -56,7 +56,9 @@ export function liczDostepnosc(d: DaneDzialki, cfg: KonfiguracjaM2 = KONFIG_M2):
       }
     }
     const repr = prog.seniorzy ?? prog.mlodzi ?? null;
-    pozycje.push({ klucz, etykieta: ETYKIETY_USLUG[klucz] ?? klucz, m, typ: "bramka", profile, progi: repr ? { komfortM: repr.komfortM, dyskwalifikacjaM: repr.dyskwalifikacjaM } : null, status });
+    // 7.3 skala dostępu (prezentacja): w zasięgu spaceru (≤ próg pieszy) vs tylko dojazdem.
+    const skalaDostepu = m == null ? undefined : m <= cfg.progPieszoM ? "pieszo" : "dojazd";
+    pozycje.push({ klucz, etykieta: ETYKIETY_USLUG[klucz] ?? klucz, m, typ: "bramka", profile, progi: repr ? { komfortM: repr.komfortM, dyskwalifikacjaM: repr.dyskwalifikacjaM } : null, status, skalaDostepu });
   }
   // Otoczenie / jakość życia (modyfikator) — nigdy nie dyskwalifikuje (blisko/w zasięgu/daleko).
   const oc = cfg.otoczenie;

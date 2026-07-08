@@ -101,6 +101,15 @@ test("DOMKNIĘCIE: ekstremalna odległość usług ZMIENIA werdykt i rekomendacj
   assert.ok(oB.werdykty.seniorzy.score > oD.werdykty.seniorzy.score); // wejście realnie rusza wynik
 });
 
+test("liczDostepnosc (7.3): skala dostepu — bliska usluga pieszo, daleka dojazdem (bez zmiany bramki)", () => {
+  const d = { ...baza, odleglosciM2: { sklep: 300, poz: 5000 } } as DaneDzialki;
+  const poz = liczDostepnosc(d).pozycje;
+  const sklep = poz.find((p) => p.klucz === "sklep");
+  const przychodnia = poz.find((p) => p.klucz === "poz");
+  assert.equal(sklep?.skalaDostepu, "pieszo"); // 300 m ≤ próg pieszy
+  assert.equal(przychodnia?.skalaDostepu, "dojazd"); // 5 km to dojazd, nie spacer
+});
+
 test("ocenM2 (2.1): dane krytyczne do_weryfikacji wstrzymują zielony (cap na zolty), score niezerowy", () => {
   const blisko = { ...baza, odleglosciM2: { poz: 300, apteka: 300, sklep: 300, przystanek: 300, szkola: 300, przedszkole: 300 } } as DaneDzialki;
   const pass = ocenM2(blisko, p1, "pass");

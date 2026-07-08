@@ -553,6 +553,12 @@ export interface DostepnoscPozycja {
   profile: Profil[]; // dla których profili istotna
   progi: { komfortM: number; dyskwalifikacjaM: number } | null; // reprezentatywne progi (do etykiety)
   status: "komfort" | "gradient" | "bramka" | "daleko" | "brak";
+  /**
+   * 7.3 — skala dostępu (prezentacja, NIE zmienia funkcji bramki): „pieszo" gdy
+   * próg dyskwalifikacji mieści się w zasięgu spaceru, „dojazd" gdy tolerancja
+   * sięga kilku km (np. 5 km do POZ to dojazd, nie spacer). Tylko dla usług (kanał A).
+   */
+  skalaDostepu?: "pieszo" | "dojazd";
 }
 
 /** Dostępność do panelu M2 — jedna lista pozycji (usługi + otoczenie równorzędnie). */
