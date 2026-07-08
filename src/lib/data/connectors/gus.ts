@@ -165,6 +165,13 @@ function zakresWieku(band: string): [number, number] | null {
 
 /** Cache listy pasm (definicja zmiennych P2137 jest stała) — 1 zapytanie na instancję, nie na analizę. */
 let cachePasma: PasmoWieku[] | null = null;
+/** Cache ID zmiennej „ludność ogółem" (wiek=ogółem, płeć=ogółem) — dynamicznie z katalogu P2137. */
+let cacheTotalId: string | null = null;
+
+/** ID zmiennej „ludność ogółem" z tematu P2137 (samodobór; fallback do stałej). */
+export function totalIdWieku(): string {
+  return cacheTotalId ?? P2137_OGOLEM_TOTAL;
+}
 
 /** Lista pasm wieku (kolumna „· ogółem") tematu P2137 — samodobór z katalogu (bez zgadywania ID). */
 async function pasmaWiekuOgolem(): Promise<PasmoWieku[]> {
@@ -177,8 +184,10 @@ async function pasmaWiekuOgolem(): Promise<PasmoWieku[]> {
   for (const r of odp?.results ?? []) {
     const czesci = [r.n1, r.n2, r.n3].filter(Boolean) as string[];
     if (czesci[czesci.length - 1] !== "ogółem") continue; // tylko kolumna obu płci
+    const wiek = (czesci[0] ?? "").toLowerCase().trim();
     const zakres = zakresWieku(czesci[0] ?? "");
     if (zakres) out.push({ id: String(r.id), lo: zakres[0], hi: zakres[1] });
+    else if (wiek === "ogółem" || wiek === "ogolem") cacheTotalId = String(r.id); // grand total (wiek=ogółem)
   }
   if (out.length > 0) cachePasma = out;
   return out;
@@ -230,8 +239,9 @@ async function medianaWojAktywni(wojNazwa: string, pAktywni: PasmoWieku[]): Prom
   if (cacheMediana.has(klucz)) return cacheMediana.get(klucz)!;
   const wojId = await jednostkaWojewodztwa(wojNazwa);
   if (!wojId) return null;
-  const m = await wartosciWielu(wojId, [P2137_OGOLEM_TOTAL, ...pAktywni.map((p) => p.id)]);
-  const ogolem = m.get(P2137_OGOLEM_TOTAL);
+  const idTotal = totalIdWieku();
+  const m = await wartosciWielu(wojId, [idTotal, P2137_OGOLEM_TOTAL, ...pAktywni.map((p) => p.id)]);
+  const ogolem = m.get(idTotal) ?? m.get(P2137_OGOLEM_TOTAL);
   const suma = sumaPasm(pAktywni, m);
   if (!ogolem || ogolem <= 0 || suma === null) return null;
   const udzial = Math.round((suma / ogolem) * 1000) / 10;
@@ -309,11 +319,13 @@ export const konektorGUS: Konektor = {
     const idWymel = gus.wymeldowaniaId ?? (await idZmiennejPoFrazie(gus.zapytania.wymeldowania));
     const opcjonalne = [idDochod, idZamel, idWymel].filter(Boolean) as string[];
     const pasma = await pasmaWiekuOgolem();
+    const idTotal = totalIdWieku(); // ID „ludność ogółem" (dynamiczne z katalogu, fallback do stałej)
     const pAktywni = pasma.filter((p) => p.lo >= 20 && p.hi <= 64 && p.hi - p.lo === 4);
-    const p65_69 = pasma.find((p) => p.lo === 65 && p.hi === 69);
-    const p70plus = pasma.find((p) => p.lo === 70 && p.hi === Infinity); // agregat „70 i więcej"
-    const p65 = [p65_69, p70plus].filter(Boolean) as PasmoWieku[];
-    const potrzebne = [...new Set([P2137_OGOLEM_TOTAL, ...pAktywni.map((p) => p.id), ...p65.map((p) => p.id), idPodmioty, idSaldo, ...opcjonalne])];
+    // 65+: agregat „70 i więcej" (odporny na braki) LUB pasma szczegółowe 65-69…85+ (fallback).
+    const p65agg = [pasma.find((p) => p.lo === 65 && p.hi === 69), pasma.find((p) => p.lo === 70 && p.hi === Infinity)].filter(Boolean) as PasmoWieku[];
+    const p65gran = pasma.filter((p) => p.lo >= 65 && (p.hi - p.lo === 4 || (p.lo >= 85 && p.hi === Infinity)));
+    const idsWieku65 = [...new Set([...p65agg, ...p65gran].map((p) => p.id))];
+    const potrzebne = [...new Set([idTotal, P2137_OGOLEM_TOTAL, ...pAktywni.map((p) => p.id), ...idsWieku65, idPodmioty, idSaldo, ...opcjonalne])];
     const m = await wartosciWielu(jednostka.id, potrzebne);
     if ([...m.values()].every((v) => v === null)) {
       return brakWyniku(
@@ -323,9 +335,10 @@ export const konektorGUS: Konektor = {
         `Jednostka „${jednostka.name}" (id ${jednostka.id}) znaleziona, ale data/by-unit nie zwróciło wartości (limit BDL / brak klucza X-ClientId?). Diagnostyka: /api/diag-gus?gmina=${encodeURIComponent(teren.gmina)}.`
       );
     }
-    const ogolem = m.get(P2137_OGOLEM_TOTAL) ?? null;
+    // Ludność ogółem: dynamiczne ID → stałe ID → suma pasm aktywni+65+ (ostatnia deska ratunku).
     const popAktywni = sumaPasm(pAktywni, m);
-    const pop65 = p65.length === 2 ? sumaPasm(p65, m) : null; // 65-69 + 70+
+    const pop65 = (p65agg.length === 2 ? sumaPasm(p65agg, m) : null) ?? (p65gran.length > 0 ? sumaPasm(p65gran, m) : null);
+    const ogolem = m.get(idTotal) ?? m.get(P2137_OGOLEM_TOTAL) ?? null;
     const podmioty = m.get(idPodmioty) ?? null;
     const saldo = m.get(idSaldo) ?? null;
 
@@ -373,9 +386,9 @@ export const konektorGUS: Konektor = {
 
     // Trend (rok bazowy → bieżący) dla 65+ i ludności ogółem — profil senioralny + „pułapka seniorów".
     if (ogolem && ogolem > 0) {
-      const mBaza = await wartosciWielu(jednostka.id, [P2137_OGOLEM_TOTAL, ...p65.map((p) => p.id)], gus.rokBazowyTrend);
-      const ogolemBaza = mBaza.get(P2137_OGOLEM_TOTAL);
-      const pop65Baza = p65.length === 2 ? sumaPasm(p65, mBaza) : null;
+      const mBaza = await wartosciWielu(jednostka.id, [idTotal, P2137_OGOLEM_TOTAL, ...idsWieku65], gus.rokBazowyTrend);
+      const ogolemBaza = mBaza.get(idTotal) ?? mBaza.get(P2137_OGOLEM_TOTAL);
+      const pop65Baza = (p65agg.length === 2 ? sumaPasm(p65agg, mBaza) : null) ?? (p65gran.length > 0 ? sumaPasm(p65gran, mBaza) : null);
       if (ogolemBaza && ogolemBaza > 0) {
         // Trend ludności → trendLudnosc + populacjaStabilna.
         const zmianaPop = (ogolem - ogolemBaza) / ogolemBaza;
