@@ -35,15 +35,16 @@ export const statusSlowny: Record<Werdykt, string> = {
   czerwony: "Nie nadaje się",
 };
 
+// Oba profile: wspólny warunek braku własnego lokalu; wiek jedynie rozdziela.
 export const etykietaProfilu: Record<ProfilRekomendowany, string> = {
-  mlodzi: "Dla młodych",
-  seniorzy: "Senioralny",
+  mlodzi: "Aktywni (bez własnego mieszkania)",
+  seniorzy: "Seniorzy (bez własnego mieszkania)",
   oba: "Oba profile",
   zaden: "Żaden profil",
 };
 
 export function etykietaProfilKrotka(p: Profil): string {
-  return p === "mlodzi" ? "młodzi" : "seniorzy";
+  return p === "mlodzi" ? "aktywni" : "seniorzy";
 }
 
 export const etykietaTypologii: Record<Typologia, string> = {

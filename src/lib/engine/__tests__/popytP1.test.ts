@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ocenPopytP1 } from "../popytP1";
+import { KONFIG_POPYT_P1 } from "../../config";
 import { DZIALKI_PRZYKLADOWE } from "../../data/sample";
 import type { DaneDzialki } from "../../types";
 
@@ -90,6 +91,24 @@ test("popytP1 (1.2): rozkład dochodu per profil — seniorzy (emerytury) mają 
   const o = ocenPopytP1(wzorcowa, POJ);
   // Niższa średnia emerytur → większa frakcja poniżej progu komunalnego.
   assert.ok((o.kwalifikacje.seniorzy.qK ?? 0) > (o.kwalifikacje.mlodzi.qK ?? 0));
+});
+
+test("profil bez własnego lokalu: filtr własności skaluje populację obu profili (definicja, nie mnożnik)", () => {
+  const bazowy = ocenPopytP1(wzorcowa, POJ);
+  // Połowa udziału bez własnego lokalu → o połowę mniej gospodarstw kwalifikujących (oba profile).
+  const cfgPol = {
+    ...KONFIG_POPYT_P1,
+    udzialBezWlasnegoLokalu: { mlodzi: KONFIG_POPYT_P1.udzialBezWlasnegoLokalu.mlodzi / 2, seniorzy: KONFIG_POPYT_P1.udzialBezWlasnegoLokalu.seniorzy / 2 },
+  };
+  const polowa = ocenPopytP1(wzorcowa, POJ, cfgPol);
+  const bM = bazowy.kwalifikacje.mlodzi.nSpoleczny!;
+  const pM = polowa.kwalifikacje.mlodzi.nSpoleczny!;
+  const bS = bazowy.kwalifikacje.seniorzy.nSpoleczny!;
+  const pS = polowa.kwalifikacje.seniorzy.nSpoleczny!;
+  assert.ok(Math.abs(pM - bM / 2) <= 1, `aktywni: ${pM} ~ ${bM / 2}`);
+  assert.ok(Math.abs(pS - bS / 2) <= 1, `seniorzy: ${pS} ~ ${bS / 2}`);
+  // Flaga estymacji własności obecna (niższa pewność, nie udajemy dokładności).
+  assert.ok(bazowy.werdykty.spolecznyMlodzi.flagi.some((f) => f.includes("bez własnego lokalu")));
 });
 
 test("popytP1 (4.1): rekomendacja działki wybierana TYLKO spośród werdyktów społecznych", () => {
