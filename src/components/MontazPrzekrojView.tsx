@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { WariantZabudowy, WartoscOdtworzeniowaMeta } from "@/lib/types";
 import type { ProfilFinansowy } from "@/lib/finanse/typy";
 import { KONFIG_FINANSE } from "@/lib/config";
@@ -23,23 +23,29 @@ function pln(k: number): string {
 export function MontazPrzekrojView({
   wariant,
   wartoscOdtworzeniowaM2,
+  onWO,
   woMeta,
   odlegloscDoSieciM,
   profil,
+  kosztBudowyM2,
+  onKoszt,
+  oprocPct,
+  onOproc,
 }: {
   wariant: WariantZabudowy;
-  wartoscOdtworzeniowaM2: number;
+  wartoscOdtworzeniowaM2: number; // kontrolowane przez stronę (współdzielone z raportem)
+  onWO: (v: number) => void;
   woMeta?: WartoscOdtworzeniowaMeta | null;
   odlegloscDoSieciM: number | null;
   profil: ProfilFinansowy;
+  kosztBudowyM2: number; // suwak — kontrolowany przez stronę
+  onKoszt: (v: number) => void;
+  oprocPct: number | null; // override oprocentowania [%], null = wg reżimu
+  onOproc: (v: number | null) => void;
 }) {
   const suwak = KONFIG_FINANSE.kosztBudowySuwak;
-  const [kosztBudowyM2, setKoszt] = useState(suwak.domyslny);
-  // Jawne założenia edytowalne (najmocniej ruszają montaż): WO + oprocentowanie.
-  const [woEdyt, setWoEdyt] = useState(String(Math.round(wartoscOdtworzeniowaM2)));
-  const [oprocEdyt, setOprocEdyt] = useState(""); // puste → każdy reżim swoje oprocentowanie
-  const wo = Number(woEdyt) > 0 ? Number(woEdyt) : wartoscOdtworzeniowaM2;
-  const oprocOverride = Number(oprocEdyt) > 0 ? Number(oprocEdyt) / 100 : undefined;
+  const wo = wartoscOdtworzeniowaM2;
+  const oprocOverride = oprocPct != null && oprocPct > 0 ? oprocPct / 100 : undefined;
 
   const rola = rolaZeSposobu(profil.sposobWniesieniaDzialki);
   const powierzchniaBudowy = wariant.pumM2 + wariant.powWspolneUslugoweM2;
@@ -67,7 +73,7 @@ export function MontazPrzekrojView({
         <div className="grid sm:grid-cols-2 gap-3">
           <label className="text-sm block">
             <span className="text-[11px] font-medium text-grunt-text-muted2">Wartość odtworzeniowa [zł/m²]</span>
-            <input type="number" value={woEdyt} onChange={(e) => setWoEdyt(e.target.value)} className="inp mono mt-1" />
+            <input type="number" value={wartoscOdtworzeniowaM2 || ""} onChange={(e) => onWO(Number(e.target.value) || 0)} className="inp mono mt-1" />
             <span className="text-[10px] text-grunt-text-faint2 block mt-1">
               {woMeta?.benchmark
                 ? `benchmark (brak obwieszczenia dla tej lokalizacji) — ${woMeta.jednostka}`
@@ -77,7 +83,7 @@ export function MontazPrzekrojView({
           </label>
           <label className="text-sm block">
             <span className="text-[11px] font-medium text-grunt-text-muted2">Oprocentowanie kredytu [%] — oba reżimy</span>
-            <input type="number" step="0.25" value={oprocEdyt} onChange={(e) => setOprocEdyt(e.target.value)} placeholder="wg reżimu (np. 3)" className="inp mono mt-1" />
+            <input type="number" step="0.25" value={oprocPct ?? ""} onChange={(e) => onOproc(e.target.value === "" ? null : Number(e.target.value))} placeholder="wg reżimu (np. 3)" className="inp mono mt-1" />
             <span className="text-[10px] text-grunt-text-faint2 block mt-1">Puste → obecny środek zakresu SBC 2–4%; przyszły wg programu (do potwierdzenia).</span>
           </label>
         </div>
@@ -91,7 +97,7 @@ export function MontazPrzekrojView({
             max={suwak.max}
             step={suwak.krok}
             value={kosztBudowyM2}
-            onChange={(e) => setKoszt(Number(e.target.value))}
+            onChange={(e) => onKoszt(Number(e.target.value))}
             className="flex-1 accent-grunt-ink"
           />
           <div className="shrink-0 text-right">

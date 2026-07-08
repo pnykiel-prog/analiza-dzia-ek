@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import type { BramkaWielkosci, DaneDzialki, PojemnoscForma, WynikAnalizy, WynikPoziom1, KluczWerdyktu } from "@/lib/types";
 import type { ProfilFinansowy } from "@/lib/finanse/typy";
-import { domyslnaKonfiguracja, KONFIG_M2, type Konfiguracja } from "@/lib/config";
+import { domyslnaKonfiguracja, KONFIG_M2, KONFIG_FINANSE, type Konfiguracja } from "@/lib/config";
 import { WOJEWODZTWA } from "@/lib/wojewodztwa";
 import type { PozycjaDzialki } from "@/lib/teryt";
 import { OPIS_TRYBU, trybRynkowy, type Tryb } from "@/lib/fieldModes";
@@ -91,6 +91,11 @@ export default function NowaAnalizaPage() {
   const [p3, setP3] = useState<Record<string, string>>({});
   // Profil finansowy z ankiety (brama P3).
   const [profilFin, setProfilFin] = useState<ProfilFinansowy | null>(null);
+  // Interaktywne założenia M3 (suwak kosztu + WO + oprocentowanie) — WSPÓŁDZIELONE
+  // przez przekrój i raport, żeby raport liczył na bieżąco to samo, co widać na M3.
+  const [m3Koszt, setM3Koszt] = useState<number>(KONFIG_FINANSE.kosztBudowySuwak.domyslny);
+  const [m3WO, setM3WO] = useState<number>(KONFIG_FINANSE.kosztBudowySuwak.domyslny);
+  const [m3Oproc, setM3Oproc] = useState<number | null>(null); // % override, null = wg reżimu
 
   // ── Krok 1: identyfikacja → rozwiązanie → P1 ──────────────────────────────
   function patchPozycje(i: number, patch: Partial<PozycjaDzialki>) {
@@ -293,6 +298,13 @@ export default function NowaAnalizaPage() {
   async function zatwierdzAnkiete(profil: ProfilFinansowy) {
     setProfilFin(profil);
     await przeliczP3(profil);
+    // Punkt wyjścia suwaka kosztu = wartość odtworzeniowa z warstwy dla lokalizacji działki
+    // (wskaźnik przeliczeniowy kosztu odtworzenia 1 m²), przycięta do zakresu suwaka.
+    const s = KONFIG_FINANSE.kosztBudowySuwak;
+    const wo = dane?.wartoscOdtworzeniowaM2 ?? mediana?.wartoscOdtworzeniowa ?? s.domyslny;
+    setM3WO(Math.round(wo));
+    setM3Koszt(Math.min(s.max, Math.max(s.min, Math.round(wo))));
+    setM3Oproc(null);
     setEkran("poziom3");
     setMaxKrok((m) => Math.max(m, 4));
   }
@@ -390,7 +402,7 @@ export default function NowaAnalizaPage() {
             </button>
             <button onClick={() => window.print()} className="btn-primary" style={{ height: "var(--grunt-h-cta)" }}>↓ Pobierz PDF (drukuj)</button>
           </div>
-          <RaportView wynik={wynik} data={new Date().toLocaleDateString("pl-PL")} />
+          <RaportView wynik={wynik} data={new Date().toLocaleDateString("pl-PL")} kosztBudowyM2={m3Koszt} wartoscOdtworzeniowaM2={m3WO} oprocPct={m3Oproc} />
         </div>
       )}
 
@@ -487,10 +499,20 @@ export default function NowaAnalizaPage() {
             const warianty = wynik.poziom2.warianty;
             const idx = Math.max(0, warianty.findIndex((w) => wynik.poziom1.profilRekomendowany === "oba" || w.profil === wynik.poziom1.profilRekomendowany));
             const wariant = warianty[idx] ?? warianty[0];
-            const wartOdtw = dane?.wartoscOdtworzeniowaM2 ?? mediana?.wartoscOdtworzeniowa ?? 7000;
             return (
               <>
-                <MontazPrzekrojView wariant={wariant} wartoscOdtworzeniowaM2={wartOdtw} woMeta={dane?.woMeta ?? null} odlegloscDoSieciM={dane?.odlegloscDoSieciM ?? null} profil={profilFin} />
+                <MontazPrzekrojView
+                  wariant={wariant}
+                  woMeta={dane?.woMeta ?? null}
+                  odlegloscDoSieciM={dane?.odlegloscDoSieciM ?? null}
+                  profil={profilFin}
+                  kosztBudowyM2={m3Koszt}
+                  onKoszt={setM3Koszt}
+                  wartoscOdtworzeniowaM2={m3WO}
+                  onWO={setM3WO}
+                  oprocPct={m3Oproc}
+                  onOproc={setM3Oproc}
+                />
                 <BannerBramki
                   tytul="Studium gotowe — wygeneruj raport"
                   opis="Drukowalne podsumowanie: werdykt, pewność sekcji, model zabudowy i finansowy, prowenancja."
