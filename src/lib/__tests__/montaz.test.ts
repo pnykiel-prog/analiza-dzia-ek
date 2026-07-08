@@ -111,6 +111,21 @@ test("montaż: rola działki ze sposobu wniesienia", () => {
   assert.equal(rolaZeSposobu("JUZ_POSIADANA"), "neutralna");
 });
 
+test("montaz (6): skrajnie wysoki wklad wlasny daje flage (miekkie sprzezenie, bez tworzenia komunikatu odrzucenia)", () => {
+  // Społeczny czynszowy, zakup gruntu na kredyt, niska WO → duża luka, wysoki wkład.
+  const k = zlozKolumne(
+    profil({ typZasobu: "SPOLECZNY_CZYNSZOWY", typInwestora: "SIM_PRYWATNY", sposobWniesieniaDzialki: "ZAKUP_KREDYT" }),
+    "current",
+    wej({ rolaDzialki: "koszt", wartoscDzialkiPln: 6_000_000, wartoscOdtworzeniowaM2: 4000 })
+  );
+  const udzial = k.zrodla.wkladWlasny / k.koszt.razem;
+  if (udzial > 0.45) {
+    assert.ok(k.flagi.some((f) => f.includes("wysokiego wkładu")), `oczekiwano flagi wkładu przy udziale ${Math.round(udzial * 100)}%`);
+    // Miękkie sprzężenie: flaga mówi wprost „rekomendacja warunkowa", a montaż i tak się liczy (dostępny).
+    assert.ok(k.dostepny && k.zrodla.wkladWlasny >= 0);
+  }
+});
+
 test("montaż (5.1): grant liczony od kosztów BEZ gruntu — zakup nie zawyża dotacji", () => {
   // Zakup na kredyt: grunt = koszt. Grant NIE finansuje gruntu → baza = RAZEM − grunt.
   const zakup = zlozKolumne(profil({ typZasobu: "KOMUNALNY", sposobWniesieniaDzialki: "ZAKUP_KREDYT" }), "current", wej({ rolaDzialki: "koszt", wartoscDzialkiPln: 2_000_000 }));

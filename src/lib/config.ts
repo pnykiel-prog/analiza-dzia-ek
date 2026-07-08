@@ -225,8 +225,7 @@ export interface KonfiguracjaPopytP1 {
   /** Zakresy modyfikatorów napięcia i trendu (centrowane w 1,0). */
   mNapiecie: { min: number; max: number }; // społeczne
   mNapiecieKom: { min: number; max: number }; // komunalne — mocniej w górę
-  mTrendMlodzi: { min: number; max: number };
-  mTrendSeniorzy: { min: number; max: number }; // ostrzej w dół
+  mTrend: { min: number; max: number }; // wspólny dla obu profili (4.2 — bez cięcia senioralnego)
   /** Atrakcyjność migracyjna: wagi składowych + sufit skali. */
   atrakcyjnosc: { waga2: number; waga3: number; sufit: number; naplywBenchNa1000: number; odplywBenchNa1000: number };
   /** Pasma werdyktu (score → kolor). */
@@ -251,8 +250,7 @@ export const KONFIG_POPYT_P1: KonfiguracjaPopytP1 = {
   mLuka: { baza: 0.75, nachylenie: 0.5 },
   mNapiecie: { min: 0.8, max: 1.2 },
   mNapiecieKom: { min: 0.8, max: 1.4 },
-  mTrendMlodzi: { min: 0.85, max: 1.15 },
-  mTrendSeniorzy: { min: 0.6, max: 1.1 },
+  mTrend: { min: 0.85, max: 1.15 },
   atrakcyjnosc: { waga2: 0.6, waga3: 0.4, sufit: 100, naplywBenchNa1000: 20, odplywBenchNa1000: 15 },
   pasma: { zielony: 65, zolty: 40 },
 };
@@ -354,6 +352,9 @@ export interface KonfiguracjaFinanse {
     rezerwaBezpieczenstwaPct: number;
     domyslnaPartycypacjaNajemcowPct: number;
     domyslnyWkladGminyPct: number;
+    /** 6 — próg [%] udziału wkładu własnego, powyżej którego montaż dostaje flagę
+     *  „wymaga wysokiego wkładu" (miękkie sprzężenie → rekomendacja warunkowa; NIE „nie spina"). */
+    progWkladuOstrzezeniePct: number;
   };
   /** Mnożniki scenariuszy (na koszt budowy i stopę wzrostu wartości). */
   scenariusze: {
@@ -426,6 +427,7 @@ export const KONFIG_FINANSE: KonfiguracjaFinanse = {
     rezerwaBezpieczenstwaPct: 12.5,
     domyslnaPartycypacjaNajemcowPct: 0,
     domyslnyWkladGminyPct: 0,
+    progWkladuOstrzezeniePct: 45,
   },
   scenariusze: {
     konserwatywny: { mnoznikKosztu: 1.08, mnoznikWartOdtw: 0.98, mnoznikStopy: 1.5 },
