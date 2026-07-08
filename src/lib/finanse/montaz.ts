@@ -178,6 +178,12 @@ export function zlozKolumne(
   const kredyt = Math.max(0, Math.round(Math.min(kredytZeZdolnosci, (maxKredytPct / 100) * razem, luka)));
   const wkladWlasny = Math.max(0, luka - kredyt); // pozycja domykająca
 
+  // 6 — miękkie sprzężenie M3 → rekomendacja: skrajnie wysoki wymagany wkład własny
+  // sygnalizuje flagą „montaż wymaga wysokiego wkładu" (rekomendacja warunkowa).
+  // NIE jest to twarda bramka i NIE pojawia się komunikat „nie spina". Próg w konfiguracji.
+  if (razem > 0 && (wkladWlasny / razem) * 100 > z.progWkladuOstrzezeniePct)
+    flagi.push(`Montaż wymaga wysokiego wkładu własnego (${Math.round((wkladWlasny / razem) * 100)}%) — rekomendacja warunkowa (miękkie sprzężenie, nie „nie spina").`);
+
   return {
     rezim: rezimUI,
     rezimFin,

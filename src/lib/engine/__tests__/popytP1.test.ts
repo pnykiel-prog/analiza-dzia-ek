@@ -91,3 +91,19 @@ test("popytP1 (1.2): rozkład dochodu per profil — seniorzy (emerytury) mają 
   // Niższa średnia emerytur → większa frakcja poniżej progu komunalnego.
   assert.ok((o.kwalifikacje.seniorzy.qK ?? 0) > (o.kwalifikacje.mlodzi.qK ?? 0));
 });
+
+test("popytP1 (4.1): rekomendacja działki wybierana TYLKO spośród werdyktów społecznych", () => {
+  const o = ocenPopytP1(wzorcowa, POJ);
+  // Kafle komunalne = „potrzeba gminy", nie rekomendacja konkretnej działki.
+  assert.ok(["spolecznyMlodzi", "spolecznySeniorzy"].includes(o.rekomendowanyKierunek));
+});
+
+test("popytP1 (4.2): pulapka senioralna jako FLAGA, nie ciecie score komunalnego seniorow", () => {
+  const bazaS: DaneDzialki = { ...wzorcowa, trendLudnosc: "malejaca" };
+  const zWzorcem: DaneDzialki = { ...bazaS, trend65Plus: "rosnacy", populacjaStabilna: false };
+  const bezWzorca: DaneDzialki = { ...bazaS, trend65Plus: "stabilny", populacjaStabilna: false };
+  const a = ocenPopytP1(zWzorcem, POJ).werdykty.komunalnySeniorzy;
+  const b = ocenPopytP1(bezWzorca, POJ).werdykty.komunalnySeniorzy;
+  assert.equal(a.score, b.score); // wzorzec nie tnie już wyniku
+  assert.ok(a.flagi.some((f) => f.includes("ryzyko utrwalania odpływu"))); // idzie jako flaga
+});

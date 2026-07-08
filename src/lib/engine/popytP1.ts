@@ -128,13 +128,20 @@ function napiecie01(d: DaneDzialki): number {
 
 const skala = (x01: number, min: number, max: number) => min + (max - min) * clamp01(x01);
 
-/** M_trend per profil — dla seniorów ostrzej w dół (pułapka wyludniania). */
-function mTrend(d: DaneDzialki, profil: Profil, cfg: KonfiguracjaPopytP1): number {
-  const zakres = profil === "seniorzy" ? cfg.mTrendSeniorzy : cfg.mTrendMlodzi;
+/**
+ * M_trend (4.2): wspólny zakres dla obu profili. NIE tłumimy realnej potrzeby
+ * senioralnej dodatkowym mnożnikiem — „pułapka wyludniania" była fałszywie
+ * negatywna na wsi. Ostrzeżenie o ryzyku utrwalania odpływu idzie jako FLAGA
+ * (patrz `flagaPulapkaSenioralna` w werdyktKomunalny), nie jako cięcie score.
+ */
+function mTrend(d: DaneDzialki, _profil: Profil, cfg: KonfiguracjaPopytP1): number {
   const t01 = d.trendLudnosc == null ? 0.5 : d.trendLudnosc === "rosnaca" ? 1 : d.trendLudnosc === "stabilna" ? 0.55 : 0;
-  // Seniorzy: dodatkowo tłum, gdy 65+ rośnie przy wyludnianiu (populacja niestabilna).
-  const kara = profil === "seniorzy" && d.trend65Plus === "rosnacy" && d.populacjaStabilna === false ? 0.7 : 1;
-  return skala(t01, zakres.min, zakres.max) * kara;
+  return skala(t01, cfg.mTrend.min, cfg.mTrend.max);
+}
+
+/** 4.2 — wzorzec „pułapki senioralnej": 65+ rośnie przy malejącej populacji. */
+function flagaPulapkaSenioralna(d: DaneDzialki): boolean {
+  return d.trend65Plus === "rosnacy" && d.populacjaStabilna === false;
 }
 
 /** Pull gospodarczy 0..1 (niskie bezrobocie + gęstość podmiotów) — do atrakcyjności. */
@@ -254,6 +261,9 @@ function werdyktKomunalny(
   if (profil === "seniorzy") {
     pewnosc = clamp(pewnosc - 10);
     flagi.push("Kierunek: mieszkania wspomagane dla seniorów (senioralne ze wsparciem).");
+    // 4.2 Ryzyko utrwalania odpływu jako FLAGA (nie cięcie score) — realna potrzeba pokazana.
+    if (flagaPulapkaSenioralna(d))
+      flagi.push("Uwaga: rosnący udział 65+ przy malejącej populacji — ryzyko utrwalania odpływu (informacyjnie, nie obniża oceny).");
   }
   const komentarz =
     kw.nKomunalny == null
@@ -282,8 +292,11 @@ export function ocenPopytP1(
     komunalnySeniorzy: werdyktKomunalny("seniorzy", kwSeniorzy, d, cfg),
   };
 
-  const lista = Object.values(werdykty);
-  const rekomendowany = lista.reduce((a, b) => (b.score > a.score ? b : a));
+  // 4.1 Rekomendacja DZIAŁKI wybierana spośród werdyktów SPOŁECZNYCH (ocena projektu
+  // na działce). Kafle komunalne to „potrzeba gminy" (skala per mieszkaniec, bez
+  // pojemności/lokalizacji) — nie mogą samodzielnie rekomendować konkretnej działki.
+  const spoleczne = [werdykty.spolecznyMlodzi, werdykty.spolecznySeniorzy];
+  const rekomendowany = spoleczne.reduce((a, b) => (b.score > a.score ? b : a));
   const pewnoscOgolna = rekomendowany.pewnosc;
 
   return {
