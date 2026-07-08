@@ -366,7 +366,9 @@ export interface KonfiguracjaFinanse {
 }
 
 export const KONFIG_FINANSE: KonfiguracjaFinanse = {
-  rezimDomyslny: "B_program_2027",
+  // 5.3 Rekomendację kotwiczymy w reżimie OBECNYM (pewne dane); przyszły (2027+)
+  // ma parametry `tbc` i służy jako scenariusz. Przekrój M3 nadal pokazuje oba.
+  rezimDomyslny: "A_SBC_2026",
   rezimy: {
     A_SBC_2026: {
       nazwa: "A — obecny SBC (do jesieni 2026)",

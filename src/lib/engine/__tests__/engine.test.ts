@@ -133,10 +133,11 @@ test("P2: sygnały i realne białe plamy", () => {
   assert.ok(!b.poziom2.sygnaly.some((s) => /natura/i.test(s.tekst)));
 });
 
-test("P3: trzy scenariusze, reżim domyślny B, oś czasu sensowna", () => {
+test("P3: trzy scenariusze, reżim domyślny kotwiczony w OBECNYM (5.3), oś czasu sensowna", () => {
   const a = uruchomAnalize(wzorcowa);
   assert.equal(a.poziom3.scenariusze.length, 3);
-  assert.equal(a.poziom3.rezimDomyslny, "B_program_2027");
+  // 5.3 Rekomendacja kotwiczona w reżimie obecnym (pewne dane); przyszły = scenariusz.
+  assert.equal(a.poziom3.rezimDomyslny, "A_SBC_2026");
   assert.ok(a.poziom3.osCzasu.rokOddania > a.poziom3.osCzasu.rokStartuBudowy);
   assert.ok(a.poziom3.osCzasu.rokStartuBudowy >= 2027);
 });
