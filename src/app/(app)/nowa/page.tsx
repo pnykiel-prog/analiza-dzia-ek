@@ -15,7 +15,7 @@ import { PytaniaM2, type OdpowiedziM2 } from "@/components/PytaniaM2";
 import { AnkietaFinansowa } from "@/components/AnkietaFinansowa";
 import { MontazPrzekrojView } from "@/components/MontazPrzekrojView";
 import { rolaZeSposobu } from "@/lib/finanse/montaz";
-import { Stepper, BannerBramki } from "@/components/grunt";
+import { Stepper, BannerBramki, BanerPoziomu } from "@/components/grunt";
 import { SYMBOLE_MPZP, statusZeSymbolu } from "@/lib/mpzp";
 import { PodgladTerenu, type TrybMapy, type WarstwyMapy } from "@/components/GruntMap";
 import { RaportView } from "@/components/RaportView";
@@ -367,14 +367,38 @@ export default function NowaAnalizaPage() {
   return (
     <div className="space-y-5">
       <div className="-mx-4 sm:-mx-6 -mt-6">
-        <Stepper aktywny={stepAktywny} maxOsiagniety={maxKrok} onKrok={idzDoKroku} />
-        {dane && ekran !== "wejscie" && ekran !== "poziom1" && (
-          <div className="bg-grunt-surface border-b border-grunt-border px-4 sm:px-6 py-2 flex flex-wrap items-center gap-x-4 sm:gap-x-6 gap-y-1">
-            <span className="text-[10px] uppercase tracking-wider text-grunt-text-faint">Teren inwestycji</span>
-            <span className="mono text-[12px] text-grunt-text">{dane.id}</span>
-            {dane.powierzchniaM2 > 0 && <span className="mono text-[12px] text-grunt-text-muted">{liczba(dane.powierzchniaM2, " m²")}</span>}
-            {dane.gmina && <span className="text-[12px] text-grunt-text-muted">{dane.gmina}</span>}
-          </div>
+        {/* Poziom 1 (flagowy ekran): ciemny baner nagłówka z motywem + stepper w banerze
+            (kierunek wizualny §2). Pozostałe ekrany: jasny stepper + pasek kontekstu. */}
+        {ekran === "poziom1" && wynik?.poziom1 ? (
+          <BanerPoziomu
+            eyebrow="Poziom 1 · Szybki przesiew"
+            tytul="Wynik wstępnej oceny terenu"
+            opis={
+              wynik.poziom1.pewnosc < 100
+                ? "Analiza na dostępnych rejestrach publicznych — część danych niepotwierdzona, pewność odpowiednio obniżona."
+                : "Wstępny przesiew terenu na podstawie rejestrów publicznych."
+            }
+            krokAktywny={stepAktywny}
+            maxOsiagniety={maxKrok}
+            onKrok={idzDoKroku}
+            badge={
+              wynik.poziom1.pewnosc < 100
+                ? { ton: "ostrzezenie", tytul: "Wynik częściowy", opis: "pewność obniżona" }
+                : { ton: "sukces", tytul: "Komplet danych", opis: "pełna pewność" }
+            }
+          />
+        ) : (
+          <>
+            <Stepper aktywny={stepAktywny} maxOsiagniety={maxKrok} onKrok={idzDoKroku} />
+            {dane && ekran !== "wejscie" && (
+              <div className="bg-grunt-surface border-b border-grunt-border px-4 sm:px-6 py-2 flex flex-wrap items-center gap-x-4 sm:gap-x-6 gap-y-1">
+                <span className="text-[10px] uppercase tracking-wider text-grunt-text-faint">Teren inwestycji</span>
+                <span className="mono text-[12px] text-grunt-text">{dane.id}</span>
+                {dane.powierzchniaM2 > 0 && <span className="mono text-[12px] text-grunt-text-muted">{liczba(dane.powierzchniaM2, " m²")}</span>}
+                {dane.gmina && <span className="text-[12px] text-grunt-text-muted">{dane.gmina}</span>}
+              </div>
+            )}
+          </>
         )}
       </div>
 
