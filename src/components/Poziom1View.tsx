@@ -78,21 +78,20 @@ export function Poziom1View({ p1, pelny = true, pokazRekomendacje = true }: { p1
         </div>
       </div>
 
-      {/* Atrakcyjność migracyjna (zastępuje popyt zewnętrzny) */}
+      {/* Korekta migracyjna — JEDEN mnożnik (oczyszczony model), waga per kafel */}
       <Karta
-        tytul="Atrakcyjność migracyjna"
-        podtytul="A1 zmierzone (napływ) jest bramką dla A2/A3 estymowanych — zasila werdykty społeczne"
-        prawy={<span className="badge bg-grunt-surface-3 text-grunt-text-muted">pewność {ocena.atrakcyjnoscMigracyjna.pewnosc}%</span>}
+        tytul="Korekta migracyjna"
+        podtytul="Jeden mnożnik z salda migracji; przyłożony z wagą per kafel (najmocniej: aktywni społeczni)"
       >
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Statystyka etykieta="A1 · napływ (zmierz.)" wartosc={`${ocena.atrakcyjnoscMigracyjna.a1}/100`} />
-          <Statystyka etykieta="A2 · odblok. (estym.)" wartosc={`${ocena.atrakcyjnoscMigracyjna.a2}/100`} />
-          <Statystyka etykieta="A3 · zatrzym. (estym.)" wartosc={`${ocena.atrakcyjnoscMigracyjna.a3}/100`} />
-          <Statystyka etykieta="Łącznie" wartosc={`${ocena.atrakcyjnoscMigracyjna.wartosc}/100`} akcent />
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <Statystyka etykieta="Mnożnik popytu" wartosc={`×${ocena.korektaMigracyjna.mBazowy.toFixed(2)}`} akcent />
+          <Statystyka etykieta="Saldo migracji" wartosc={ocena.korektaMigracyjna.saldo1000 == null ? "brak danych" : `${ocena.korektaMigracyjna.saldo1000 > 0 ? "+" : ""}${ocena.korektaMigracyjna.saldo1000}/1000`} />
+          <Statystyka etykieta="Wpływ" wartosc={ocena.korektaMigracyjna.mBazowy > 1 ? "podnosi popyt" : ocena.korektaMigracyjna.mBazowy < 1 ? "obniża popyt" : "neutralny"} />
         </div>
-        {ocena.atrakcyjnoscMigracyjna.fallback && (
-          <p className="text-[11px] text-grunt-amber-text2 mt-2">A1 z proxy salda migracji (brak napływu brutto) — obniżona pewność.</p>
+        {!ocena.korektaMigracyjna.dostepna && (
+          <p className="text-[11px] text-grunt-amber-text2 mt-2">Brak danych migracyjnych (napływ/odpływ) — mnożnik neutralny ×1,00 (bez korekty).</p>
         )}
+        <p className="text-[10px] text-grunt-text-faint2 mt-2">Wagi kafli: aktywni–społeczny 1,0 · aktywni–komunalny 0,3 · seniorzy–społeczny 0,2 · seniorzy–komunalny 0,0.</p>
       </Karta>
 
       {/* Kwalifikacje — trójdzielny podział dochodowy (liczby) */}
