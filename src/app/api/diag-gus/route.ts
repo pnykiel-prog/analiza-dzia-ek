@@ -82,6 +82,18 @@ export async function GET(req: Request) {
   const dane = wynik.dane ?? {};
   const liczbaPol = Object.keys(dane).length;
 
+  // Diagnostyka doboru zmiennych panelu dynamiki (mieszkania oddane / dochody własne /
+  // bezrobotni) — kandydaci z variables/search, do przypięcia potwierdzonych ID.
+  const dynFrazy: Record<string, string> = {
+    mieszkaniaOddane: gus.zapytania.mieszkaniaOddane,
+    dochodyWlasne: gus.zapytania.dochodyWlasne,
+    bezrobotni: gus.zapytania.bezrobotniLiczba,
+  };
+  const diagnostykaDynamiki: Record<string, unknown> = {};
+  for (const [k, fraza] of Object.entries(dynFrazy)) {
+    diagnostykaDynamiki[k] = { fraza, kandydaci: await diagZmienne(fraza) };
+  }
+
   const wniosek =
     wynik.status === "ok" && liczbaPol >= 4
       ? "✅ GUS DZIAŁA — konektor zwraca komplet demografii (to samo, co dostaje aplikacja). " +
@@ -98,6 +110,7 @@ export async function GET(req: Request) {
     status: wynik.status,
     liczbaPolDanych: liczbaPol,
     dane, // udzialAktywniPct, udzial65PlusPct, bezrobociePct, trend65Plus, trendLudnosc, saldoMigracjiMlodzi, …
+    diagnostykaDynamiki, // kandydaci na ID 3 szeregów panelu dynamiki (do potwierdzenia)
     debug: wynik.debug ?? null,
     wniosek,
   };
