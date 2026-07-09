@@ -50,6 +50,13 @@ function WerdyktM2Karta({ ocena }: { ocena: OcenaM2 }) {
           <ProfilM2 key={p} w={ocena.werdykty[p]} rekomendowany={ocena.rekomendacja === p} />
         ))}
       </div>
+      <div className="mt-4 flex items-center gap-2">
+        <span className="text-[11px] text-grunt-text-muted2 shrink-0">Pewność werdyktu</span>
+        <div className="grow"><WskaznikPewnosci pewnosc={ocena.pewnoscM2} rozmiar="sm" /></div>
+      </div>
+      <p className="text-[10px] text-grunt-text-faint2 mt-1">
+        Pewność obniżają pozycje z listy „Do weryfikacji" (środowisko, plan/WZ, dostęp do drogi, wskaźniki) — nie zmieniają werdyktu, wskazują, ile klient musi sam potwierdzić.
+      </p>
     </Karta>
   );
 }
@@ -174,9 +181,9 @@ export function Poziom2View({
             </Karta>
           )}
           {braki && (
-            <Karta tytul="Czego nie pobrano" prawy={<span className="badge bg-grunt-surface-3 text-grunt-text-muted mono">{braki.length}</span>}>
+            <Karta tytul="Do weryfikacji" podtytul="Czego aplikacja nie potwierdziła automatycznie — sprawdź samodzielnie (nie blokuje wyniku, obniża pewność)" prawy={<span className="badge bg-grunt-surface-3 text-grunt-text-muted mono">{braki.length}</span>}>
               {braki.length === 0 ? (
-                <p className="text-[12px] text-grunt-text-muted2">Komplet danych wejściowych — brak białych plam dla tej działki.</p>
+                <p className="text-[12px] text-grunt-text-muted2">Komplet danych wejściowych — brak luk do samodzielnej weryfikacji dla tej działki.</p>
               ) : (
                 <div className="space-y-2">
                   {braki.map((b, i) => (

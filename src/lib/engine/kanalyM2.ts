@@ -257,13 +257,20 @@ export function modyfikatorPopytuC(d: DaneDzialki, profil: Profil, cfg: Konfigur
  * przydatności ekonomicznej (B) + bramkach (E); rekomendacja = najlepszy z dopuszczalnych
  * i obsługiwalnych profili, „brak" gdy żaden.
  */
-export function ocenM2(d: DaneDzialki, p1: WynikPoziom1, dopuszczalnosc: StatusBramki, cfg: KonfiguracjaM2 = KONFIG_M2): OcenaM2 {
+export function ocenM2(
+  d: DaneDzialki,
+  p1: WynikPoziom1,
+  dopuszczalnosc: StatusBramki,
+  cfg: KonfiguracjaM2 = KONFIG_M2,
+  liczbaDoWeryfikacji = 0
+): OcenaM2 {
   const przydat = przydatnoscEkonomicznaB(d, cfg);
   const dopuszczalny = dopuszczalnosc !== "fail";
-  // 2.1 Dane KRYTYCZNE niezweryfikowane (bramki „do weryfikacji": środowisko/MPZP/
-  // droga) → CAP: zielony wynik wstrzymany (max „żółty/warunkowy") do potwierdzenia.
-  // Nie zeruje score — tylko blokuje zielony (biała plama danych krytycznych ≠ ryzyko OK).
-  const capDoWeryfikacji = dopuszczalnosc === "do_weryfikacji";
+  // NAPRAWA CAP (warstwy środowiskowe 2): warunkowa ZAREZERWOWANA dla realnie
+  // WYKRYTEGO zagrożenia/ograniczenia (status „warunkowo": powódź/osuwisko/ochrona/
+  // droga/odrolnienie) → CAP na żółty. „do weryfikacji" (brak danych) NIE blokuje —
+  // przepuszcza, trafia na listę braków i obniża pewność (nie werdykt).
+  const capWarunkowo = dopuszczalnosc === "warunkowo";
 
   const werdyktProfilu = (profil: Profil): WerdyktProfiluM2 => {
     const popytM1 = profil === "mlodzi" ? p1.scoreMlodzi : p1.scoreSeniorzy;
@@ -284,11 +291,12 @@ export function ocenM2(d: DaneDzialki, p1: WynikPoziom1, dopuszczalnosc: StatusB
       score = 0;
       powody.unshift("Bramka bezwzględna — działka niedopuszczalna (kanał E).");
     }
-    // CAP zielonego przy niezweryfikowanych danych krytycznych (2.1).
+    // CAP zielonego WYŁĄCZNIE przy realnie wykrytym zagrożeniu/ograniczeniu
+    // (status „warunkowo"). Brak weryfikacji („do weryfikacji") NIE blokuje.
     let werdykt = pasmo(score);
-    if (capDoWeryfikacji && werdykt === "zielony") {
+    if (capWarunkowo && werdykt === "zielony") {
       werdykt = "zolty";
-      powody.unshift("Wynik wstrzymany na warunkowym — dane krytyczne (środowisko/MPZP/droga) wymagają weryfikacji; zielony po potwierdzeniu.");
+      powody.unshift("Wynik warunkowy — wykryte ograniczenie/zagrożenie (powódź/osuwisko/ochrona przyrody/grunt/droga); zielony po usunięciu bariery.");
     }
     return {
       profil,
@@ -319,5 +327,14 @@ export function ocenM2(d: DaneDzialki, p1: WynikPoziom1, dopuszczalnosc: StatusB
   } else {
     rekomendacja = kandydaci.reduce((a, b) => (werdykty[b].score > werdykty[a].score ? b : a));
   }
-  return { werdykty, dopuszczalnosc, rekomendacja, powodBrak, flagi: flagiTransportu(d) };
+  // Pewność M2 (warstwy śrd. 2 §4a): „pewność mówi ILE". Bazę z P1 obniżamy
+  // proporcjonalnie do liczby pozycji „do weryfikacji" (−8 pkt każda) oraz o −10,
+  // gdy wynik warunkowy (wykryte ograniczenie). NIE zmienia werdyktu — tylko sygnał
+  // ile jeszcze klient musi sam potwierdzić. Podłoga 30, sufit = pewność P1.
+  const pewnoscM2 = clamp(
+    Math.min(p1.pewnosc ?? 100, 100) - 8 * Math.max(0, liczbaDoWeryfikacji) - (capWarunkowo ? 10 : 0),
+    30,
+    100
+  );
+  return { werdykty, dopuszczalnosc, rekomendacja, powodBrak, flagi: flagiTransportu(d), pewnoscM2 };
 }

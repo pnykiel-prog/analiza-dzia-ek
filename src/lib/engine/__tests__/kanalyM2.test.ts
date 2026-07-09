@@ -120,15 +120,20 @@ test("liczDostepnosc (7.3): skala dostepu — bliska usluga pieszo, daleka dojaz
   assert.equal(przychodnia?.skalaDostepu, "dojazd"); // 5 km to dojazd, nie spacer
 });
 
-test("ocenM2 (2.1): dane krytyczne do_weryfikacji wstrzymują zielony (cap na zolty), score niezerowy", () => {
+test("ocenM2 (warstwy śrd. 2 §4): WYKRYTE zagrożenie (warunkowo) wstrzymuje zielony; brak weryfikacji (do_weryfikacji) NIE blokuje", () => {
   const blisko = { ...baza, odleglosciM2: { poz: 300, apteka: 300, sklep: 300, przystanek: 300, szkola: 300, przedszkole: 300 } } as DaneDzialki;
   const pass = ocenM2(blisko, p1, "pass");
-  const cap = ocenM2(blisko, p1, "do_weryfikacji");
+  const cap = ocenM2(blisko, p1, "warunkowo"); // realnie wykryte ograniczenie → CAP na żółty
+  const brakWer = ocenM2(blisko, p1, "do_weryfikacji"); // sam brak weryfikacji → NIE blokuje
   for (const pr of ["mlodzi", "seniorzy"] as const) {
-    if (pass.werdykty[pr].werdykt === "zielony") assert.equal(cap.werdykty[pr].werdykt, "zolty");
+    if (pass.werdykty[pr].werdykt === "zielony") {
+      assert.equal(cap.werdykty[pr].werdykt, "zolty"); // warunkowo capuje
+      assert.equal(brakWer.werdykty[pr].werdykt, "zielony"); // do_weryfikacji przepuszcza
+    }
     // CAP nie zeruje wyniku — to tylko wstrzymanie zielonego (dopuszczalny nadal true).
     assert.equal(cap.werdykty[pr].score, pass.werdykty[pr].score);
     assert.equal(cap.werdykty[pr].dopuszczalny, true);
+    assert.equal(brakWer.werdykty[pr].dopuszczalny, true);
   }
 });
 

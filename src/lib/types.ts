@@ -580,6 +580,7 @@ export interface OcenaM2 {
   rekomendacja: Profil | "brak"; // najlepszy z dopuszczalnych/obsługiwalnych; „brak" gdy żaden
   powodBrak?: string; // uzasadnienie „BRAK — lokalizacja nieodpowiednia"
   flagi: string[]; // informacyjne (np. „teren bez komunikacji zbiorowej") — BEZ wpływu na punktację
+  pewnoscM2: number; // 0–100 — obniżana przez pozycje „do weryfikacji" (nie zmienia werdyktu)
 }
 
 export interface WynikPoziom2 {
