@@ -827,12 +827,15 @@ function EkranM1({ p1, onDalej, onKoniec }: { p1: WynikPoziom1; onDalej: () => v
     );
   }
 
-  // Punkt decyzyjny opłacalności = MODAL (osobne okno) nad modelem zabudowy; zatrzymuje
-  // przed pełną analizą i pyta „analizować dalej?". Bez stałej etykiety/noty w widoku.
+  // Bramka wielkości/formy PRACUJE W TLE: nie pokazujemy stałej karty „Model zabudowy"
+  // w widoku M1 (forma rekomendowana wraca w Poziomie 2). Punkt decyzyjny opłacalności
+  // = MODAL (osobne okno) — zatrzymuje przed pełną analizą i pyta „analizować dalej?".
   if (pytanie) {
     return (
       <div className="space-y-4">
-        <KartaFormy bramka={br} />
+        <Karta tytul="Ocena wstępna działki" podtytul="Sprawdzamy skalę możliwej zabudowy przed pełną analizą">
+          <p className="text-[12px] text-grunt-text-muted">Potwierdź kierunek w oknie, aby kontynuować.</p>
+        </Karta>
         <ModalOplacalnosc bramka={br} onTak={() => setSkalaOk(true)} onKoniec={onKoniec} />
       </div>
     );
@@ -840,7 +843,6 @@ function EkranM1({ p1, onDalej, onKoniec }: { p1: WynikPoziom1; onDalej: () => v
 
   return (
     <div className="space-y-4">
-      <KartaFormy bramka={br} />
       <Poziom1View p1={p1} pelny pokazRekomendacje={false} />
       <BannerBramki
         tytul="Poziom 1 zaliczony — przejdź do oceny działki"
@@ -861,37 +863,6 @@ function KomunikatBramki({ bramka }: { bramka: BramkaWielkosci }) {
         <div className={`text-[13px] font-semibold ${scalenie ? "text-grunt-amber-text" : "text-grunt-red"}`}>{scalenie ? "Działka zbyt mała samodzielnie" : "Działka nie nadaje się pod zabudowę"}</div>
         <div className="text-[12px] text-grunt-text-muted mt-0.5">{bramka.komunikat}</div>
       </div>
-    </div>
-  );
-}
-
-function KartaFormy({ bramka }: { bramka: BramkaWielkosci }) {
-  return (
-    <Karta tytul="Model zabudowy — orientacyjna skala" podtytul="Dwie formy liczone tym samym łańcuchem; rekomendowana daje najwięcej lokali">
-      <div className="grid sm:grid-cols-2 gap-3">
-        <FormaBox etykieta="Zabudowa niska (do 2 kond.)" f={bramka.niska} rekomendowana={bramka.formaRekomendowana === "niska"} />
-        <FormaBox etykieta="Zabudowa wysoka (powyżej 2 kond.)" f={bramka.wysoka} rekomendowana={bramka.formaRekomendowana === "wysoka"} />
-      </div>
-      <p className="text-[11px] text-grunt-text-faint2 mt-2">Skala orientacyjna z kształtu działki i zabudowy sąsiedztwa — nie zastępuje ustaleń MPZP/WZ (potwierdzenie na Poziomie 2).</p>
-    </Karta>
-  );
-}
-
-// Etykieta „w progu opłacalności" USUNIĘTA ze stałego widoku — próg opłacalności
-// ujawnia się WYŁĄCZNIE jako modal (osobne okno), gdy skala < próg (wytyczne §2.2/§5).
-function FormaBox({ etykieta, f, rekomendowana }: { etykieta: string; f: PojemnoscForma; rekomendowana: boolean }) {
-  return (
-    <div className={`rounded-card border p-3 ${rekomendowana ? "border-grunt-ink shadow-raised" : "border-grunt-border"}`}>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[12px] font-semibold text-grunt-text">{etykieta}</span>
-        {rekomendowana && <span className="badge bg-grunt-ink text-white text-[10px] shrink-0">★ REKOMENDOWANA</span>}
-      </div>
-      <div className="flex items-end gap-1 mt-2">
-        <span className="mono text-[28px] font-semibold leading-none text-grunt-text">{f.lokali}</span>
-        <span className="text-[12px] text-grunt-text-faint2 mb-0.5">lokali</span>
-      </div>
-      <div className="text-[11px] text-grunt-text-muted2 mt-1">{f.kondygnacje} kond. · PUM ~{liczba(f.pumM2, " m²")}</div>
-      {!rekomendowana && <div className="text-[11px] mt-1 text-grunt-text-faint2">forma alternatywna</div>}
     </div>
   );
 }
