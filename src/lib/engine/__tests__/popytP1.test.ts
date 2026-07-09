@@ -24,11 +24,14 @@ test("popytP1: K + S ≤ N_grupa; segment społeczny dodatni", () => {
   assert.ok(k.nSpoleczny! > 0);
 });
 
-test("popytP1: komunalny NIE zależy od pojemności; społeczny zależy", () => {
+test("popytP1 (spójność P1/P2): ani komunalny ani społeczny NIE zależą od pojemności — P1 bez pojemności", () => {
   const malo = ocenPopytP1(wzorcowa, { mlodzi: 5, seniorzy: 5 });
   const duzo = ocenPopytP1(wzorcowa, { mlodzi: 6000, seniorzy: 6000 });
   assert.equal(malo.werdykty.komunalnyMlodzi.score, duzo.werdykty.komunalnyMlodzi.score);
-  assert.ok(malo.werdykty.spolecznyMlodzi.score > duzo.werdykty.spolecznyMlodzi.score);
+  assert.equal(malo.werdykty.spolecznyMlodzi.score, duzo.werdykty.spolecznyMlodzi.score); // teraz też niezależny
+  // Werdykt społeczny = POZIOM potrzeby z proporcji kohortowej (nie „100/100" wystarczalności).
+  assert.ok(["niski", "umiarkowany", "wysoki"].includes(malo.werdykty.spolecznyMlodzi.poziom ?? ""));
+  assert.ok((malo.werdykty.spolecznyMlodzi.proporcjaKohortowaPct ?? -1) >= 0);
 });
 
 test("popytP1: komunalny-seniorzy ma flagę senioralną i nie wyższą pewność niż aktywni", () => {
