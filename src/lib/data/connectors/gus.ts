@@ -349,7 +349,23 @@ export const konektorGUS: Konektor = {
     const pop65 = (p65agg.length === 2 ? sumaPasm(p65agg, m) : null) ?? (p65gran.length > 0 ? sumaPasm(p65gran, m) : null);
     const ogolem = m.get(idTotal) ?? m.get(P2137_OGOLEM_TOTAL) ?? sumaPasm(pPartycja, m);
     const podmioty = m.get(idPodmioty) ?? null;
-    const saldo = m.get(idSaldo) ?? null;
+
+    // MIGRACJA — fallback roczny. Zapytanie pinuje `year=gus.rok`, a saldo/wymeldowania
+    // bywają publikowane z opóźnieniem (obserwacja: Katowice mają zameldowania 2023,
+    // ale saldo i wymeldowania puste). Gdy któraś zmienna migracyjna jest null dla
+    // bieżącego roku, sięgamy po najnowszy dostępny (rok-1, rok-2) — tylko dla tych ID.
+    let saldo = m.get(idSaldo) ?? null;
+    let zamel = idZamel ? m.get(idZamel) ?? null : null;
+    let wymel = idWymel ? m.get(idWymel) ?? null : null;
+    const migIds = [idSaldo, idZamel, idWymel].filter(Boolean) as string[];
+    const brakMig = () => (saldo == null) || (idZamel != null && zamel == null) || (idWymel != null && wymel == null);
+    for (const rokFb of [gus.rok - 1, gus.rok - 2]) {
+      if (!brakMig() || migIds.length === 0) break;
+      const mFb = await wartosciWielu(jednostka.id, migIds, rokFb);
+      if (saldo == null) saldo = mFb.get(idSaldo) ?? null;
+      if (idZamel && zamel == null) zamel = mFb.get(idZamel) ?? null;
+      if (idWymel && wymel == null) wymel = mFb.get(idWymel) ?? null;
+    }
 
     const udzial65 = ogolem && ogolem > 0 && pop65 !== null ? (pop65 / ogolem) * 100 : null;
     // Liczby bezwzględne (popyt P1: trójdzielny podział + benchmarki per mieszkaniec).
@@ -359,12 +375,10 @@ export const konektorGUS: Konektor = {
     // Dochód i migracje brutto — tylko gdy skonfigurowano ID zmiennych BDL (inaczej fallback w modelu).
     if (idDochod) dodaj("dochodPrzecietnyGmina", m.get(idDochod) ?? null, 70);
     if (idZamel && ogolem && ogolem > 0) {
-      const z = m.get(idZamel);
-      dodaj("naplywZameldowanNa1000", z == null ? null : (z / ogolem) * 1000, 75);
+      dodaj("naplywZameldowanNa1000", zamel == null ? null : (zamel / ogolem) * 1000, 75);
     }
     if (idWymel && ogolem && ogolem > 0) {
-      const w = m.get(idWymel);
-      dodaj("odplywMlodychNa1000", w == null ? null : (w / ogolem) * 1000, 65);
+      dodaj("odplywMlodychNa1000", wymel == null ? null : (wymel / ogolem) * 1000, 65);
     }
     if (ogolem && ogolem > 0) {
       if (udzial65 !== null) dodaj("udzial65PlusPct", udzial65, 80);
