@@ -1,6 +1,6 @@
 import type { KluczWerdyktu, WerdyktP1, Werdykt, WynikPoziom1 } from "@/lib/types";
 import { Karta, Statystyka } from "./ui";
-import { WskaznikPewnosci } from "./grunt";
+import { WskaznikPewnosci, Gauge } from "./grunt";
 import { liczba, statusSlowny } from "@/lib/format";
 
 // Oba profile definiuje wspólny warunek: brak własnego lokalu (kwalifikacja do
@@ -126,51 +126,82 @@ export function Poziom1View({ p1, pelny = true, pokazRekomendacje = true }: { p1
   );
 }
 
+// Hex kolorów werdyktu (do łuku gauge — SVG stroke, nie klasa Tailwind).
+const KOLOR_HEX: Record<Werdykt, string> = {
+  zielony: "#1C8A5A",
+  zolty: "#B5790B",
+  czerwony: "#C0392B",
+};
+
 function KartaWerdyktu({ w, rekomendowany }: { w: WerdyktP1; rekomendowany: boolean }) {
   const spol = w.natura === "spoleczny";
-  const tint = spol ? "bg-grunt-young-bg" : "bg-grunt-senior-bg";
+  const mlodzi = w.klucz.includes("Mlodzi");
+  const akcent = mlodzi ? "var(--grunt-young)" : "var(--grunt-senior)"; // kolor profilu
   const natura = spol ? "ocena projektu (vs pojemność)" : "skala potrzeby (per mieszk.)";
   return (
-    <div className={`relative rounded-card border overflow-hidden ${rekomendowany ? "border-grunt-ink shadow-raised" : "border-grunt-border"}`}>
-      <div className={`flex items-center justify-between px-4 py-2.5 ${tint}`}>
-        <span className="text-[13px] font-semibold text-grunt-text">{ETYK_WERDYKT[w.klucz]}</span>
-        {rekomendowany && <span className="badge bg-grunt-ink text-white text-[10px]">★ REKOMENDOWANY</span>}
-      </div>
-      <div className="p-4">
-        <div className="flex items-end justify-between">
-          {w.nieoznaczony ? (
-            <span className="flex items-center gap-2 text-[18px] font-semibold text-grunt-text-muted2">
-              <span className="w-2.5 h-2.5 rounded-full bg-grunt-text-faint2" />
-              Nieoznaczona
-            </span>
-          ) : (
-            <span className={`flex items-center gap-2 text-[20px] font-semibold ${KOLOR_STATUSU[w.werdykt]}`}>
-              <span className={`w-2.5 h-2.5 rounded-full ${KROPKA[w.werdykt]}`} />
-              {statusSlowny[w.werdykt]}
-            </span>
-          )}
-          {/* Nieoznaczona: NIE pokazujemy ostrej liczby przy nieznanej podstawie (sito, nie instrument). */}
-          {!w.nieoznaczony && (
-            <span className="mono text-[34px] font-semibold leading-none text-grunt-text">
-              {w.score}
-              <span className="text-[14px] text-grunt-text-faint2">/100</span>
-            </span>
-          )}
+    <div
+      className={`relative rounded-2xl border overflow-hidden ${rekomendowany ? "border-grunt-ink shadow-raised" : "border-grunt-border shadow-card"}`}
+      style={{ background: "var(--grunt-surface)" }}
+    >
+      {/* Pasek akcentu profilu (kierunek wizualny §3) */}
+      <div style={{ height: 4, background: akcent }} />
+      {rekomendowany && (
+        <span
+          className="absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full text-white text-[11px] font-semibold uppercase"
+          style={{ background: "var(--grunt-ink)", padding: "5px 11px", letterSpacing: ".03em" }}
+        >
+          ★ Rekomendowany
+        </span>
+      )}
+      <div className="px-5 pt-5 pb-5">
+        {/* Profil */}
+        <div className="flex items-center gap-2.5 mb-4">
+          <span className="w-[11px] h-[11px] rounded-full" style={{ background: akcent }} />
+          <span className="text-[13px] font-semibold text-grunt-text-3">{ETYK_WERDYKT[w.klucz]}</span>
         </div>
-        <div className="text-[10px] uppercase tracking-wide text-grunt-text-faint mt-1">{natura}</div>
-        <div className="mt-3"><WskaznikPewnosci pewnosc={w.pewnosc} /></div>
-        <div className="grid grid-cols-1 gap-2 mt-3 text-[11px]">
-          <MiniStat e={spol ? "Kwalifikujący (segment S)" : "Kwalifikujący (segment K)"} v={w.liczbaKwalifikujacych == null ? "brak danych" : `${liczba(w.liczbaKwalifikujacych)} os.`} />
+        {/* Werdykt + gauge */}
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            {w.nieoznaczony ? (
+              <span className="flex items-center gap-2.5 text-[22px] font-semibold text-grunt-text-muted2">
+                <span className="w-3 h-3 rounded-full bg-grunt-text-faint2" />
+                Nieoznaczona
+              </span>
+            ) : (
+              <span className={`flex items-center gap-2.5 text-[26px] font-semibold ${KOLOR_STATUSU[w.werdykt]}`} style={{ letterSpacing: "-.01em" }}>
+                <span className={`w-[13px] h-[13px] rounded-full ${KROPKA[w.werdykt]}`} />
+                {statusSlowny[w.werdykt]}
+              </span>
+            )}
+            <div className="mt-4">
+              <WskaznikPewnosci pewnosc={w.pewnosc} />
+            </div>
+            <div className="text-[10px] uppercase tracking-wide text-grunt-text-faint mt-2">{natura}</div>
+          </div>
+          {/* Nieoznaczona: pierścień pusty (bez ostrej liczby przy nieznanej podstawie). */}
+          <Gauge wartosc={w.score} kolor={KOLOR_HEX[w.werdykt]} nieoznaczony={w.nieoznaczony} />
         </div>
-        <p className="text-[12px] text-grunt-text-muted mt-3">{w.komentarz}</p>
-        {w.flagi.length > 0 && (
-          <ul className="mt-2 space-y-1">
-            {w.flagi.map((f, i) => (
-              <li key={i} className="text-[11px] text-grunt-amber-text bg-grunt-amber-bg border border-grunt-amber/25 rounded px-2 py-1">⚑ {f}</li>
-            ))}
-          </ul>
-        )}
+        {/* Drivery: kwalifikujący + komentarz + flagi */}
+        <div className="mt-5 pt-4 border-t border-grunt-divider-row flex flex-col gap-2.5">
+          <DriverRow ton="info" txt={`${spol ? "Kwalifikujący (segment S)" : "Kwalifikujący (segment K)"}: ${w.liczbaKwalifikujacych == null ? "brak danych" : `${liczba(w.liczbaKwalifikujacych)} os.`}`} />
+          {w.komentarz && <DriverRow ton="info" txt={w.komentarz} />}
+          {w.flagi.map((f, i) => (
+            <DriverRow key={i} ton="warn" txt={f} />
+          ))}
+        </div>
       </div>
+    </div>
+  );
+}
+
+/** Wiersz drivera (kierunek wizualny §6): okrągła ikona semantyczna 20px + tekst 13.5px. */
+function DriverRow({ ton, txt }: { ton: "plus" | "warn" | "info"; txt: string }) {
+  const bg = ton === "plus" ? "bg-grunt-green" : ton === "warn" ? "bg-grunt-amber" : "bg-grunt-border-input";
+  const ico = ton === "plus" ? "✓" : ton === "warn" ? "!" : "—";
+  return (
+    <div className="flex gap-2.5 items-start">
+      <span className={`grid place-items-center shrink-0 w-5 h-5 rounded-full text-white text-[11px] font-bold ${bg}`}>{ico}</span>
+      <span className="text-[13.5px] text-grunt-text-3 leading-snug">{txt}</span>
     </div>
   );
 }

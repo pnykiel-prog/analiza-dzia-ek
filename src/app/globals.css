@@ -14,7 +14,7 @@
   --grunt-mint:       #6FE3C4;
 
   /* --- POWIERZCHNIE --- */
-  --grunt-bg:         #E9EDF2;
+  --grunt-bg:         #ECEFF3;  /* tło aplikacji — cieplejszy neutralny (kierunek wizualny §7) */
   --grunt-bg-report:  #E1E6EC;
   --grunt-surface:    #FFFFFF;
   --grunt-surface-2:  #FAFBFC;
@@ -88,7 +88,7 @@
   --grunt-h-input-sm: 36px;
 
   /* --- UKŁAD --- */
-  --grunt-page-max:   1340px;
+  --grunt-page-max:   1200px;  /* szerokość UJEDNOLICONA (normalizacja §4); raport = 880 */
   --grunt-page-pad-x: 24px;
   --grunt-sticky-top: 130px;
 
@@ -205,6 +205,25 @@ textarea.inp { height: auto; padding: 0.5rem 0.7rem; }
 }
 .btn-secondary:hover { background: #F4F6F9; }
 .btn-secondary:disabled { color: var(--grunt-text-ghost); cursor: not-allowed; }
+
+/* ── CTA miętowe (kierunek wizualny §5) — „iskra” marki: JEDYNY żywy przycisk ──
+   „naprzód” w bramkach. Używać oszczędnie i tylko na ciemnym pasie bramki. */
+.btn-mint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: var(--grunt-h-btn-lg);
+  padding: 0 1.25rem;
+  border-radius: var(--grunt-r-md);
+  background: var(--grunt-mint);
+  color: #0C2A22;
+  font-size: 14px;
+  font-weight: 600;
+  transition: filter 0.15s ease;
+}
+.btn-mint:hover { filter: brightness(1.05); }
+.btn-mint:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── Chip wyboru (ankieta) ─────────────────────────────────── */
 .chip {
