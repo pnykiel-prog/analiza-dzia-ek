@@ -140,3 +140,16 @@ test("migracja: gmina rosnąca podnosi popyt aktywnych społecznych; komunalny-s
   // Komunalny-seniorzy: waga migracji 0 → popyt identyczny niezależnie od salda.
   assert.equal(r.werdykty.komunalnySeniorzy.liczbaKwalifikujacych, k.werdykty.komunalnySeniorzy.liczbaKwalifikujacych);
 });
+
+test("migracja: fallback z samego napływu (odpływ i saldo puste, jak Katowice) — napływ > benchmark daje korektę dodatnią", () => {
+  // Katowice: napływ 11,41/1000 obecny, odpływ i saldo null → fallback.
+  const bazaBezSalda = { saldoMigracjiMlodzi: null, odplywMlodychNa1000: null };
+  const naplywWysoki: DaneDzialki = { ...wzorcowa, ...bazaBezSalda, naplywZameldowanNa1000: 15 };
+  const naplywNiski: DaneDzialki = { ...wzorcowa, ...bazaBezSalda, naplywZameldowanNa1000: 5 };
+  const oW = ocenPopytP1(naplywWysoki, POJ);
+  const oN = ocenPopytP1(naplywNiski, POJ);
+  assert.equal(oW.korektaMigracyjna.zNaplywu, true); // sygnał z napływu
+  assert.equal(oW.korektaMigracyjna.dostepna, true); // NIE neutralny — napływ jest wykorzystany
+  assert.ok(oW.korektaMigracyjna.mBazowy > 1, `napływ 15 > benchmark → mnożnik >1 (${oW.korektaMigracyjna.mBazowy})`);
+  assert.ok(oN.korektaMigracyjna.mBazowy < 1, `napływ 5 < benchmark → mnożnik <1 (${oN.korektaMigracyjna.mBazowy})`);
+});

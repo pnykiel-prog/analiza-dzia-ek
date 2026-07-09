@@ -299,8 +299,9 @@ export interface WerdyktP1 {
 export interface OcenaPopytuP1 {
   kwalifikacje: { mlodzi: KwalifikacjeProfil; seniorzy: KwalifikacjeProfil };
   atrakcyjnoscMigracyjna: AtrakcyjnoscMigracyjna;
-  /** Oczyszczony model: JEDEN mnożnik migracji (M) + saldo/1000, waga per kafel. */
-  korektaMigracyjna: { mBazowy: number; saldo1000: number | null; dostepna: boolean };
+  /** Oczyszczony model: JEDEN mnożnik migracji (M) + saldo/1000, waga per kafel.
+   *  `zNaplywu` = bilans oszacowany tylko z napływu (brak odpływu/salda) → niższa pewność. */
+  korektaMigracyjna: { mBazowy: number; saldo1000: number | null; dostepna: boolean; zNaplywu: boolean };
   werdykty: Record<KluczWerdyktu, WerdyktP1>;
   rekomendowanyKierunek: KluczWerdyktu;
   pewnoscOgolna: number;

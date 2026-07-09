@@ -85,9 +85,15 @@ export function Poziom1View({ p1, pelny = true, pokazRekomendacje = true }: { p1
       >
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <Statystyka etykieta="Mnożnik popytu" wartosc={`×${ocena.korektaMigracyjna.mBazowy.toFixed(2)}`} akcent />
-          <Statystyka etykieta="Saldo migracji" wartosc={ocena.korektaMigracyjna.saldo1000 == null ? "brak danych" : `${ocena.korektaMigracyjna.saldo1000 > 0 ? "+" : ""}${ocena.korektaMigracyjna.saldo1000}/1000`} />
+          <Statystyka
+            etykieta={ocena.korektaMigracyjna.zNaplywu ? "Napływ vs benchmark" : "Saldo migracji"}
+            wartosc={ocena.korektaMigracyjna.saldo1000 == null ? "brak danych" : `${ocena.korektaMigracyjna.saldo1000 > 0 ? "+" : ""}${ocena.korektaMigracyjna.saldo1000}/1000`}
+          />
           <Statystyka etykieta="Wpływ" wartosc={ocena.korektaMigracyjna.mBazowy > 1 ? "podnosi popyt" : ocena.korektaMigracyjna.mBazowy < 1 ? "obniża popyt" : "neutralny"} />
         </div>
+        {ocena.korektaMigracyjna.zNaplywu && (
+          <p className="text-[11px] text-grunt-amber-text2 mt-2">Oszacowane z samego napływu zameldowań (brak odpływu i salda netto w BDL) — słabszy sygnał, niższa pewność.</p>
+        )}
         {!ocena.korektaMigracyjna.dostepna && (
           <p className="text-[11px] text-grunt-amber-text2 mt-2">Brak danych migracyjnych (napływ/odpływ) — mnożnik neutralny ×1,00 (bez korekty).</p>
         )}
