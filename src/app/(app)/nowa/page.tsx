@@ -511,8 +511,9 @@ export default function NowaAnalizaPage() {
           )}
           {ekran === "poziom2" && (
             <>
-              {/* Bez audytu braków na ekranie klienckim (wg wytycznych M2) — braki zostają w raporcie PDF. */}
-              <Poziom2View p2={wynik.poziom2} profilRek={wynik.poziom1.profilRekomendowany} sygnaly={wynik.poziom2.sygnaly} />
+              {/* Bez audytu braków ani pasa flag na ekranie klienckim (wg wytycznych M2) —
+                  status dostępności niesie tabela dostępności; braki zostają w raporcie PDF. */}
+              <Poziom2View p2={wynik.poziom2} profilRek={wynik.poziom1.profilRekomendowany} />
               <BannerBramki
                 tytul="Poziom 2 gotowy — czas na model finansowy"
                 opis="Osobny ekran ankiety (kto pyta i jak finansuje), potem przekrój montażu w obu reżimach."

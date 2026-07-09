@@ -1,4 +1,4 @@
-import type { BrakDanych, OcenaM2, PoleWskaznika, Profil, ProfilRekomendowany, Sygnal, WariantZabudowy, Werdykt, WerdyktProfiluM2, WynikPoziom2, ZrodloWskaznika } from "@/lib/types";
+import type { BrakDanych, OcenaM2, PoleWskaznika, Profil, ProfilRekomendowany, WariantZabudowy, Werdykt, WerdyktProfiluM2, WynikPoziom2, ZrodloWskaznika } from "@/lib/types";
 import { Karta, Statystyka } from "./ui";
 import { WskaznikPewnosci, Gauge } from "./grunt";
 import { etykietaTypologii, liczba, statusSlowny } from "@/lib/format";
@@ -150,12 +150,10 @@ const KOLORY_MIX = ["bg-grunt-ink", "bg-grunt-chart-4", "bg-grunt-chart-5", "bg-
 export function Poziom2View({
   p2,
   profilRek,
-  sygnaly,
   braki,
 }: {
   p2: WynikPoziom2;
   profilRek?: ProfilRekomendowany;
-  sygnaly?: Sygnal[];
   braki?: BrakDanych[];
 }) {
   const o = p2.obwiednia;
@@ -169,50 +167,25 @@ export function Poziom2View({
     <>
       <WerdyktM2Karta ocena={p2.ocenaM2} />
 
-      {(sygnaly || braki) && (
-        <div className={`grid gap-4 items-start ${braki ? "md:grid-cols-2" : ""}`}>
-          {sygnaly && (
-            <Karta tytul="Flagi i sygnały">
-              {sygnaly.length === 0 ? (
-                <p className="text-[12px] text-grunt-text-muted2">Brak istotnych flag — brak twardych ograniczeń ani wyróżniających atutów.</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {sygnaly.map((s, i) => {
-                    const kl =
-                      s.ton === "pozytyw"
-                        ? "bg-grunt-green-bg text-grunt-green"
-                        : s.ton === "ostrzezenie"
-                          ? "bg-grunt-amber-bg text-grunt-amber-text"
-                          : "bg-grunt-neutral-bg text-grunt-text-muted";
-                    const kropka = s.ton === "pozytyw" ? "bg-grunt-green" : s.ton === "ostrzezenie" ? "bg-grunt-amber" : "bg-grunt-neutral";
-                    return (
-                      <span key={i} className={`badge ${kl}`}>
-                        <span className={`w-2 h-2 rounded-full ${kropka}`} /> {s.tekst}
-                      </span>
-                    );
-                  })}
+      {/* „Flagi i sygnały" USUNIĘTE (wytyczna: usunięcie dublowania dostępności) —
+          status „w zasięgu / w komforcie / blisko" niosła już tabela dostępności niżej.
+          „Do weryfikacji" to osobna, niedublująca warstwa (luki danych) — zostaje. */}
+      {braki && (
+        <Karta tytul="Do weryfikacji" podtytul="Czego aplikacja nie potwierdziła automatycznie — sprawdź samodzielnie (nie blokuje wyniku, obniża pewność)" prawy={<span className="badge bg-grunt-surface-3 text-grunt-text-muted mono">{braki.length}</span>}>
+          {braki.length === 0 ? (
+            <p className="text-[12px] text-grunt-text-muted2">Komplet danych wejściowych — brak luk do samodzielnej weryfikacji dla tej działki.</p>
+          ) : (
+            <div className="space-y-2">
+              {braki.map((b, i) => (
+                <div key={i} className="rounded-md border border-dashed border-grunt-border-soft px-3 py-2">
+                  <div className="text-[13px] font-semibold text-grunt-text">{b.tytul}</div>
+                  <div className="text-[12px] text-grunt-text-muted2">{b.opis}</div>
+                  <div className="mono text-[11px] text-grunt-amber-text2 mt-0.5">{b.wplyw}</div>
                 </div>
-              )}
-            </Karta>
+              ))}
+            </div>
           )}
-          {braki && (
-            <Karta tytul="Do weryfikacji" podtytul="Czego aplikacja nie potwierdziła automatycznie — sprawdź samodzielnie (nie blokuje wyniku, obniża pewność)" prawy={<span className="badge bg-grunt-surface-3 text-grunt-text-muted mono">{braki.length}</span>}>
-              {braki.length === 0 ? (
-                <p className="text-[12px] text-grunt-text-muted2">Komplet danych wejściowych — brak luk do samodzielnej weryfikacji dla tej działki.</p>
-              ) : (
-                <div className="space-y-2">
-                  {braki.map((b, i) => (
-                    <div key={i} className="rounded-md border border-dashed border-grunt-border-soft px-3 py-2">
-                      <div className="text-[13px] font-semibold text-grunt-text">{b.tytul}</div>
-                      <div className="text-[12px] text-grunt-text-muted2">{b.opis}</div>
-                      <div className="mono text-[11px] text-grunt-amber-text2 mt-0.5">{b.wplyw}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Karta>
-          )}
-        </div>
+        </Karta>
       )}
 
       {p2.dostepnosc?.pozycje?.length ? (
