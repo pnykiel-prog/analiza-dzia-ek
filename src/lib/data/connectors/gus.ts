@@ -179,10 +179,13 @@ async function pobierzDynamike(unitId: string): Promise<DynamikaGminy | null> {
     const lata = Array.from({ length: gus.dynamikaLata }, (_, i) => rokDo - (gus.dynamikaLata - 1) + i);
     const idLudnosc = totalIdWieku();
     const idPodmioty = gus.zmienneId.podmiotyNa10k ?? "60530";
-    // Potwierdzone ID mają pierwszeństwo; inaczej dobór odporny (poziom gminy + jednostka).
-    const idMieszkania = gus.zmienneId.mieszkaniaOddane ?? (await idDynamiki(gus.zapytania.mieszkaniaOddane)); // jedn. „-"
+    // Potwierdzone ID mają pierwszeństwo; inaczej dobór odporny (POZIOM GMINY + jednostka).
+    // GUS nie publikuje „mieszkań oddanych" ani LICZBY bezrobotnych na poziomie gminy
+    // (tylko powiat), więc panel gminny używa gminnych odpowiedników: nasycenie mieszkaniami
+    // (mieszkania na 1000 ludności) oraz stopa bezrobocia (udział w ludności produkcyjnej).
+    const idMieszkania = gus.zmienneId.mieszkaniaOddane ?? (await idDynamiki(gus.zapytania.mieszkaniaOddane));
     const idDochody = gus.zmienneId.dochodyWlasne ?? (await idDynamiki(gus.zapytania.dochodyWlasne, "zł"));
-    const idBezrobotni = gus.zmienneId.bezrobotniLiczba ?? (await idDynamiki(gus.zapytania.bezrobotniLiczba, "osoba"));
+    const idBezrobotni = gus.zmienneId.bezrobotniLiczba ?? (await idDynamiki(gus.zapytania.bezrobocie, "%"));
     const ids = [idLudnosc, idPodmioty, idMieszkania, idDochody, idBezrobotni].filter(Boolean) as string[];
     const m = await szeregiWielu(unitId, ids, lata);
     const wez = (id: string | null): PunktSzeregu[] | null => (id ? m.get(id) ?? null : null);
@@ -371,7 +374,11 @@ async function idDynamiki(fraza: string, jednostkaZawiera?: string): Promise<str
   const roczne = wyniki.filter((r) => !MIESIACE.test(nazwa(r)) || nazwa(r).includes("styczeń-grudzień"));
   const zbiorBaza = roczne.length ? roczne : wyniki;
   const kandydaci = zbiorBaza.filter(pasujeJedn);
-  const zbior = kandydaci.length ? kandydaci : zbiorBaza;
+  const zbiorJedn = kandydaci.length ? kandydaci : zbiorBaza;
+  // POZIOM GMINY (level 6) ma dane w jednostce gminy — zmienne poziom ≤ 5 (powiat i wyżej)
+  // zwracają dla gminy null. Preferujemy więc kandydatów gminnych; brak → zbiór bazowy.
+  const gminne = zbiorJedn.filter((r) => Number(r.level) === 6);
+  const zbior = gminne.length ? gminne : zbiorJedn;
   // Preferuj „ogółem"/roczne, a przy braku — najkrótszą nazwę (najmniej przekrojów).
   const wybrany =
     zbior.find((r) => nazwa(r).includes("styczeń-grudzień") && nazwa(r).includes("ogółem")) ??
