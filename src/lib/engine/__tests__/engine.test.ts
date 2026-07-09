@@ -89,6 +89,29 @@ test("P2 (warstwy srd. 2 par.4): potwierdzony brak zagrozenia (stan false) -> pa
   assert.ok(env.every((s) => s.status === "pass"), "stan false → pass (czysto)");
 });
 
+test("P2: potwierdzone wskaźniki z ankiety schodzą z listy do weryfikacji i podnoszą pewność", () => {
+  // bialePlamy: brak MPZP + brak wskaźników planistycznych → obie pozycje na liście „do weryfikacji".
+  const bazowy = uruchomAnalize(bialePlamy);
+  const zDeklaracja = uruchomAnalize({
+    ...bialePlamy,
+    wskaznikiReczne: { intensywnosc: 1.2, maxWysokoscM: 12, maxPowZabudowyPct: 40, minPbcPct: 25 },
+    wskaznikiPotwierdzone: true,
+  });
+  const maBrak = (braki: { tytul: string }[], re: RegExp) => braki.some((b) => re.test(b.tytul));
+
+  // Baseline: plan/WZ oraz wskaźniki widnieją jako „do weryfikacji".
+  assert.ok(maBrak(bazowy.poziom2.braki, /Przeznaczenie w planie/i));
+  assert.ok(maBrak(bazowy.poziom2.braki, /Wskaźniki zabudowy/i));
+
+  // Po potwierdzonej deklaracji klienta obie pozycje schodzą z listy (dana zweryfikowana przez klienta).
+  assert.ok(!maBrak(zDeklaracja.poziom2.braki, /Przeznaczenie w planie/i));
+  assert.ok(!maBrak(zDeklaracja.poziom2.braki, /Wskaźniki zabudowy/i));
+
+  // Ten sam korzeń: mniej braków → wyższa pewność M2 (8 pkt za pozycję).
+  assert.ok(zDeklaracja.poziom2.braki.length < bazowy.poziom2.braki.length);
+  assert.ok(zDeklaracja.poziom2.ocenaM2.pewnoscM2 > bazowy.poziom2.ocenaM2.pewnoscM2);
+});
+
 test("P2: obwiednia z MPZP ma wyższą pewność niż fallback z sąsiedztwa", () => {
   const z = uruchomAnalize(senioralna); // MPZP
   const b = uruchomAnalize(bialePlamy); // brak MPZP → fallback
