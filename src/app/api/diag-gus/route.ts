@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { KONFIG_KONEKTORY } from "@/lib/data/connectorsConfig";
-import { konektorGUS, diagJednostki, diagZmienne } from "@/lib/data/connectors/gus";
+import { konektorGUS, diagJednostki, diagZmienne, diagSzeregiGminy } from "@/lib/data/connectors/gus";
 import type { Teren } from "@/lib/data/connectors/types";
 import { rozwiazDzialki } from "@/lib/data/resolver";
 
@@ -91,8 +91,22 @@ export async function GET(req: Request) {
   };
   const diagnostykaDynamiki: Record<string, unknown> = {};
   for (const [k, fraza] of Object.entries(dynFrazy)) {
-    diagnostykaDynamiki[k] = { fraza, kandydaci: await diagZmienne(fraza) };
+    const kandydaci = (await diagZmienne(fraza)) as { poziom?: number | null }[];
+    // Tylko kandydaci na poziomie GMINY (level 6) mają dane w jednostce gminy —
+    // zmienne poziom ≤ 5 są dostępne dopiero od powiatu i w gminie zwracają null.
+    const poziom6 = kandydaci.filter((c) => Number(c.poziom) === 6);
+    diagnostykaDynamiki[k] = { fraza, poziom6, liczbaKandydatow: kandydaci.length, kandydaci };
   }
+
+  // SUROWE szeregi przypiętych ID (bez przeliczeń) na gminie i na powiecie — rozstrzyga,
+  // czemu dana zmienna daje null (poziom powiatu) lub 0 (skala/jednostka po przeliczeniu).
+  const przypiete = [
+    gus.zmienneId.mieszkaniaOddane,
+    gus.zmienneId.dochodyWlasne,
+    gus.zmienneId.bezrobotniLiczba,
+    gus.zmienneId.podmiotyNa10k,
+  ].filter(Boolean) as string[];
+  const suroweSzeregi = await diagSzeregiGminy(gmina, "", przypiete);
 
   const wniosek =
     wynik.status === "ok" && liczbaPol >= 4
@@ -110,7 +124,8 @@ export async function GET(req: Request) {
     status: wynik.status,
     liczbaPolDanych: liczbaPol,
     dane, // udzialAktywniPct, udzial65PlusPct, bezrobociePct, trend65Plus, trendLudnosc, saldoMigracjiMlodzi, …
-    diagnostykaDynamiki, // kandydaci na ID 3 szeregów panelu dynamiki (do potwierdzenia)
+    diagnostykaDynamiki, // kandydaci na ID 3 szeregów panelu dynamiki (poziom6 = dostępne w gminie)
+    suroweSzeregi, // surowe wartości przypiętych ID na gminie vs powiecie (rozstrzyga null/0)
     debug: wynik.debug ?? null,
     wniosek,
   };
