@@ -99,6 +99,7 @@
   --grunt-font-mono:  var(--font-mono);
 }
 
+html { scroll-behavior: smooth; }
 body {
   background: var(--grunt-bg);
   color: var(--grunt-text);
