@@ -123,6 +123,7 @@ export function Gauge({
   kolor = "var(--grunt-ink)",
   rozmiar = 104,
   sufiks = "/100",
+  tekstSrodek,
   nieoznaczony = false,
 }: {
   wartosc: number;
@@ -130,6 +131,7 @@ export function Gauge({
   kolor?: string;
   rozmiar?: number;
   sufiks?: string;
+  tekstSrodek?: string; // nadpisuje zaokrągloną liczbę w środku (np. DSCR „1,20")
   nieoznaczony?: boolean;
 }) {
   const r = 50;
@@ -149,7 +151,7 @@ export function Gauge({
           <span className="text-grunt-text-faint2 text-[13px]">—</span>
         ) : (
           <>
-            <span className="mono font-semibold leading-none" style={{ fontSize: 30 }}>{Math.round(wartosc)}</span>
+            <span className="mono font-semibold leading-none" style={{ fontSize: tekstSrodek ? 24 : 30 }}>{tekstSrodek ?? Math.round(wartosc)}</span>
             <span className="text-[11px] text-grunt-text-faint2 mt-0.5">{sufiks}</span>
           </>
         )}

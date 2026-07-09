@@ -1,6 +1,6 @@
 import type { OsCzasu, WynikPoziom3, WynikScenariusza } from "@/lib/types";
 import { Karta, Statystyka, Flagi } from "./ui";
-import { StosMontazu, type SegmentStosu } from "./grunt";
+import { StosMontazu, Gauge, type SegmentStosu } from "./grunt";
 import { AnalizaFinansowaView } from "./AnalizaFinansowaView";
 import { etykietaRezimu, etykietaScenariusza, liczba, pct, plnMln } from "@/lib/format";
 
@@ -223,15 +223,28 @@ function DomkniecieKarta({ p3, oczekiwany }: { p3: WynikPoziom3; oczekiwany: Wyn
   const maxCzynsz = Math.max(czynsz, pulap) * 1.15 || 1;
   return (
     <div className={`card p-[18px] border-l-4 ${spina ? "border-l-grunt-green" : "border-l-grunt-amber"}`}>
-      <div className="flex items-center gap-2">
-        <span className={`w-3 h-3 rounded-full ${spina ? "bg-grunt-green" : "bg-grunt-amber"}`} />
-        <span className={`text-[16px] font-semibold ${spina ? "text-grunt-green" : "text-grunt-amber-text"}`}>
-          {spina ? "Inwestycja się spina" : "Domknięcie na granicy"}
-        </span>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className={`w-3 h-3 rounded-full ${spina ? "bg-grunt-green" : "bg-grunt-amber"}`} />
+            <span className={`text-[16px] font-semibold ${spina ? "text-grunt-green" : "text-grunt-amber-text"}`}>
+              {spina ? "Inwestycja się spina" : "Domknięcie na granicy"}
+            </span>
+          </div>
+          <p className="text-[12px] text-grunt-text-muted mt-1 max-w-xs">
+            DSCR {spina ? "powyżej" : "poniżej"} progu {PROG.toFixed(2).replace(".", ",")} w scenariuszu oczekiwanym.
+          </p>
+        </div>
+        {/* Gauge DSCR (kierunek wizualny §4): wartość względem 2× progu, kolor domknięcia. */}
+        <Gauge
+          wartosc={oczekiwany.dscr}
+          max={PROG * 2}
+          kolor={spina ? "#1C8A5A" : "#B5790B"}
+          rozmiar={92}
+          sufiks="DSCR"
+          tekstSrodek={liczba(oczekiwany.dscr, "", 2)}
+        />
       </div>
-      <p className="text-[12px] text-grunt-text-muted mt-1">
-        DSCR {spina ? "powyżej" : "poniżej"} progu {PROG.toFixed(2).replace(".", ",")} w scenariuszu oczekiwanym.
-      </p>
 
       {/* DSCR — przedział */}
       <div className="mt-4">
