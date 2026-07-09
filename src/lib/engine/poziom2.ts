@@ -259,7 +259,8 @@ export function uruchomPoziom2(
 
   // DOMKNIĘCIE M2 (kanały A–F): popyt realizowalny + przydatność ekonomiczna + bramki
   // → werdykt per profil + rekomendacja. To TU wpisane dane (odległości) zmieniają wynik.
-  const ocenaM2 = ocenM2(d, p1, bramki.status);
+  // Liczba pozycji „do weryfikacji" (środowisko/plan/droga/rynek) obniża pewność M2.
+  const ocenaM2 = ocenM2(d, p1, bramki.status, undefined, braki.length);
   // Flaga transportu (info) + pozytywne sygnały otoczenia (park/plac zabaw/poczta/bank) → „Flagi i sygnały".
   const sygnaly = [
     ...sygnalyBaza,

@@ -80,8 +80,8 @@ export function RaportView({
         return (
           <SekcjaRap numer="01" tytul="Werdykt przydatności — budownictwo społeczne (Poziom 2)">
             <div className="grid grid-cols-2 gap-4">
-              <WerdyktMini nazwa="Aktywni (bez własnego M)" profil="mlodzi" score={wm.score} werdykt={wm.werdykt} pewnosc={p1.pewnosc} rek={om2.rekomendacja === "mlodzi"} />
-              <WerdyktMini nazwa="Seniorzy (bez własnego M)" profil="seniorzy" score={ws.score} werdykt={ws.werdykt} pewnosc={p1.pewnosc} rek={om2.rekomendacja === "seniorzy"} />
+              <WerdyktMini nazwa="Aktywni (bez własnego M)" profil="mlodzi" score={wm.score} werdykt={wm.werdykt} pewnosc={om2.pewnoscM2} rek={om2.rekomendacja === "mlodzi"} />
+              <WerdyktMini nazwa="Seniorzy (bez własnego M)" profil="seniorzy" score={ws.score} werdykt={ws.werdykt} pewnosc={om2.pewnoscM2} rek={om2.rekomendacja === "seniorzy"} />
             </div>
           </SekcjaRap>
         );
@@ -154,6 +154,27 @@ export function RaportView({
           <p className="text-[12px] text-grunt-text-muted">Model finansowy dostępny po wypełnieniu ankiety finansowej (Poziom 3).</p>
         )}
       </SekcjaRap>
+
+      {/* 05 Do weryfikacji — jawna lista luk niepotwierdzonych automatycznie
+          (środowisko/plan/WZ/droga/wskaźniki/rynek). Wejście do modułu dokumentów. */}
+      {p2.braki.length > 0 && (
+        <SekcjaRap numer="05" tytul="Do weryfikacji — potwierdź przed decyzją">
+          <div className="space-y-1.5">
+            {p2.braki.map((b, i) => (
+              <div key={i} className="flex items-start gap-2 text-[12px]">
+                <span className="mono text-grunt-text-faint2 shrink-0">□</span>
+                <span>
+                  <span className="font-semibold text-grunt-text">{b.tytul}</span>
+                  <span className="text-grunt-text-muted2"> — {b.opis}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[10px] text-grunt-text-faint">
+            Lista nie zmienia werdyktu — wskazuje, co domknąć samodzielnie; każda pozycja obniża pewność wyniku.
+          </p>
+        </SekcjaRap>
+      )}
 
       {/* Prowenancja + zastrzeżenie */}
       <div className="mt-6">

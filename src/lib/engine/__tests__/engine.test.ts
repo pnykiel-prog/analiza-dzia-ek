@@ -122,9 +122,10 @@ test("P2: wariant senioralny zawsze ma windę", () => {
 
 test("P2: sygnały i realne białe plamy", () => {
   const a = uruchomAnalize(wzorcowa);
-  // Komplet danych „miękkich"; białe plamy to tylko niezassane warstwy środowiskowe
-  // (powódź/ochrona/osuwiska — do weryfikacji). Poza nimi brak braków; sygnały pozytywne.
-  assert.ok(a.poziom2.braki.every((x) => /powodz|ochron|osuwisk|środowisk/i.test(x.tytul)), `nieoczekiwane braki: ${a.poziom2.braki.map((x) => x.tytul).join(", ")}`);
+  // Komplet danych „miękkich"; lista „do weryfikacji" obejmuje niezassane warstwy
+  // środowiskowe (powódź/ochrona/osuwiska) ORAZ podstawę planistyczną (plan/WZ), gdy
+  // działka nie ma MPZP mieszkaniowego (warstwy śrd. 2 §4a — jedno miejsce ze wszystkimi lukami).
+  assert.ok(a.poziom2.braki.every((x) => /powodz|ochron|osuwisk|środowisk|plan|przeznacz|wskaźnik|zabudow/i.test(x.tytul)), `nieoczekiwane braki: ${a.poziom2.braki.map((x) => x.tytul).join(", ")}`);
   assert.ok(a.poziom2.sygnaly.some((s) => s.ton === "pozytyw"));
 
   const b = uruchomAnalize(bialePlamy);
