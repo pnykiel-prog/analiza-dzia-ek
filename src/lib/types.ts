@@ -299,6 +299,8 @@ export interface WerdyktP1 {
 export interface OcenaPopytuP1 {
   kwalifikacje: { mlodzi: KwalifikacjeProfil; seniorzy: KwalifikacjeProfil };
   atrakcyjnoscMigracyjna: AtrakcyjnoscMigracyjna;
+  /** Oczyszczony model: JEDEN mnożnik migracji (M) + saldo/1000, waga per kafel. */
+  korektaMigracyjna: { mBazowy: number; saldo1000: number | null; dostepna: boolean };
   werdykty: Record<KluczWerdyktu, WerdyktP1>;
   rekomendowanyKierunek: KluczWerdyktu;
   pewnoscOgolna: number;

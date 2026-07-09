@@ -253,6 +253,7 @@ export function ocenPopytP1(
   return {
     kwalifikacje: { mlodzi: kwMlodzi, seniorzy: kwSeniorzy },
     atrakcyjnoscMigracyjna,
+    korektaMigracyjna: { mBazowy: Math.round(mig.mBazowy * 100) / 100, saldo1000: mig.saldo1000 == null ? null : Math.round(mig.saldo1000 * 10) / 10, dostepna: mig.dostepna },
     werdykty,
     rekomendowanyKierunek: rekomendowany.klucz,
     pewnoscOgolna: rekomendowany.pewnosc,
