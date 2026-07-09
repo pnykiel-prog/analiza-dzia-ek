@@ -110,20 +110,21 @@ interface Migracja {
 
 /**
  * M = clamp(1 + saldo_na_1000 × k). Gmina rosnąca podnosi popyt, kurcząca się obniża.
- * Kolejność źródeł (od najlepszego): napływ−odpływ (oba na 1000) → saldo netto → sam
- * napływ (fallback). Fallback z napływu: gdy odpływ i saldo są puste (częste w BDL —
- * tak jest np. dla Katowic), a napływ jest — bilans szacujemy względem benchmarku
- * napływu i słabszym współczynnikiem (napływ nie mówi o odpływie → niższa pewność).
+ * Kolejność źródeł (od najlepszego): SALDO NETTO (jedna, spójna liczba z jednego roku) →
+ * napływ−odpływ → sam napływ (fallback). Saldo netto jest preferowane, bo napływ i odpływ
+ * mogą pochodzić z RÓŻNYCH lat (fallback roczny w konektorze), co czyni ich różnicę
+ * niewiarygodną. Fallback z napływu: gdy nie ma salda ani odpływu, a napływ jest —
+ * bilans szacujemy względem benchmarku napływu i słabszym współczynnikiem (niższa pewność).
  */
 function korektaMigracji(d: DaneDzialki, cfg: KonfiguracjaPopytP1): Migracja {
   const total = d.liczbaMieszkancowGminy ?? null;
   let saldo1000: number | null = null;
   let zNaplywu = false;
   let k = cfg.migracja.k;
-  if (d.naplywZameldowanNa1000 != null && d.odplywMlodychNa1000 != null) {
+  if (d.saldoMigracjiMlodzi != null && total != null && total > 0) {
+    saldo1000 = (d.saldoMigracjiMlodzi / total) * 1000; // saldo NETTO (absolutne → /total) — najczystszy sygnał
+  } else if (d.naplywZameldowanNa1000 != null && d.odplywMlodychNa1000 != null) {
     saldo1000 = d.naplywZameldowanNa1000 - d.odplywMlodychNa1000; // obie już na 1000
-  } else if (d.saldoMigracjiMlodzi != null && total != null && total > 0) {
-    saldo1000 = (d.saldoMigracjiMlodzi / total) * 1000; // saldo NETTO (absolutne → /total)
   } else if (d.naplywZameldowanNa1000 != null) {
     // FALLBACK: sam napływ względem benchmarku, słabszym współczynnikiem i niższą pewnością.
     saldo1000 = d.naplywZameldowanNa1000 - cfg.migracja.benchmarkNaplyw1000;

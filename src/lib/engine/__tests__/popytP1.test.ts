@@ -132,8 +132,10 @@ test("brak danych ludnościowych → werdykt nieoznaczony (nie czerwony, nie ost
 
 test("migracja: gmina rosnąca podnosi popyt aktywnych społecznych; komunalny-seniorzy bez zmian (waga 0)", () => {
   const duzaPoj = { mlodzi: 4000, seniorzy: 4000 }; // duża pojemność → widać różnicę popytu (bez saturacji)
-  const rosnaca: DaneDzialki = { ...wzorcowa, naplywZameldowanNa1000: 15, odplywMlodychNa1000: 3 };
-  const kurczaca: DaneDzialki = { ...wzorcowa, naplywZameldowanNa1000: 3, odplywMlodychNa1000: 15 };
+  // Saldo NETTO jest źródłem pierwszym (po naprawie kolejności) — sterujemy nim; napływ/odpływ puste.
+  const bezPary = { naplywZameldowanNa1000: null, odplywMlodychNa1000: null, liczbaMieszkancowGminy: 30000 };
+  const rosnaca: DaneDzialki = { ...wzorcowa, ...bezPary, saldoMigracjiMlodzi: 360 }; // +12/1000
+  const kurczaca: DaneDzialki = { ...wzorcowa, ...bezPary, saldoMigracjiMlodzi: -360 }; // −12/1000
   const r = ocenPopytP1(rosnaca, duzaPoj);
   const k = ocenPopytP1(kurczaca, duzaPoj);
   assert.ok(r.werdykty.spolecznyMlodzi.score > k.werdykty.spolecznyMlodzi.score, "aktywni społeczni czuli migrację");
