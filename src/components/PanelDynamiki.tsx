@@ -3,9 +3,10 @@ import { Karta } from "./ui";
 import { liczba } from "@/lib/format";
 
 /**
- * Panel dynamiki gminy — 5 wykresów liniowych ~10 lat (czysty KONTEKST, NIE zmienia
- * popytu ani werdyktu; klient czyta trend sam). Ludność = kotwica; brak danego szeregu
- * → jego wykres znika (panel się nie wywraca). Braki w środku szeregu = luka, NIE zero.
+ * Panel dynamiki gminy — wykresy liniowe ~10 lat (czysty KONTEKST, NIE zmienia popytu
+ * ani werdyktu; klient czyta trend sam). Tylko wskaźniki pewnie dostępne na poziomie
+ * GMINY (ludność, podmioty REGON, dochody własne / mieszkańca). Ludność = kotwica;
+ * brak danego szeregu → jego wykres znika. Braki w środku szeregu = luka, NIE zero.
  */
 interface DefWykresu {
   klucz: keyof DynamikaGminy;
@@ -16,10 +17,8 @@ interface DefWykresu {
 
 const WYKRESY: DefWykresu[] = [
   { klucz: "ludnosc", tytul: "Liczba ludności", jednostka: "os.", fmt: (v) => liczba(Math.round(v)) },
-  { klucz: "mieszkaniaOddane", tytul: "Nasycenie mieszkaniami", jednostka: "na 1000 os.", fmt: (v) => liczba(Math.round(v)) },
   { klucz: "podmioty", tytul: "Podmioty REGON", jednostka: "na 10 tys.", fmt: (v) => liczba(Math.round(v)) },
   { klucz: "dochodyWlasne", tytul: "Dochody własne / mieszk.", jednostka: "zł", fmt: (v) => liczba(Math.round(v)) },
-  { klucz: "bezrobotni", tytul: "Stopa bezrobocia", jednostka: "%", fmt: (v) => `${(Math.round(v * 10) / 10).toLocaleString("pl-PL")}` },
 ];
 
 export function PanelDynamiki({ dynamika }: { dynamika?: DynamikaGminy | null }) {

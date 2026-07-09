@@ -92,15 +92,15 @@ export interface PunktSzeregu {
 }
 
 /**
- * Panel dynamiki gminy — 5 szeregów rocznych (~10 lat) jako CZYSTY KONTEKST
- * (nie koryguje popytu). Ludność = kotwica; brak innego szeregu → jego wykres znika.
+ * Panel dynamiki gminy — szeregi roczne (~10 lat) jako CZYSTY KONTEKST (nie koryguje
+ * popytu). Ludność = kotwica; brak innego szeregu → jego wykres znika. Uwzględniamy
+ * tylko wskaźniki pewnie dostępne na poziomie GMINY (GUS nie daje na gminie liczby
+ * mieszkań oddanych ani liczby bezrobotnych — dlatego ich tu nie ma).
  */
 export interface DynamikaGminy {
   ludnosc: PunktSzeregu[] | null; // kotwica — liczba ludności
-  mieszkaniaOddane: PunktSzeregu[] | null; // mieszkania oddane do użytkowania / rok
   podmioty: PunktSzeregu[] | null; // podmioty REGON (na 10 tys.)
   dochodyWlasne: PunktSzeregu[] | null; // dochody własne gminy / mieszkańca [zł]
-  bezrobotni: PunktSzeregu[] | null; // liczba bezrobotnych zarejestrowanych
 }
 
 export interface DaneDzialki {
