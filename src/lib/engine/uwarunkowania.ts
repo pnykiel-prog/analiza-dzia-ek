@@ -20,28 +20,29 @@ import { warstwaZaladowana } from "../data/srodowisko";
 // ── Bramki (Warstwa 0) ──────────────────────────────────────────────────────
 
 /**
- * Jedna bramka środowiskowa E sterowana danymi lokalnej warstwy (naprawa CAP,
- * warstwy środowiskowe 2 §4):
- *  - zassana + WYKRYTO przecięcie → „warunkowo" (realne zagrożenie → CAP na żółty),
- *  - zassana + brak przecięcia → „pass" (czysto, odblokowuje zielony),
- *  - niezassana / brak danej → „do weryfikacji" (NIE blokuje; trafia na listę
- *    braków i obniża pewność — brak weryfikacji ≠ warunkowa).
+ * Jedna bramka środowiskowa E sterowana TRÓJSTANEM danej (auto z warstwy WFS
+ * LUB deklaracja klienta w panelu — oba trafiają w to samo pole true/false/null),
+ * wsparta flagą `zassana` (czy warstwa lokalna działała). Naprawa CAP (§4):
+ *  - stan === true (wykryte/zadeklarowane zagrożenie) → „warunkowo" (CAP na żółty),
+ *  - stan === false LUB warstwa zassana bez przecięcia → „pass" (czysto → zielony),
+ *  - stan === null i warstwa niezassana → „do weryfikacji" (NIE blokuje; trafia na
+ *    listę braków i obniża pewność — brak weryfikacji ≠ warunkowa).
  */
 function bramkaSrodowiskowa(
   szczegoly: WynikBramki[],
   flagi: string[],
-  o: { nazwa: string; zrodlo: string; zassana: boolean; wykryto: boolean; flagaWykryto: string; uzasWykryto: string; uzasPass: string }
+  o: { nazwa: string; zrodlo: string; zassana: boolean; stan: boolean | null; flagaWykryto: string; uzasWykryto: string; uzasPass: string }
 ): void {
-  if (!o.zassana) {
-    szczegoly.push({ nazwa: o.nazwa, zrodlo: o.zrodlo, status: "do_weryfikacji", uzasadnienie: "Niezweryfikowane automatycznie — brak podłączonej warstwy; sprawdź źródło (nie blokuje wyniku)." });
-    return;
-  }
-  if (o.wykryto) {
+  if (o.stan === true) {
     szczegoly.push({ nazwa: o.nazwa, zrodlo: o.zrodlo, status: "warunkowo", uzasadnienie: o.uzasWykryto });
     flagi.push(o.flagaWykryto);
-  } else {
-    szczegoly.push({ nazwa: o.nazwa, zrodlo: o.zrodlo, status: "pass", uzasadnienie: o.uzasPass });
+    return;
   }
+  if (o.stan === false || o.zassana) {
+    szczegoly.push({ nazwa: o.nazwa, zrodlo: o.zrodlo, status: "pass", uzasadnienie: o.uzasPass });
+    return;
+  }
+  szczegoly.push({ nazwa: o.nazwa, zrodlo: o.zrodlo, status: "do_weryfikacji", uzasadnienie: "Niezweryfikowane automatycznie — brak podłączonej warstwy ani deklaracji; sprawdź źródło (nie blokuje wyniku)." });
 }
 
 export function liczBramki(d: DaneDzialki): { status: StatusBramki; flagi: string[]; szczegoly: WynikBramki[] } {
@@ -94,39 +95,39 @@ export function liczBramki(d: DaneDzialki): { status: StatusBramki; flagi: strin
   );
   if (gruntChroniony) flagi.push("Wymagane odrolnienie/odlesienie");
 
-  // Bramki E środowiskowe (powódź/ochrona przyrody/osuwiska) — STEROWANE DANYMI
-  // z lokalnych warstw (przecięcie geometrii, ustawione w resolverze). Reguła per
-  // warstwa (naprawa CAP): zassana + przecięcie → „warunkowo" (realne zagrożenie,
-  // CAP na żółty); zassana + brak przecięcia → „pass" (odblokowuje zielony);
-  // NIEzassana → „do weryfikacji" (NIE blokuje, trafia na listę braków). Dla działki
-  // objętej MPZP mieszkaniowym środowisko jest przesądzone w planie → pomijamy.
+  // Bramki E środowiskowe (powódź/ochrona przyrody/osuwiska) — STEROWANE TRÓJSTANEM
+  // danej: auto z warstwy WFS (przecięcie geometrii) LUB deklaracja klienta w panelu
+  // środowiskowym (oba w tym samym polu true/false/null). Reguła (naprawa CAP):
+  // stan true → „warunkowo" (CAP na żółty); stan false / warstwa zassana bez przecięcia
+  // → „pass"; stan null i warstwa niezassana → „do weryfikacji" (NIE blokuje). Dla
+  // działki objętej MPZP mieszkaniowym środowisko jest przesądzone w planie → pomijamy.
   if (!objetePlanem) {
     const powodzZassana = warstwaZaladowana("powodz_q10") || warstwaZaladowana("powodz_q1") || warstwaZaladowana("powodz_q02");
     bramkaSrodowiskowa(szczegoly, flagi, {
       nazwa: "Obszar zagrożenia powodzią",
-      zrodlo: "ISOK / Wody Polskie (WFS)",
+      zrodlo: "ISOK / Wody Polskie (WFS) lub deklaracja",
       zassana: powodzZassana,
-      wykryto: d.ryzykoPowodzioweSzczegolne === true,
-      flagaWykryto: "Zagrożenie powodziowe (ISOK) — wynik warunkowy do usunięcia bariery",
-      uzasWykryto: "Działka przecina strefę zagrożenia powodzią (ISOK) — wykryte zagrożenie, wynik warunkowy.",
-      uzasPass: "Poza strefą zagrożenia powodzią (dane ISOK).",
+      stan: d.ryzykoPowodzioweSzczegolne,
+      flagaWykryto: "Zagrożenie powodziowe — wynik warunkowy do usunięcia bariery",
+      uzasWykryto: "Działka w strefie zagrożenia powodzią (ISOK / deklaracja) — wykryte zagrożenie, wynik warunkowy.",
+      uzasPass: "Poza strefą zagrożenia powodzią.",
     });
     bramkaSrodowiskowa(szczegoly, flagi, {
       nazwa: "Ochrona przyrody (Natura 2000 / park / rezerwat)",
       zrodlo: "GDOŚ Geoserwis (WFS) / OSM",
       zassana: warstwaZaladowana("ochrona_przyrody"),
-      wykryto: d.natura2000 === true,
+      stan: d.natura2000,
       flagaWykryto: "Forma ochrony przyrody — wynik warunkowy do weryfikacji ograniczeń",
       uzasWykryto: "Działka przecina formę ochrony przyrody — ograniczenia zabudowy, wynik warunkowy.",
       uzasPass: "Poza formami ochrony przyrody (dane GDOŚ/OSM).",
     });
     bramkaSrodowiskowa(szczegoly, flagi, {
       nazwa: "Osuwiska / tereny zagrożone ruchami masowymi",
-      zrodlo: "PIG-PIB / SOPO (WFS)",
+      zrodlo: "PIG-PIB / SOPO (WFS) lub deklaracja",
       zassana: warstwaZaladowana("osuwiska"),
-      wykryto: d.osuwisko === true,
+      stan: d.osuwisko,
       flagaWykryto: "Osuwisko / teren zagrożony — wynik warunkowy do weryfikacji posadowienia",
-      uzasWykryto: "Działka przecina osuwisko lub teren zagrożony — ograniczenia posadowienia, wynik warunkowy.",
+      uzasWykryto: "Działka na osuwisku lub terenie zagrożonym (SOPO / deklaracja) — ograniczenia posadowienia, wynik warunkowy.",
       uzasPass: "Poza osuwiskami (dane SOPO).",
     });
   }

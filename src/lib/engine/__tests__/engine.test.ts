@@ -63,10 +63,30 @@ test("P2: pułap czynszu = wartość odtworzeniowa × 5% ÷ 12", () => {
   assert.ok(a.poziom2.kluczoweLiczby.pulapCzynszuSimM2! > 30 && a.poziom2.kluczoweLiczby.pulapCzynszuSimM2! < 35);
 });
 
-test("P2 (2.2): bramki srodowiskowe nieaktywne daja pozycje do-weryfikacji + flage (nie ciche przepuszczanie)", () => {
-  const a = uruchomAnalize(bialePlamy); // brak MPZP, warstwy środowiskowe niezassane (seed)
-  // Każda niezassana warstwa (powódź/ochrona/osuwiska) → pozycja „do weryfikacji" (CAP), nie ciche pass.
-  assert.ok(a.poziom2.bramki.szczegoly.some((s) => s.status === "do_weryfikacji" && /powodz|ochron|osuwisk/i.test(s.nazwa)));
+test("P2 (warstwy srd. 2 par.4): niezweryfikowane srodowisko (stan null, brak warstwy) -> do weryfikacji, nie blokuje", () => {
+  // Brak MPZP i brak danej środowiskowej (null) — warstwy niezassane w teście → do weryfikacji.
+  const d = { ...bialePlamy, statusPlanistyczny: "brak_danych" as const, ryzykoPowodzioweSzczegolne: null, osuwisko: null, natura2000: null };
+  const a = uruchomAnalize(d);
+  const env = a.poziom2.bramki.szczegoly.filter((s) => /powodz|ochron|osuwisk/i.test(s.nazwa));
+  assert.ok(env.length >= 3);
+  assert.ok(env.every((s) => s.status === "do_weryfikacji"), "każda niezweryfikowana warstwa → do_weryfikacji");
+  // Brak weryfikacji NIE robi bramki „warunkowo" (nie blokuje) — to naprawa CAP.
+  assert.ok(!env.some((s) => s.status === "warunkowo"));
+});
+
+test("P2 (warstwy srd. 2 par.4): wykryte/zadeklarowane zagrozenie (stan true) -> warunkowo (CAP)", () => {
+  const d = { ...bialePlamy, statusPlanistyczny: "brak_danych" as const, ryzykoPowodzioweSzczegolne: true, osuwisko: null, natura2000: null };
+  const a = uruchomAnalize(d);
+  const powodz = a.poziom2.bramki.szczegoly.find((s) => /powodz/i.test(s.nazwa));
+  assert.equal(powodz?.status, "warunkowo"); // deklaracja „tak" → warunkowo, nawet bez warstwy WFS
+  assert.ok(a.poziom2.bramki.flagi.some((f) => /powodz/i.test(f)));
+});
+
+test("P2 (warstwy srd. 2 par.4): potwierdzony brak zagrozenia (stan false) -> pass, odblokowuje zielony", () => {
+  const d = { ...bialePlamy, statusPlanistyczny: "brak_danych" as const, ryzykoPowodzioweSzczegolne: false, osuwisko: false, natura2000: false };
+  const a = uruchomAnalize(d);
+  const env = a.poziom2.bramki.szczegoly.filter((s) => /powodz|ochron|osuwisk/i.test(s.nazwa));
+  assert.ok(env.every((s) => s.status === "pass"), "stan false → pass (czysto)");
 });
 
 test("P2: obwiednia z MPZP ma wyższą pewność niż fallback z sąsiedztwa", () => {
@@ -129,10 +149,11 @@ test("P2: sygnały i realne białe plamy", () => {
   assert.ok(a.poziom2.sygnaly.some((s) => s.ton === "pozytyw"));
 
   const b = uruchomAnalize(bialePlamy);
-  // Brak czynszu → biała plama rynku najmu. Środowisko ZAPARKOWANE → brak sygnału z Natury 2000.
+  // Brak czynszu → biała plama rynku najmu. Natura 2000 = true w danych → bramka „warunkowo"
+  // + sygnał ostrzegawczy (wykryte ograniczenie, zgodnie z naprawą CAP).
   assert.ok(b.poziom2.braki.length >= 1, `braki=${b.poziom2.braki.length}`);
   assert.ok(b.poziom2.braki.some((x) => x.tytul.toLowerCase().includes("najmu")));
-  assert.ok(!b.poziom2.sygnaly.some((s) => /natura/i.test(s.tekst)));
+  assert.ok(b.poziom2.sygnaly.some((s) => /natura|ochron/i.test(s.tekst)));
 });
 
 test("P3: trzy scenariusze, reżim domyślny kotwiczony w OBECNYM (5.3), oś czasu sensowna", () => {

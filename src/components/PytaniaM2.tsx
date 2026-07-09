@@ -11,6 +11,8 @@ export interface OdpowiedziM2 {
   odleglosci: Record<string, number | null>; // metry
   wysokoscOkolicyPieter: number | null;
   transport: DaneTransportu | null; // ręczny panel transportu; null = pominięte
+  zalewowy: boolean | null; // deklaracja: teren zalewowy? tak/nie/nie wiem (fallback WFS)
+  osuwiska: boolean | null; // deklaracja: teren zagrożony osuwiskami? tak/nie/nie wiem
   planistyka: {
     intensywnosc: number | null;
     maxWysokoscM: number | null;
@@ -68,6 +70,15 @@ export function PytaniaM2({
         }))
       : [{ ...pustyPrzystanek }]
   );
+  // Panel środowiskowy (fallback WFS): teren zalewowy / osuwiska — tak/nie/nie wiem.
+  // Pytamy tylko o to, czego auto (warstwa WFS) nie rozstrzygnęło. „nie wiem" → null
+  // → trafia na listę „do weryfikacji", NIE blokuje (naprawa CAP).
+  const zalewowyAuto = dane.ryzykoPowodzioweSzczegolne != null;
+  const osuwiskaAuto = dane.osuwisko != null;
+  const stanNaOdp = (v: boolean | null): "" | "tak" | "nie" => (v == null ? "" : v ? "tak" : "nie");
+  const [zalewowy, setZalewowy] = useState<"" | "tak" | "nie">(stanNaOdp(dane.ryzykoPowodzioweSzczegolne));
+  const [osuwiska, setOsuwiska] = useState<"" | "tak" | "nie">(stanNaOdp(dane.osuwisko));
+
   const [planOtwarte, setPlanOtwarte] = useState(false);
   const [potwierdzona, setPotwierdzona] = useState(false);
   const [plan, setPlan] = useState<Record<string, string>>({ intensywnosc: "", maxWysokoscM: "", maxPowZabudowyPct: "", minPbcPct: "" });
@@ -97,11 +108,14 @@ export function PytaniaM2({
                 .map((p) => ({ odlegloscM: num(p.odlegloscM), liczbaLinii: num(p.liczbaLinii), kursyDzien: num(p.kursyDzien), kursyNoc: num(p.kursyNoc) }))
                 .filter((p) => p.odlegloscM != null || p.liczbaLinii != null || p.kursyDzien != null || p.kursyNoc != null),
             };
+    const naStan = (v: "" | "tak" | "nie"): boolean | null => (v === "" ? null : v === "tak");
     onPrzelicz({
       dostepDrogi: droga === "" ? null : droga === "tak",
       odleglosci,
       wysokoscOkolicyPieter: num(wys),
       transport,
+      zalewowy: naStan(zalewowy),
+      osuwiska: naStan(osuwiska),
       planistyka: planPodane
         ? {
             intensywnosc: num(plan.intensywnosc),
@@ -244,6 +258,35 @@ export function PytaniaM2({
         </div>
       </div>
 
+      {/* 2b. PANEL ŚRODOWISKOWY (fallback WFS): teren zalewowy / osuwiska.
+          Pytamy tylko o to, czego auto nie rozstrzygnęło. „Nie wiem" → nie blokuje,
+          trafia na listę „do weryfikacji". „Tak" → wynik warunkowy (CAP). */}
+      {(!zalewowyAuto || !osuwiskaAuto) && (
+        <div className="mb-4 rounded-lg border border-grunt-divider p-3">
+          <div className="text-[13px] font-semibold text-grunt-text mb-1">Zagrożenia środowiskowe</div>
+          <p className="text-[11px] text-grunt-text-muted2 mb-3">
+            Jeśli nie wiesz — zostaw „Nie wiem". Nie zablokuje to oceny, ale trafi na listę „Do weryfikacji". „Tak" oznacza wynik warunkowy do potwierdzenia.
+          </p>
+          {!zalewowyAuto && (
+            <TrojstanPytanie
+              pytanie="Czy działka leży w terenie zalewowym (zagrożenie powodziowe)?"
+              podpowiedz="Sprawdź: Hydroportal Wód Polskich (mapy zagrożenia powodziowego)."
+              wartosc={zalewowy}
+              onChange={setZalewowy}
+            />
+          )}
+          {!osuwiskaAuto && (
+            <TrojstanPytanie
+              pytanie="Czy działka leży w terenie zagrożonym osuwiskami?"
+              podpowiedz="Sprawdź: Geoportal SOPO / PIG (osuwiska). Istotne głównie w terenie górskim/pofałdowanym."
+              wartosc={osuwiska}
+              onChange={setOsuwiska}
+              className={!zalewowyAuto ? "mt-3" : ""}
+            />
+          )}
+        </div>
+      )}
+
       {/* 3. Wysokość zabudowy w okolicy — tylko gdy auto (BDOT) nie pobrało */}
       {!wysokoscAuto && (
         <div className="mb-4">
@@ -310,5 +353,39 @@ export function PytaniaM2({
         </button>
       </div>
     </Karta>
+  );
+}
+
+/** Pytanie trójstanowe tak/nie/nie wiem (fallback środowiskowy jak transport). */
+function TrojstanPytanie({
+  pytanie,
+  podpowiedz,
+  wartosc,
+  onChange,
+  className = "",
+}: {
+  pytanie: string;
+  podpowiedz: string;
+  wartosc: "" | "tak" | "nie";
+  onChange: (v: "" | "tak" | "nie") => void;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <div className="text-[13px] text-grunt-text mb-1.5">{pytanie}</div>
+      <div className="flex gap-2 mb-1">
+        {([["tak", "Tak"], ["nie", "Nie"], ["", "Nie wiem"]] as const).map(([v, l]) => (
+          <button
+            key={l}
+            type="button"
+            onClick={() => onChange(v)}
+            className={`badge ${wartosc === v ? "bg-grunt-ink text-white" : "bg-grunt-surface-3 text-grunt-text-muted"}`}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+      <div className="text-[11px] text-grunt-text-faint2">{podpowiedz}</div>
+    </div>
   );
 }

@@ -249,6 +249,10 @@ export default function NowaAnalizaPage() {
       dostepDrogaPubliczna: o.dostepDrogi ?? dane.dostepDrogaPubliczna,
       wysokoscOkolicyPieter: o.wysokoscOkolicyPieter ?? dane.wysokoscOkolicyPieter,
       transport: o.transport ?? dane.transport,
+      // Deklaracja środowiskowa (fallback WFS): „tak"→true (warunkowo), „nie"→false (pass),
+      // „nie wiem"→null (do weryfikacji). Nie nadpisujemy auto-wartości wartością null.
+      ryzykoPowodzioweSzczegolne: o.zalewowy ?? dane.ryzykoPowodzioweSzczegolne,
+      osuwisko: o.osuwiska ?? dane.osuwisko,
       uslugiPodstawowePieszo: lubZasieg("sklep", "apteka") ?? dane.uslugiPodstawowePieszo,
       pozWZasiegu: wZasiegu("poz") ?? dane.pozWZasiegu,
       zlobkiSzkolyWZasiegu: lubZasieg("szkola", "przedszkole") ?? dane.zlobkiSzkolyWZasiegu,
