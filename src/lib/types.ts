@@ -270,16 +270,6 @@ export interface KwalifikacjeProfil {
   estymacja: boolean; // czy udziały q estymowane (rozkład regionalny) → niższa pewność
 }
 
-/** Wskaźnik atrakcyjności migracyjnej (zastępuje popyt zewnętrzny). */
-export interface AtrakcyjnoscMigracyjna {
-  a1: number; // 0–100, ZMIERZONE (napływ vs benchmark) — kotwica i bramka
-  a2: number; // 0–100, ESTYMOWANE (potencjał odblokowany tańszą ofertą)
-  a3: number; // 0–100, ESTYMOWANE (zatrzymany odpływ)
-  wartosc: number; // 0–100 (złożona, z sufitem skali)
-  pewnosc: number; // niższa, im większy udział A2/A3
-  fallback: boolean; // A1 z proxy (saldo) zamiast zmierzonego napływu
-}
-
 /** Pojedynczy werdykt (jedno z czterech pól siatki). */
 export interface WerdyktP1 {
   klucz: KluczWerdyktu;
@@ -299,13 +289,9 @@ export interface WerdyktP1 {
   nieoznaczony?: boolean;
 }
 
-/** Pełna ocena popytu P1 — siatka 4 werdyktów + kwalifikacje + atrakcyjność. */
+/** Pełna ocena popytu P1 — siatka 4 werdyktów + kwalifikacje (popyt CZYSTO niekorygowany). */
 export interface OcenaPopytuP1 {
   kwalifikacje: { mlodzi: KwalifikacjeProfil; seniorzy: KwalifikacjeProfil };
-  atrakcyjnoscMigracyjna: AtrakcyjnoscMigracyjna;
-  /** Oczyszczony model: JEDEN mnożnik migracji (M) + saldo/1000, waga per kafel.
-   *  `zNaplywu` = bilans oszacowany tylko z napływu (brak odpływu/salda) → niższa pewność. */
-  korektaMigracyjna: { mBazowy: number; saldo1000: number | null; dostepna: boolean; zNaplywu: boolean };
   werdykty: Record<KluczWerdyktu, WerdyktP1>;
   rekomendowanyKierunek: KluczWerdyktu;
   pewnoscOgolna: number;

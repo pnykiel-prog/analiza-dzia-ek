@@ -2,14 +2,17 @@
  * Ocena popytu P1 — OCZYSZCZONY model (wg „wytyczne_claude_code_model_popytu_oczyszczony").
  * ================================================================================
  * Aplikacja to SITO — pokazuje potencjał przed płatną analizą, nie precyzyjny
- * instrument. Prosta formuła (5 kroków), bez bram, bez osobnego modelu migracji,
+ * instrument. Prosta formuła (4 kroki), bez bram, bez korekty migracyjnej,
  * bez dzielenia zamieniającego brak mianownika w zero:
  *
  *   1. Populacja gminy (GUS)
  *   2. → podział na PROFILE po wieku: aktywni (18–emerytura) · seniorzy
  *   3. → ustawowy próg dochodowy dzieli na KOMUNALNY i SPOŁECZNY (qK, qS)
- *   4. → × UDZIAŁ BEZ MIESZKANIA (tabela per profil × segment)   = POPYT ZASTANY
- *   5. → × korekta MIGRACYJNA (jeden mnożnik, waga per kafel)     = POTENCJAŁ
+ *   4. → × UDZIAŁ BEZ MIESZKANIA (tabela per profil × segment)   = POPYT (liczba bezwzględna)
+ *
+ * MIGRACJA NIE koryguje popytu (nieodtwarzalna na danych GUS — saldo z opóźnieniem,
+ * brak salda młodych per gmina, netowanie myli miasta rdzeniowe). Dynamika gminy =
+ * osobny, czysto kontekstowy panel wykresów (patrz PanelDynamiki), nie zmienia popytu.
  *
  * Werdykty (spójność P1/P2 — jednym językiem dla wszystkich 4 kafli):
  *   • społeczny / komunalny — POZIOM POTRZEBY (niski/umiarkowany/wysoki) wyprowadzony
@@ -24,7 +27,6 @@
  */
 
 import type {
-  AtrakcyjnoscMigracyjna,
   DaneDzialki,
   KluczWerdyktu,
   KwalifikacjeProfil,
@@ -101,49 +103,6 @@ function kwalifikacje(d: DaneDzialki, profil: Profil, cfg: KonfiguracjaPopytP1):
   };
 }
 
-// ── Krok 5: korekta migracyjna — jeden mnożnik ───────────────────────────────
-
-interface Migracja {
-  mBazowy: number;
-  saldo1000: number | null;
-  dostepna: boolean;
-  /** true, gdy bilans oszacowano TYLKO z napływu (brak odpływu i salda netto) — niższa pewność. */
-  zNaplywu: boolean;
-}
-
-/**
- * M = clamp(1 + saldo_na_1000 × k). Gmina rosnąca podnosi popyt, kurcząca się obniża.
- * Kolejność źródeł (od najlepszego): SALDO NETTO (jedna, spójna liczba z jednego roku) →
- * napływ−odpływ → sam napływ (fallback). Saldo netto jest preferowane, bo napływ i odpływ
- * mogą pochodzić z RÓŻNYCH lat (fallback roczny w konektorze), co czyni ich różnicę
- * niewiarygodną. Fallback z napływu: gdy nie ma salda ani odpływu, a napływ jest —
- * bilans szacujemy względem benchmarku napływu i słabszym współczynnikiem (niższa pewność).
- */
-function korektaMigracji(d: DaneDzialki, cfg: KonfiguracjaPopytP1): Migracja {
-  const total = d.liczbaMieszkancowGminy ?? null;
-  let saldo1000: number | null = null;
-  let zNaplywu = false;
-  let k = cfg.migracja.k;
-  if (d.saldoMigracjiMlodzi != null && total != null && total > 0) {
-    saldo1000 = (d.saldoMigracjiMlodzi / total) * 1000; // saldo NETTO (absolutne → /total) — najczystszy sygnał
-  } else if (d.naplywZameldowanNa1000 != null && d.odplywMlodychNa1000 != null) {
-    saldo1000 = d.naplywZameldowanNa1000 - d.odplywMlodychNa1000; // obie już na 1000
-  } else if (d.naplywZameldowanNa1000 != null) {
-    // FALLBACK: sam napływ względem benchmarku, słabszym współczynnikiem i niższą pewnością.
-    saldo1000 = d.naplywZameldowanNa1000 - cfg.migracja.benchmarkNaplyw1000;
-    k = cfg.migracja.kNaplyw;
-    zNaplywu = true;
-  }
-  const dostepna = saldo1000 != null;
-  const mBazowy = dostepna ? Math.max(cfg.migracja.min, Math.min(cfg.migracja.max, 1 + saldo1000! * k)) : 1;
-  return { mBazowy, saldo1000, dostepna, zNaplywu };
-}
-
-/** popyt_kafla = popyt_zastany × (1 + (M − 1) × waga_kafla). */
-function zMigracja(popyt: number, mBazowy: number, waga: number): number {
-  return popyt * (1 + (mBazowy - 1) * waga);
-}
-
 // ── Werdykty ─────────────────────────────────────────────────────────────────
 
 function lukaCenowaPct(d: DaneDzialki, cfgS: KonfiguracjaScoring): number | null {
@@ -188,19 +147,12 @@ function poziomZProporcji(prop: number, progi: { umiarkowany: number; wysoki: nu
   return { poziom: "niski", score: 35 };
 }
 
-function werdyktSpoleczny(
-  profil: Profil,
-  kw: KwalifikacjeProfil,
-  mig: Migracja,
-  luka: number | null,
-  d: DaneDzialki,
-  cfg: KonfiguracjaPopytP1
-): WerdyktP1 {
+function werdyktSpoleczny(profil: Profil, kw: KwalifikacjeProfil, luka: number | null, d: DaneDzialki, cfg: KonfiguracjaPopytP1): WerdyktP1 {
   const klucz: KluczWerdyktu = profil === "mlodzi" ? "spolecznyMlodzi" : "spolecznySeniorzy";
   if (kw.nSpoleczny == null || kw.nGrupa == null || kw.nGrupa <= 0) return werdyktNieoznaczony(klucz, "spoleczny", profil);
 
-  // Krok 5 — korekta migracyjna z wagą kafla [gospodarstwa segmentu S].
-  const popytGosp = zMigracja(kw.nSpoleczny, mig.mBazowy, cfg.migracja.wagi[klucz]);
+  // Popyt CZYSTO NIEKORYGOWANY — liczba gospodarstw segmentu S bez korekty migracyjnej.
+  const popytGosp = kw.nSpoleczny;
   // PROPORCJA KOHORTOWA (spójność P1/P2): osoby segmentu S ÷ WŁASNA kohorta (nie gmina).
   // gospodarstwa → osoby przez wielkość gospodarstwa; mianownik = liczebność kohorty.
   const osobyS = popytGosp * cfg.wielkoscGospodarstwa[profil];
@@ -210,12 +162,8 @@ function werdyktSpoleczny(
   const flagi: string[] = [FLAGA_UDZIAL];
   if (luka != null && luka >= PROG_LUKI_FLAGA) flagi.push(`Wysoka luka cenowa (${Math.round(luka)}%) — realny popyt na najem społeczny.`);
   if (kw.estymacja) flagi.push("Dochód gminy estymowany (brak danej BDL) — podział K/S orientacyjny.");
-  if (mig.dostepna && mig.mBazowy !== 1)
-    flagi.push(
-      `Korekta migracyjna ×${Math.round(mig.mBazowy * 100) / 100} (${mig.zNaplywu ? "z napływu, bez odpływu" : `saldo ${Math.round((mig.saldo1000 ?? 0) * 10) / 10}/1000`}).`
-    );
 
-  const pewnosc = clamp(Math.round(78 - (kw.estymacja ? 8 : 0) - (mig.dostepna ? (mig.zNaplywu ? 3 : 0) : 6)));
+  const pewnosc = clamp(Math.round(78 - (kw.estymacja ? 8 : 0)));
   const komentarz = `${Math.round(popytGosp)} gosp. bez mieszkania (segment społeczny) — potrzeba ${poziom} (${(prop * 100).toFixed(1)}% ${ETYK_KOHORTA[profil]} kohorty). Wystarczalność wobec liczby mieszkań: Poziom 2.`;
   return {
     klucz,
@@ -232,12 +180,12 @@ function werdyktSpoleczny(
   };
 }
 
-function werdyktKomunalny(profil: Profil, kw: KwalifikacjeProfil, mig: Migracja, d: DaneDzialki, cfg: KonfiguracjaPopytP1): WerdyktP1 {
+function werdyktKomunalny(profil: Profil, kw: KwalifikacjeProfil, d: DaneDzialki, cfg: KonfiguracjaPopytP1): WerdyktP1 {
   const klucz: KluczWerdyktu = profil === "mlodzi" ? "komunalnyMlodzi" : "komunalnySeniorzy";
   if (kw.nKomunalny == null || kw.nGrupa == null || kw.nGrupa <= 0) return werdyktNieoznaczony(klucz, "komunalny", profil);
 
-  // Krok 5 — korekta migracyjna z wagą kafla (komunalny-seniorzy ≈ 0) [osoby segmentu K].
-  const popyt = Math.round(zMigracja(kw.nKomunalny, mig.mBazowy, cfg.migracja.wagi[klucz]));
+  // Popyt CZYSTO NIEKORYGOWANY — bezwzględna liczba osób segmentu K bez korekty migracyjnej.
+  const popyt = kw.nKomunalny;
   // PROPORCJA KOHORTOWA: osoby segmentu K ÷ WŁASNA kohorta (aktywni ÷ aktywni / seniorzy ÷ seniorzy).
   const prop = clamp01(popyt / kw.nGrupa);
   const { poziom, score } = poziomZProporcji(prop, cfg.progiKohortowe[klucz]);
@@ -277,15 +225,14 @@ export function ocenPopytP1(
   cfgS: KonfiguracjaScoring = KONFIG_SCORING
 ): OcenaPopytuP1 {
   const luka = lukaCenowaPct(d, cfgS);
-  const mig = korektaMigracji(d, cfg);
   const kwMlodzi = kwalifikacje(d, "mlodzi", cfg);
   const kwSeniorzy = kwalifikacje(d, "seniorzy", cfg);
 
   const werdykty: Record<KluczWerdyktu, WerdyktP1> = {
-    spolecznyMlodzi: werdyktSpoleczny("mlodzi", kwMlodzi, mig, luka, d, cfg),
-    spolecznySeniorzy: werdyktSpoleczny("seniorzy", kwSeniorzy, mig, luka, d, cfg),
-    komunalnyMlodzi: werdyktKomunalny("mlodzi", kwMlodzi, mig, d, cfg),
-    komunalnySeniorzy: werdyktKomunalny("seniorzy", kwSeniorzy, mig, d, cfg),
+    spolecznyMlodzi: werdyktSpoleczny("mlodzi", kwMlodzi, luka, d, cfg),
+    spolecznySeniorzy: werdyktSpoleczny("seniorzy", kwSeniorzy, luka, d, cfg),
+    komunalnyMlodzi: werdyktKomunalny("mlodzi", kwMlodzi, d, cfg),
+    komunalnySeniorzy: werdyktKomunalny("seniorzy", kwSeniorzy, d, cfg),
   };
 
   // Rekomendacja DZIAŁKI wybierana spośród werdyktów SPOŁECZNYCH (poziom potrzeby w kohorcie).
@@ -293,21 +240,8 @@ export function ocenPopytP1(
   const spoleczne = [werdykty.spolecznyMlodzi, werdykty.spolecznySeniorzy];
   const rekomendowany = spoleczne.reduce((a, b) => (b.score > a.score ? b : a));
 
-  // Zgodność wsteczna: pole atrakcyjności = sygnał migracyjny (0–100) z jednego mnożnika.
-  const sygnalMigracji = clamp(Math.round(((mig.mBazowy - 1) / (cfg.migracja.max - 1)) * 100), 0, 100);
-  const atrakcyjnoscMigracyjna: AtrakcyjnoscMigracyjna = {
-    a1: 0,
-    a2: 0,
-    a3: 0,
-    wartosc: sygnalMigracji,
-    pewnosc: mig.dostepna ? (mig.zNaplywu ? 60 : 75) : 45,
-    fallback: !mig.dostepna || mig.zNaplywu,
-  };
-
   return {
     kwalifikacje: { mlodzi: kwMlodzi, seniorzy: kwSeniorzy },
-    atrakcyjnoscMigracyjna,
-    korektaMigracyjna: { mBazowy: Math.round(mig.mBazowy * 100) / 100, saldo1000: mig.saldo1000 == null ? null : Math.round(mig.saldo1000 * 10) / 10, dostepna: mig.dostepna, zNaplywu: mig.zNaplywu },
     werdykty,
     rekomendowanyKierunek: rekomendowany.klucz,
     pewnoscOgolna: rekomendowany.pewnosc,

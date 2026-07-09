@@ -133,7 +133,7 @@ function kompatPopyt(profil: Profil, w: WerdyktP1, ocena: OcenaPopytuP1): WynikP
   return {
     profil,
     wewnetrzny: w.score,
-    zewnetrzny: ocena.atrakcyjnoscMigracyjna.wartosc,
+    zewnetrzny: 0, // popyt zewnętrzny/migracyjny usunięty (popyt czysto niekorygowany)
     potencjalny: w.score,
     realizowalny: w.score,
     mnoznikLuka: 1,
