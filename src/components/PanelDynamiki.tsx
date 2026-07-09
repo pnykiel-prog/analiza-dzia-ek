@@ -16,10 +16,10 @@ interface DefWykresu {
 
 const WYKRESY: DefWykresu[] = [
   { klucz: "ludnosc", tytul: "Liczba ludności", jednostka: "os.", fmt: (v) => liczba(Math.round(v)) },
-  { klucz: "mieszkaniaOddane", tytul: "Mieszkania oddane / rok", jednostka: "szt./rok", fmt: (v) => liczba(Math.round(v)) },
+  { klucz: "mieszkaniaOddane", tytul: "Nasycenie mieszkaniami", jednostka: "na 1000 os.", fmt: (v) => liczba(Math.round(v)) },
   { klucz: "podmioty", tytul: "Podmioty REGON", jednostka: "na 10 tys.", fmt: (v) => liczba(Math.round(v)) },
   { klucz: "dochodyWlasne", tytul: "Dochody własne / mieszk.", jednostka: "zł", fmt: (v) => liczba(Math.round(v)) },
-  { klucz: "bezrobotni", tytul: "Bezrobotni zarejestrowani", jednostka: "os.", fmt: (v) => liczba(Math.round(v)) },
+  { klucz: "bezrobotni", tytul: "Stopa bezrobocia", jednostka: "%", fmt: (v) => `${(Math.round(v * 10) / 10).toLocaleString("pl-PL")}` },
 ];
 
 export function PanelDynamiki({ dynamika }: { dynamika?: DynamikaGminy | null }) {

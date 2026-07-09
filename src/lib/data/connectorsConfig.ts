@@ -34,11 +34,11 @@ export interface KonfiguracjaKonektorow {
       gospodarstwaOgolem: string;
       /** NSP 2021 — gospodarstwa zajmujące mieszkanie na zasadzie WŁASNOŚCI (licznik). */
       gospodarstwaWlasnosc: string;
-      /** Panel dynamiki gminy — mieszkania oddane do użytkowania / rok. */
+      /** Panel dynamiki gminy — nasycenie mieszkaniami (mieszkania na 1000 ludności), poziom gminy. */
       mieszkaniaOddane: string;
       /** Panel dynamiki gminy — dochody własne gminy na 1 mieszkańca [zł]. */
       dochodyWlasne: string;
-      /** Panel dynamiki gminy — liczba bezrobotnych zarejestrowanych. */
+      /** Panel dynamiki gminy — stopa bezrobocia (fallback; realnie używamy frazy `bezrobocie`). */
       bezrobotniLiczba: string;
     };
     /** Panel dynamiki gminy — liczba lat wstecz w szeregach czasowych. */
@@ -114,7 +114,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       wymeldowania: "wymeldowania w ruchu wewnętrznym",
       gospodarstwaOgolem: "gospodarstwa domowe według tytułu prawnego do zajmowanego mieszkania ogółem",
       gospodarstwaWlasnosc: "gospodarstwa domowe według tytułu prawnego do zajmowanego mieszkania własność",
-      mieszkaniaOddane: "mieszkania oddane do użytkowania",
+      mieszkaniaOddane: "mieszkania na 1000 ludności",
       dochodyWlasne: "dochody własne",
       bezrobotniLiczba: "bezrobotni ogółem",
     },
@@ -130,20 +130,20 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
     // konektor przelicza na zł przez `wynagrodzenieKrajoweMies`.
     // Potwierdzone diagnostyką /api/diag-gus?vars=… (poziom gminy, „· ogółem"):
     //   zameldowania (napływ) = 80121 [osoba]; wymeldowania (odpływ) = 80123 [osoba].
-    // Panel dynamiki (diagnostykaDynamiki, Katowice):
-    //   mieszkania oddane suma roczna „styczeń-grudzień · … · ogółem" = 217317;
-    //   dochody własne (poziom 6, uniwersalny „gminy łącznie z m. na pr. powiatu") = 76976
-    //     → konektor przelicza na 1 mieszkańca przez szereg ludności;
-    //   bezrobotni „zarejestrowani ogółem − suma stanów miesięcznych" = 1702030.
+    // Panel dynamiki (diagnostyka /api/diag-gus, Katowice):
+    //   dochody własne (poziom 6 „gminy łącznie z m. na pr. powiatu", zł na 1 mieszkańca) = 76976.
+    // UWAGA: „mieszkania oddane" i LICZBA bezrobotnych istnieją w BDL tylko od poziomu
+    // POWIATU (level 5) — w jednostce gminy zwracają null (potwierdzone: poziom6 = []).
+    // Dlatego panel gminny NIE pinuje ich ID, tylko dobiera gminne odpowiedniki po frazie:
+    //   „mieszkania na 1000 ludności" (nasycenie, level 6) oraz stopa bezrobocia
+    //   „udział bezrobotnych… w ludności produkcyjnym" (fraza `bezrobocie`, level 6).
     zmienneId: {
       podmiotyNa10k: "60530",
       saldoMigracji: "1365234",
       wynagrodzenie: "64429",
       zameldowania: "80121",
       wymeldowania: "80123",
-      mieszkaniaOddane: "217317",
       dochodyWlasne: "76976",
-      bezrobotniLiczba: "1702030",
     },
     medianaWiekAktywniPct: 25,
     rokBazowyTrend: 2015,
