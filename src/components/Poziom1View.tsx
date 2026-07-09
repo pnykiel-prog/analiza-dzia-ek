@@ -1,5 +1,5 @@
 import type { KluczWerdyktu, WerdyktP1, Werdykt, WynikPoziom1 } from "@/lib/types";
-import { Karta, Statystyka } from "./ui";
+import { Karta } from "./ui";
 import { WskaznikPewnosci, Gauge } from "./grunt";
 import { liczba, statusSlowny } from "@/lib/format";
 
@@ -78,27 +78,6 @@ export function Poziom1View({ p1, pelny = true, pokazRekomendacje = true }: { p1
         </div>
       </div>
 
-      {/* Korekta migracyjna — JEDEN mnożnik (oczyszczony model), waga per kafel */}
-      <Karta
-        tytul="Korekta migracyjna"
-        podtytul="Jeden mnożnik z salda migracji; przyłożony z wagą per kafel (najmocniej: aktywni społeczni)"
-      >
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <Statystyka etykieta="Mnożnik popytu" wartosc={`×${ocena.korektaMigracyjna.mBazowy.toFixed(2)}`} akcent />
-          <Statystyka
-            etykieta={ocena.korektaMigracyjna.zNaplywu ? "Napływ vs benchmark" : "Saldo migracji"}
-            wartosc={ocena.korektaMigracyjna.saldo1000 == null ? "brak danych" : `${ocena.korektaMigracyjna.saldo1000 > 0 ? "+" : ""}${ocena.korektaMigracyjna.saldo1000}/1000`}
-          />
-          <Statystyka etykieta="Wpływ" wartosc={ocena.korektaMigracyjna.mBazowy > 1 ? "podnosi popyt" : ocena.korektaMigracyjna.mBazowy < 1 ? "obniża popyt" : "neutralny"} />
-        </div>
-        {ocena.korektaMigracyjna.zNaplywu && (
-          <p className="text-[11px] text-grunt-amber-text2 mt-2">Oszacowane z samego napływu zameldowań (brak odpływu i salda netto w BDL) — słabszy sygnał, niższa pewność.</p>
-        )}
-        {!ocena.korektaMigracyjna.dostepna && (
-          <p className="text-[11px] text-grunt-amber-text2 mt-2">Brak danych migracyjnych (napływ/odpływ) — mnożnik neutralny ×1,00 (bez korekty).</p>
-        )}
-        <p className="text-[10px] text-grunt-text-faint2 mt-2">Wagi kafli: aktywni–społeczny 1,0 · aktywni–komunalny 0,3 · seniorzy–społeczny 0,2 · seniorzy–komunalny 0,0.</p>
-      </Karta>
 
       {/* Kwalifikacje — trójdzielny podział dochodowy (liczby) */}
       {pelny && (

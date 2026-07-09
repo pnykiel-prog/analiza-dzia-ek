@@ -131,30 +131,30 @@ test("brak danych ludnościowych → werdykt nieoznaczony (nie czerwony, nie ost
   }
 });
 
-// ── Oczyszczony model: migracja jako jeden mnożnik z wagą per kafel ───────────
+// ── Popyt CZYSTO NIEKORYGOWANY: migracja NIE dotyka popytu ────────────────────
 
-test("migracja: gmina rosnąca podnosi popyt aktywnych społecznych; komunalny-seniorzy bez zmian (waga 0)", () => {
-  const duzaPoj = { mlodzi: 4000, seniorzy: 4000 }; // duża pojemność → widać różnicę popytu (bez saturacji)
-  // Saldo NETTO jest źródłem pierwszym (po naprawie kolejności) — sterujemy nim; napływ/odpływ puste.
-  const bezPary = { naplywZameldowanNa1000: null, odplywMlodychNa1000: null, liczbaMieszkancowGminy: 30000 };
-  const rosnaca: DaneDzialki = { ...wzorcowa, ...bezPary, saldoMigracjiMlodzi: 360 }; // +12/1000
-  const kurczaca: DaneDzialki = { ...wzorcowa, ...bezPary, saldoMigracjiMlodzi: -360 }; // −12/1000
-  const r = ocenPopytP1(rosnaca, duzaPoj);
-  const k = ocenPopytP1(kurczaca, duzaPoj);
-  assert.ok(r.werdykty.spolecznyMlodzi.score > k.werdykty.spolecznyMlodzi.score, "aktywni społeczni czuli migrację");
-  // Komunalny-seniorzy: waga migracji 0 → popyt identyczny niezależnie od salda.
-  assert.equal(r.werdykty.komunalnySeniorzy.liczbaKwalifikujacych, k.werdykty.komunalnySeniorzy.liczbaKwalifikujacych);
+test("popyt niekorygowany: saldo/napływ/odpływ NIE zmieniają werdyktów (migracja usunięta)", () => {
+  const rosnaca: DaneDzialki = { ...wzorcowa, saldoMigracjiMlodzi: 360, naplywZameldowanNa1000: 15, odplywMlodychNa1000: 3 };
+  const kurczaca: DaneDzialki = { ...wzorcowa, saldoMigracjiMlodzi: -360, naplywZameldowanNa1000: 3, odplywMlodychNa1000: 15 };
+  const r = ocenPopytP1(rosnaca, POJ);
+  const k = ocenPopytP1(kurczaca, POJ);
+  for (const key of ["spolecznyMlodzi", "spolecznySeniorzy", "komunalnyMlodzi", "komunalnySeniorzy"] as const) {
+    assert.equal(r.werdykty[key].score, k.werdykty[key].score, `${key}: migracja nie może zmieniać popytu`);
+    assert.equal(r.werdykty[key].liczbaKwalifikujacych, k.werdykty[key].liczbaKwalifikujacych);
+  }
 });
 
-test("migracja: fallback z samego napływu (odpływ i saldo puste, jak Katowice) — napływ > benchmark daje korektę dodatnią", () => {
-  // Katowice: napływ 11,41/1000 obecny, odpływ i saldo null → fallback.
-  const bazaBezSalda = { saldoMigracjiMlodzi: null, odplywMlodychNa1000: null };
-  const naplywWysoki: DaneDzialki = { ...wzorcowa, ...bazaBezSalda, naplywZameldowanNa1000: 15 };
-  const naplywNiski: DaneDzialki = { ...wzorcowa, ...bazaBezSalda, naplywZameldowanNa1000: 5 };
-  const oW = ocenPopytP1(naplywWysoki, POJ);
-  const oN = ocenPopytP1(naplywNiski, POJ);
-  assert.equal(oW.korektaMigracyjna.zNaplywu, true); // sygnał z napływu
-  assert.equal(oW.korektaMigracyjna.dostepna, true); // NIE neutralny — napływ jest wykorzystany
-  assert.ok(oW.korektaMigracyjna.mBazowy > 1, `napływ 15 > benchmark → mnożnik >1 (${oW.korektaMigracyjna.mBazowy})`);
-  assert.ok(oN.korektaMigracyjna.mBazowy < 1, `napływ 5 < benchmark → mnożnik <1 (${oN.korektaMigracyjna.mBazowy})`);
+test("popyt: brak pola atrakcyjnoscMigracyjna / korektaMigracyjna (usunięte)", () => {
+  const o = ocenPopytP1(wzorcowa, POJ) as unknown as Record<string, unknown>;
+  assert.equal(o.atrakcyjnoscMigracyjna, undefined);
+  assert.equal(o.korektaMigracyjna, undefined);
+});
+
+test("komunalny: duza liczba kwalifikujacych -> NIGDY zero ani czerwony (poziom, nie 0)", () => {
+  const duza: DaneDzialki = { ...wzorcowa, liczbaMieszkancowGminy: 279000, liczbaAktywni: 170000, dochodPrzecietnyGmina: 5000 };
+  const o = ocenPopytP1(duza, POJ);
+  const km = o.werdykty.komunalnyMlodzi;
+  assert.ok((km.liczbaKwalifikujacych ?? 0) > 3000, `duża liczba kwalifikujących (${km.liczbaKwalifikujacych})`);
+  assert.notEqual(km.werdykt, "czerwony"); // NIGDY „nie nadaje się"
+  assert.ok(km.score >= 45); // co najmniej „niski", nie zero
 });

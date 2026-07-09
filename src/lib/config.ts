@@ -218,20 +218,6 @@ export interface KonfiguracjaPopytP1 {
    * większość uwłaszczona. Kalibrowalne (GUS/Eurostat/NSP).
    */
   udzialBezMieszkania: Record<Profil, { komunalny: number; spoleczny: number }>;
-  /**
-   * KOREKTA MIGRACYJNA — jeden mnożnik (nie osobny popyt). M = clamp(1 + saldo/1000 × k),
-   * przyłożony z wagą per kafel (najmocniej: aktywni-społeczny; pomijalnie: seniorzy-komunalny).
-   */
-  migracja: {
-    k: number;
-    min: number;
-    max: number;
-    wagi: Record<KluczWerdyktu, number>;
-    /** Fallback: gdy brak salda netto i odpływu, a jest napływ — bilans szacujemy
-     *  względem tego benchmarku [zameldowania na 1000], mniejszym współczynnikiem `kNaplyw`. */
-    benchmarkNaplyw1000: number;
-    kNaplyw: number;
-  };
   /** Progi poziomu potrzeby KOMUNALNEJ — na BEZWZGLĘDNEJ liczbie kwalifikujących bez mieszkania (segment K). */
   progiKomunalne: { wysoki: number; sredni: number; niski: number };
   /**
@@ -263,14 +249,6 @@ export const KONFIG_POPYT_P1: KonfiguracjaPopytP1 = {
   udzialBezMieszkania: {
     mlodzi: { komunalny: 0.45, spoleczny: 0.3 },
     seniorzy: { komunalny: 0.15, spoleczny: 0.07 },
-  },
-  migracja: {
-    k: 0.03, // saldo +5/1000 → M≈1,15; +13/1000 → sufit 1,40
-    min: 0.85,
-    max: 1.4,
-    wagi: { spolecznyMlodzi: 1.0, komunalnyMlodzi: 0.3, spolecznySeniorzy: 0.2, komunalnySeniorzy: 0.0 },
-    benchmarkNaplyw1000: 10.5, // typowy napływ zameldowań/1000; powyżej → lekki plus, poniżej → lekki minus
-    kNaplyw: 0.015, // słabszy współczynnik niż saldo netto (napływ nie mówi o odpływie → niższa pewność)
   },
   progiKomunalne: { wysoki: 3000, sredni: 1000, niski: 300 },
   // Progi proporcji kohortowej (udział kwalifikujących w segmencie ÷ własna kohorta).
