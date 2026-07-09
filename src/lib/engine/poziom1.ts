@@ -216,6 +216,7 @@ export function uruchomPoziom1(
     bramkaWielkosci,
     prognoza,
     ocenaPopytu,
+    dynamikaGminy: d.dynamikaGminy ?? null,
     pojemnosc,
     popyt: { mlodzi: kompatPopyt("mlodzi", spoleczneM, ocenaPopytu), seniorzy: kompatPopyt("seniorzy", spoleczneS, ocenaPopytu) },
     dopasowanie: {

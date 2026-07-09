@@ -85,6 +85,24 @@ export interface WartoscOdtworzeniowaMeta {
   benchmark: boolean;
 }
 
+/** Punkt szeregu czasowego (rok → wartość; null = luka w danych, NIE zero). */
+export interface PunktSzeregu {
+  rok: number;
+  wartosc: number | null;
+}
+
+/**
+ * Panel dynamiki gminy — 5 szeregów rocznych (~10 lat) jako CZYSTY KONTEKST
+ * (nie koryguje popytu). Ludność = kotwica; brak innego szeregu → jego wykres znika.
+ */
+export interface DynamikaGminy {
+  ludnosc: PunktSzeregu[] | null; // kotwica — liczba ludności
+  mieszkaniaOddane: PunktSzeregu[] | null; // mieszkania oddane do użytkowania / rok
+  podmioty: PunktSzeregu[] | null; // podmioty REGON (na 10 tys.)
+  dochodyWlasne: PunktSzeregu[] | null; // dochody własne gminy / mieszkańca [zł]
+  bezrobotni: PunktSzeregu[] | null; // liczba bezrobotnych zarejestrowanych
+}
+
 export interface DaneDzialki {
   // A. Identyfikacja i geometria (ULDK / EGiB)
   id: string; // identyfikator ewidencyjny TERYT + obręb + nr
@@ -174,6 +192,8 @@ export interface DaneDzialki {
   trendLudnosc: Maybe<"rosnaca" | "stabilna" | "malejaca">;
   bezrobociePct: Maybe<number>;
   liczbaPodmiotowGosp: Maybe<number>; // na 1000 mieszk.
+  /** Panel dynamiki gminy — szeregi czasowe ~10 lat (czysty kontekst, NIE koryguje popytu). */
+  dynamikaGminy?: DynamikaGminy | null;
 
   // H. Środowisko i ograniczenia (GDOŚ / NID)
   natura2000: Maybe<boolean>;
@@ -460,8 +480,10 @@ export interface WynikPoziom1 {
   bramkaWielkosci: BramkaWielkosci;
   /** Prognoza potencjału zabudowy (z kształtu + sąsiedztwa) — źródło pojemności na P1. */
   prognoza: PrognozaPotencjalu;
-  /** Ocena popytu P1 (pełna): siatka 4 werdyktów, kwalifikacje, atrakcyjność migracyjna. */
+  /** Ocena popytu P1 (pełna): siatka 4 werdyktów + kwalifikacje (popyt niekorygowany). */
   ocenaPopytu: OcenaPopytuP1;
+  /** Panel dynamiki gminy (szeregi ~10 lat) — czysty kontekst, nie zmienia popytu. */
+  dynamikaGminy?: DynamikaGminy | null;
   pojemnosc: PojemnoscP1;
   /** Popyt per profil (na P1 bez mnożnika usług). */
   popyt: { mlodzi: WynikPopytu; seniorzy: WynikPopytu };

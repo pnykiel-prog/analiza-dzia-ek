@@ -1,6 +1,7 @@
 import type { KluczWerdyktu, WerdyktP1, Werdykt, WynikPoziom1 } from "@/lib/types";
 import { Karta } from "./ui";
 import { WskaznikPewnosci, Gauge } from "./grunt";
+import { PanelDynamiki } from "./PanelDynamiki";
 import { liczba, statusSlowny } from "@/lib/format";
 
 // Oba profile definiuje wspólny warunek: brak własnego lokalu (kwalifikacja do
@@ -77,6 +78,9 @@ export function Poziom1View({ p1, pelny = true, pokazRekomendacje = true }: { p1
           <KartaWerdyktu w={w.komunalnySeniorzy} rekomendowany={ocena.rekomendowanyKierunek === "komunalnySeniorzy"} />
         </div>
       </div>
+
+      {/* Panel dynamiki gminy — czysty kontekst (5 wykresów ~10 lat), NIE zmienia popytu */}
+      {pelny && <PanelDynamiki dynamika={p1.dynamikaGminy} />}
 
 
       {/* Kwalifikacje — trójdzielny podział dochodowy (liczby) */}
