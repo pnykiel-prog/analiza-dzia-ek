@@ -104,20 +104,35 @@ interface Migracja {
   mBazowy: number;
   saldo1000: number | null;
   dostepna: boolean;
+  /** true, gdy bilans oszacowano TYLKO z napływu (brak odpływu i salda netto) — niższa pewność. */
+  zNaplywu: boolean;
 }
 
-/** M = clamp(1 + saldo_na_1000 × k). Gmina rosnąca podnosi popyt, kurcząca się obniża. */
+/**
+ * M = clamp(1 + saldo_na_1000 × k). Gmina rosnąca podnosi popyt, kurcząca się obniża.
+ * Kolejność źródeł (od najlepszego): napływ−odpływ (oba na 1000) → saldo netto → sam
+ * napływ (fallback). Fallback z napływu: gdy odpływ i saldo są puste (częste w BDL —
+ * tak jest np. dla Katowic), a napływ jest — bilans szacujemy względem benchmarku
+ * napływu i słabszym współczynnikiem (napływ nie mówi o odpływie → niższa pewność).
+ */
 function korektaMigracji(d: DaneDzialki, cfg: KonfiguracjaPopytP1): Migracja {
   const total = d.liczbaMieszkancowGminy ?? null;
   let saldo1000: number | null = null;
+  let zNaplywu = false;
+  let k = cfg.migracja.k;
   if (d.naplywZameldowanNa1000 != null && d.odplywMlodychNa1000 != null) {
     saldo1000 = d.naplywZameldowanNa1000 - d.odplywMlodychNa1000; // obie już na 1000
   } else if (d.saldoMigracjiMlodzi != null && total != null && total > 0) {
-    saldo1000 = (d.saldoMigracjiMlodzi / total) * 1000;
+    saldo1000 = (d.saldoMigracjiMlodzi / total) * 1000; // saldo NETTO (absolutne → /total)
+  } else if (d.naplywZameldowanNa1000 != null) {
+    // FALLBACK: sam napływ względem benchmarku, słabszym współczynnikiem i niższą pewnością.
+    saldo1000 = d.naplywZameldowanNa1000 - cfg.migracja.benchmarkNaplyw1000;
+    k = cfg.migracja.kNaplyw;
+    zNaplywu = true;
   }
   const dostepna = saldo1000 != null;
-  const mBazowy = dostepna ? Math.max(cfg.migracja.min, Math.min(cfg.migracja.max, 1 + saldo1000! * cfg.migracja.k)) : 1;
-  return { mBazowy, saldo1000, dostepna };
+  const mBazowy = dostepna ? Math.max(cfg.migracja.min, Math.min(cfg.migracja.max, 1 + saldo1000! * k)) : 1;
+  return { mBazowy, saldo1000, dostepna, zNaplywu };
 }
 
 /** popyt_kafla = popyt_zastany × (1 + (M − 1) × waga_kafla). */
@@ -175,10 +190,14 @@ function werdyktSpoleczny(
   const flagi: string[] = [FLAGA_UDZIAL];
   if (luka != null && luka >= PROG_LUKI_FLAGA) flagi.push(`Wysoka luka cenowa (${Math.round(luka)}%) — realny popyt na najem społeczny.`);
   if (kw.estymacja) flagi.push("Dochód gminy estymowany (brak danej BDL) — podział K/S orientacyjny.");
-  if (mig.dostepna && mig.mBazowy !== 1) flagi.push(`Korekta migracyjna ×${Math.round(mig.mBazowy * 100) / 100} (saldo ${Math.round((mig.saldo1000 ?? 0) * 10) / 10}/1000).`);
+  if (mig.dostepna && mig.mBazowy !== 1)
+    flagi.push(
+      `Korekta migracyjna ×${Math.round(mig.mBazowy * 100) / 100} (${mig.zNaplywu ? "z napływu, bez odpływu" : `saldo ${Math.round((mig.saldo1000 ?? 0) * 10) / 10}/1000`}).`
+    );
 
-  // Pewność: założenie „udział bez mieszkania" obniża; brak danych migracyjnych/dochodu dodatkowo.
-  const pewnosc = clamp(Math.round(78 - (kw.estymacja ? 8 : 0) - (mig.dostepna ? 0 : 6)));
+  // Pewność: założenie „udział bez mieszkania" obniża; brak danych migracyjnych dodatkowo,
+  // a bilans oszacowany tylko z napływu (bez odpływu) obniża łagodniej.
+  const pewnosc = clamp(Math.round(78 - (kw.estymacja ? 8 : 0) - (mig.dostepna ? (mig.zNaplywu ? 3 : 0) : 6)));
   const komentarz = `${Math.round(popyt)} gospodarstw bez mieszkania (segment społeczny) wobec pojemności ${pojemnoscMieszkan} mieszk. × margines ${cfg.marginesGospodarstwa}.`;
   return { klucz, natura: "spoleczny", profil, score, werdykt: pasmo(score, cfg), liczbaKwalifikujacych: Math.round(popyt), pewnosc, flagi, komentarz };
 }
@@ -246,14 +265,14 @@ export function ocenPopytP1(
     a2: 0,
     a3: 0,
     wartosc: sygnalMigracji,
-    pewnosc: mig.dostepna ? 75 : 45,
-    fallback: !mig.dostepna,
+    pewnosc: mig.dostepna ? (mig.zNaplywu ? 60 : 75) : 45,
+    fallback: !mig.dostepna || mig.zNaplywu,
   };
 
   return {
     kwalifikacje: { mlodzi: kwMlodzi, seniorzy: kwSeniorzy },
     atrakcyjnoscMigracyjna,
-    korektaMigracyjna: { mBazowy: Math.round(mig.mBazowy * 100) / 100, saldo1000: mig.saldo1000 == null ? null : Math.round(mig.saldo1000 * 10) / 10, dostepna: mig.dostepna },
+    korektaMigracyjna: { mBazowy: Math.round(mig.mBazowy * 100) / 100, saldo1000: mig.saldo1000 == null ? null : Math.round(mig.saldo1000 * 10) / 10, dostepna: mig.dostepna, zNaplywu: mig.zNaplywu },
     werdykty,
     rekomendowanyKierunek: rekomendowany.klucz,
     pewnoscOgolna: rekomendowany.pewnosc,

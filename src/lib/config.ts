@@ -222,7 +222,16 @@ export interface KonfiguracjaPopytP1 {
    * KOREKTA MIGRACYJNA — jeden mnożnik (nie osobny popyt). M = clamp(1 + saldo/1000 × k),
    * przyłożony z wagą per kafel (najmocniej: aktywni-społeczny; pomijalnie: seniorzy-komunalny).
    */
-  migracja: { k: number; min: number; max: number; wagi: Record<KluczWerdyktu, number> };
+  migracja: {
+    k: number;
+    min: number;
+    max: number;
+    wagi: Record<KluczWerdyktu, number>;
+    /** Fallback: gdy brak salda netto i odpływu, a jest napływ — bilans szacujemy
+     *  względem tego benchmarku [zameldowania na 1000], mniejszym współczynnikiem `kNaplyw`. */
+    benchmarkNaplyw1000: number;
+    kNaplyw: number;
+  };
   /** Progi poziomu potrzeby KOMUNALNEJ — na BEZWZGLĘDNEJ liczbie kwalifikujących bez mieszkania (segment K). */
   progiKomunalne: { wysoki: number; sredni: number; niski: number };
   /** Pasma werdyktu (score → kolor). */
@@ -252,6 +261,8 @@ export const KONFIG_POPYT_P1: KonfiguracjaPopytP1 = {
     min: 0.85,
     max: 1.4,
     wagi: { spolecznyMlodzi: 1.0, komunalnyMlodzi: 0.3, spolecznySeniorzy: 0.2, komunalnySeniorzy: 0.0 },
+    benchmarkNaplyw1000: 10.5, // typowy napływ zameldowań/1000; powyżej → lekki plus, poniżej → lekki minus
+    kNaplyw: 0.015, // słabszy współczynnik niż saldo netto (napływ nie mówi o odpływie → niższa pewność)
   },
   progiKomunalne: { wysoki: 3000, sredni: 1000, niski: 300 },
   pasma: { zielony: 65, zolty: 40 },
