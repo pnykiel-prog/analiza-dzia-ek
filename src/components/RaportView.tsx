@@ -87,16 +87,24 @@ export function RaportView({
         );
       })()}
 
-      {/* 02 Popyt i dopasowanie (Poziom 1) — bez orientacyjnej prognozy pojemności
-          (PUM/mieszkań); pojemność wyznacza Poziom 2. */}
-      <SekcjaRap numer="02" tytul="Popyt i dopasowanie (Poziom 1)">
-        <div className="text-[12px]">
-          <div className="text-[10px] uppercase tracking-wide text-grunt-text-faint mb-1">Dopasowanie popyt ↔ pojemność</div>
-          <div className="text-grunt-text-muted2">Młodzi: <span className="mono text-grunt-text">{p1.dopasowanie.mlodzi.score}/100</span> · popyt {p1.dopasowanie.mlodzi.popyt}</div>
-          <div className="text-grunt-text-muted2">Seniorzy: <span className="mono text-grunt-text">{p1.dopasowanie.seniorzy.score}/100</span> · popyt {p1.dopasowanie.seniorzy.popyt}</div>
-          <p className="mt-2 text-[10px] text-grunt-text-faint">Model pojemności (PUM, kondygnacje, liczba mieszkań) — Poziom 2.</p>
-        </div>
-      </SekcjaRap>
+      {/* 02 Poziom potrzeby (Poziom 1) — portret popytowy gminy: poziom słowny z
+          proporcji kohortowej. BEZ pojemności/liczby mieszkań — to wyznacza Poziom 2. */}
+      {(() => {
+        const wm = p1.ocenaPopytu.werdykty.spolecznyMlodzi;
+        const ws = p1.ocenaPopytu.werdykty.spolecznySeniorzy;
+        const opis = (w: typeof wm) =>
+          w.nieoznaczony ? "nieoznaczona" : `${w.poziom ?? "—"}${w.proporcjaKohortowaPct != null ? ` · ${w.proporcjaKohortowaPct}% kohorty` : ""}`;
+        return (
+          <SekcjaRap numer="02" tytul="Poziom potrzeby — portret popytowy gminy (Poziom 1)">
+            <div className="text-[12px]">
+              <div className="text-[10px] uppercase tracking-wide text-grunt-text-faint mb-1">Poziom potrzeby społecznej (proporcja kohortowa)</div>
+              <div className="text-grunt-text-muted2">Aktywni: <span className="text-grunt-text font-medium capitalize">{opis(wm)}</span></div>
+              <div className="text-grunt-text-muted2">Seniorzy: <span className="text-grunt-text font-medium capitalize">{opis(ws)}</span></div>
+              <p className="mt-2 text-[10px] text-grunt-text-faint">Wystarczalność wobec planowanej liczby mieszkań (pojemność) — Poziom 2.</p>
+            </div>
+          </SekcjaRap>
+        );
+      })()}
 
       {/* 03 Rekomendowany model zabudowy */}
       {(() => {

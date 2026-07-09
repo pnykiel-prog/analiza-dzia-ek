@@ -11,10 +11,13 @@
  *   4. → × UDZIAŁ BEZ MIESZKANIA (tabela per profil × segment)   = POPYT ZASTANY
  *   5. → × korekta MIGRACYJNA (jeden mnożnik, waga per kafel)     = POTENCJAŁ
  *
- * Werdykty:
- *   • społeczny  — popyt segmentu S vs pojemność działki (mechanika bez zmian),
- *   • komunalny  — ZAKOTWICZONY w BEZWZGLĘDNEJ liczbie kwalifikujących bez mieszkania
- *                  (duża liczba = wysoki popyt, NIGDY „nie nadaje się"),
+ * Werdykty (spójność P1/P2 — jednym językiem dla wszystkich 4 kafli):
+ *   • społeczny / komunalny — POZIOM POTRZEBY (niski/umiarkowany/wysoki) wyprowadzony
+ *     z PROPORCJI KOHORTOWEJ: udział kwalifikujących w segmencie ÷ liczebność WŁASNEJ
+ *     kohorty (aktywni ÷ aktywni, seniorzy ÷ seniorzy). Mierzy natężenie potrzeby wewnątrz
+ *     grupy klienta, porównywalne między gminami, oczyszczone ze struktury wiekowej.
+ *   • P1 NIE odnosi się do POJEMNOŚCI/liczby mieszkań — wystarczalność wobec planowanej
+ *     liczby mieszkań liczy dopiero P2. P1 = natychmiastowy przesiew z danych automatycznych.
  *   • brak danych ludnościowych → „nieoznaczony" (nie zero, nie „nie nadaje się").
  *
  * Funkcje czyste (testowalne offline).
@@ -170,23 +173,39 @@ function werdyktNieoznaczony(klucz: KluczWerdyktu, natura: "spoleczny" | "komuna
   };
 }
 
+/** Etykieta kohorty (mianownik proporcji) dla profilu. */
+const ETYK_KOHORTA: Record<Profil, string> = { mlodzi: "aktywnych", seniorzy: "seniorów" };
+
+/**
+ * POZIOM SŁOWNY z proporcji kohortowej → score (kolor werdyktu). To OPIS, NIE bramka:
+ * niski poziom = realna, ale niewielka potrzeba (żółty), NIGDY „nie nadaje się".
+ * Policzone ~zero (dane obecne) → najniższy score, wciąż nie czerwony-jak-brak.
+ */
+function poziomZProporcji(prop: number, progi: { umiarkowany: number; wysoki: number }): { poziom: string; score: number } {
+  if (prop >= progi.wysoki) return { poziom: "wysoki", score: 85 };
+  if (prop >= progi.umiarkowany) return { poziom: "umiarkowany", score: 60 };
+  if (prop > 0) return { poziom: "niski", score: 45 };
+  return { poziom: "niski", score: 35 };
+}
+
 function werdyktSpoleczny(
   profil: Profil,
   kw: KwalifikacjeProfil,
-  pojemnoscMieszkan: number,
   mig: Migracja,
   luka: number | null,
   d: DaneDzialki,
   cfg: KonfiguracjaPopytP1
 ): WerdyktP1 {
   const klucz: KluczWerdyktu = profil === "mlodzi" ? "spolecznyMlodzi" : "spolecznySeniorzy";
-  if (kw.nSpoleczny == null) return werdyktNieoznaczony(klucz, "spoleczny", profil);
+  if (kw.nSpoleczny == null || kw.nGrupa == null || kw.nGrupa <= 0) return werdyktNieoznaczony(klucz, "spoleczny", profil);
 
-  // Krok 5 — korekta migracyjna z wagą kafla; potem porównanie do pojemności (mechanika bez zmian).
-  const popyt = zMigracja(kw.nSpoleczny, mig.mBazowy, cfg.migracja.wagi[klucz]);
-  const denom = Math.max(1, pojemnoscMieszkan * cfg.marginesGospodarstwa);
-  const fWystarcz = clamp01(popyt / denom);
-  const score = clamp(Math.round(100 * fWystarcz));
+  // Krok 5 — korekta migracyjna z wagą kafla [gospodarstwa segmentu S].
+  const popytGosp = zMigracja(kw.nSpoleczny, mig.mBazowy, cfg.migracja.wagi[klucz]);
+  // PROPORCJA KOHORTOWA (spójność P1/P2): osoby segmentu S ÷ WŁASNA kohorta (nie gmina).
+  // gospodarstwa → osoby przez wielkość gospodarstwa; mianownik = liczebność kohorty.
+  const osobyS = popytGosp * cfg.wielkoscGospodarstwa[profil];
+  const prop = clamp01(osobyS / kw.nGrupa);
+  const { poziom, score } = poziomZProporcji(prop, cfg.progiKohortowe[klucz]);
 
   const flagi: string[] = [FLAGA_UDZIAL];
   if (luka != null && luka >= PROG_LUKI_FLAGA) flagi.push(`Wysoka luka cenowa (${Math.round(luka)}%) — realny popyt na najem społeczny.`);
@@ -196,31 +215,32 @@ function werdyktSpoleczny(
       `Korekta migracyjna ×${Math.round(mig.mBazowy * 100) / 100} (${mig.zNaplywu ? "z napływu, bez odpływu" : `saldo ${Math.round((mig.saldo1000 ?? 0) * 10) / 10}/1000`}).`
     );
 
-  // Pewność: założenie „udział bez mieszkania" obniża; brak danych migracyjnych dodatkowo,
-  // a bilans oszacowany tylko z napływu (bez odpływu) obniża łagodniej.
   const pewnosc = clamp(Math.round(78 - (kw.estymacja ? 8 : 0) - (mig.dostepna ? (mig.zNaplywu ? 3 : 0) : 6)));
-  const komentarz = `${Math.round(popyt)} gospodarstw bez mieszkania (segment społeczny) wobec pojemności ${pojemnoscMieszkan} mieszk. × margines ${cfg.marginesGospodarstwa}.`;
-  return { klucz, natura: "spoleczny", profil, score, werdykt: pasmo(score, cfg), liczbaKwalifikujacych: Math.round(popyt), pewnosc, flagi, komentarz };
-}
-
-/** Poziom potrzeby komunalnej z BEZWZGLĘDNEJ liczby (proste progi) — nigdy zero przy realnej potrzebie. */
-function scoreKomunalny(n: number, cfg: KonfiguracjaPopytP1): number {
-  const p = cfg.progiKomunalne;
-  if (n >= p.wysoki) return 90;
-  if (n >= p.sredni) return 70;
-  if (n >= p.niski) return 50;
-  if (n > 0) return 40; // realna, choć niewielka potrzeba — „warunkowo", NIGDY „nie nadaje się"
-  return 25; // policzone zero potrzeby (dane obecne)
+  const komentarz = `${Math.round(popytGosp)} gosp. bez mieszkania (segment społeczny) — potrzeba ${poziom} (${(prop * 100).toFixed(1)}% ${ETYK_KOHORTA[profil]} kohorty). Wystarczalność wobec liczby mieszkań: Poziom 2.`;
+  return {
+    klucz,
+    natura: "spoleczny",
+    profil,
+    score,
+    werdykt: pasmo(score, cfg),
+    liczbaKwalifikujacych: Math.round(popytGosp),
+    proporcjaKohortowaPct: Math.round(prop * 1000) / 10,
+    poziom,
+    pewnosc,
+    flagi,
+    komentarz,
+  };
 }
 
 function werdyktKomunalny(profil: Profil, kw: KwalifikacjeProfil, mig: Migracja, d: DaneDzialki, cfg: KonfiguracjaPopytP1): WerdyktP1 {
   const klucz: KluczWerdyktu = profil === "mlodzi" ? "komunalnyMlodzi" : "komunalnySeniorzy";
-  if (kw.nKomunalny == null) return werdyktNieoznaczony(klucz, "komunalny", profil);
+  if (kw.nKomunalny == null || kw.nGrupa == null || kw.nGrupa <= 0) return werdyktNieoznaczony(klucz, "komunalny", profil);
 
-  // Krok 5 — korekta migracyjna z wagą kafla (komunalny-seniorzy ≈ 0). Zakotwiczenie w LICZBIE.
+  // Krok 5 — korekta migracyjna z wagą kafla (komunalny-seniorzy ≈ 0) [osoby segmentu K].
   const popyt = Math.round(zMigracja(kw.nKomunalny, mig.mBazowy, cfg.migracja.wagi[klucz]));
-  const score = scoreKomunalny(popyt, cfg);
-  const poziom = score >= 90 ? "wysoki" : score >= 70 ? "podwyższony" : score >= 50 ? "umiarkowany" : "niski";
+  // PROPORCJA KOHORTOWA: osoby segmentu K ÷ WŁASNA kohorta (aktywni ÷ aktywni / seniorzy ÷ seniorzy).
+  const prop = clamp01(popyt / kw.nGrupa);
+  const { poziom, score } = poziomZProporcji(prop, cfg.progiKohortowe[klucz]);
 
   const flagi: string[] = [FLAGA_UDZIAL];
   if (kw.estymacja) flagi.push("Dochód gminy estymowany — podział K/S orientacyjny.");
@@ -230,15 +250,29 @@ function werdyktKomunalny(profil: Profil, kw: KwalifikacjeProfil, mig: Migracja,
       flagi.push("Uwaga: rosnący udział 65+ przy malejącej populacji — ryzyko utrwalania odpływu (informacyjnie, nie obniża oceny).");
   }
   const pewnosc = clamp(Math.round((profil === "seniorzy" ? 60 : 68) - (kw.estymacja ? 8 : 0)));
-  const komentarz = `Skala potrzeby komunalnej: ${popyt} os. bez mieszkania (segment K) — poziom ${poziom} (liczba bezwzględna).`;
-  return { klucz, natura: "komunalny", profil, score, werdykt: pasmo(score, cfg), liczbaKwalifikujacych: popyt, pewnosc, flagi, komentarz };
+  const komentarz = `Skala potrzeby komunalnej: ${popyt} os. bez mieszkania (segment K) — poziom ${poziom} (${(prop * 100).toFixed(1)}% ${ETYK_KOHORTA[profil]} kohorty).`;
+  return {
+    klucz,
+    natura: "komunalny",
+    profil,
+    score,
+    werdykt: pasmo(score, cfg),
+    liczbaKwalifikujacych: popyt,
+    proporcjaKohortowaPct: Math.round(prop * 1000) / 10,
+    poziom,
+    pewnosc,
+    flagi,
+    komentarz,
+  };
 }
 
 // ── Główna: oczyszczona ocena popytu P1 ──────────────────────────────────────
 
 export function ocenPopytP1(
   d: DaneDzialki,
-  pojemnosc: { mlodzi: number; seniorzy: number },
+  // Pojemność (z prognozy) NIE wchodzi już do P1 — wystarczalność wobec liczby mieszkań
+  // liczy P2. Parametr zachowany dla zgodności wołaczy (świadomie nieużywany w P1).
+  _pojemnosc: { mlodzi: number; seniorzy: number },
   cfg: KonfiguracjaPopytP1 = KONFIG_POPYT_P1,
   cfgS: KonfiguracjaScoring = KONFIG_SCORING
 ): OcenaPopytuP1 {
@@ -248,14 +282,14 @@ export function ocenPopytP1(
   const kwSeniorzy = kwalifikacje(d, "seniorzy", cfg);
 
   const werdykty: Record<KluczWerdyktu, WerdyktP1> = {
-    spolecznyMlodzi: werdyktSpoleczny("mlodzi", kwMlodzi, pojemnosc.mlodzi, mig, luka, d, cfg),
-    spolecznySeniorzy: werdyktSpoleczny("seniorzy", kwSeniorzy, pojemnosc.seniorzy, mig, luka, d, cfg),
+    spolecznyMlodzi: werdyktSpoleczny("mlodzi", kwMlodzi, mig, luka, d, cfg),
+    spolecznySeniorzy: werdyktSpoleczny("seniorzy", kwSeniorzy, mig, luka, d, cfg),
     komunalnyMlodzi: werdyktKomunalny("mlodzi", kwMlodzi, mig, d, cfg),
     komunalnySeniorzy: werdyktKomunalny("seniorzy", kwSeniorzy, mig, d, cfg),
   };
 
-  // Rekomendacja DZIAŁKI wybierana spośród werdyktów SPOŁECZNYCH (ocena projektu vs
-  // pojemność). Kafle komunalne to „potrzeba gminy" — nie rekomendują konkretnej działki.
+  // Rekomendacja DZIAŁKI wybierana spośród werdyktów SPOŁECZNYCH (poziom potrzeby w kohorcie).
+  // Kafle komunalne to „potrzeba gminy" — nie rekomendują konkretnej działki.
   const spoleczne = [werdykty.spolecznyMlodzi, werdykty.spolecznySeniorzy];
   const rekomendowany = spoleczne.reduce((a, b) => (b.score > a.score ? b : a));
 

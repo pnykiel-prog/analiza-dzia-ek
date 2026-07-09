@@ -291,6 +291,10 @@ export interface WerdyktP1 {
   pewnosc: number; // 0–100
   flagi: string[];
   komentarz: string;
+  /** Proporcja kohortowa [%]: kwalifikujący w segmencie ÷ liczebność WŁASNEJ kohorty (nie gmina). */
+  proporcjaKohortowaPct?: number | null;
+  /** Poziom słowny popytu z proporcji kohortowej: „niski" | „umiarkowany" | „wysoki". */
+  poziom?: string;
   /** true = brak podstawy ludnościowej → werdykt „nieoznaczony" (szary, niska pewność, nie zero/„nie nadaje się"). */
   nieoznaczony?: boolean;
 }

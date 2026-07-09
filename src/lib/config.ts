@@ -234,6 +234,14 @@ export interface KonfiguracjaPopytP1 {
   };
   /** Progi poziomu potrzeby KOMUNALNEJ — na BEZWZGLĘDNEJ liczbie kwalifikujących bez mieszkania (segment K). */
   progiKomunalne: { wysoki: number; sredni: number; niski: number };
+  /**
+   * Progi POZIOMU SŁOWNEGO z PROPORCJI KOHORTOWEJ (spójność P1/P2): udział kwalifikujących
+   * w segmencie ÷ liczebność WŁASNEJ kohorty (aktywni ÷ aktywni, seniorzy ÷ seniorzy) — NIE
+   * cała gmina. Mierzy natężenie potrzeby wewnątrz grupy klienta, porównywalne między gminami
+   * i oczyszczone ze struktury wiekowej. Per kafel (baza różni się przez udziałBezMieszkania).
+   * To OPIS + podstawa poziomu słownego, NIE bramka.
+   */
+  progiKohortowe: Record<KluczWerdyktu, { umiarkowany: number; wysoki: number }>;
   /** Pasma werdyktu (score → kolor). */
   pasma: { zielony: number; zolty: number };
 }
@@ -265,6 +273,15 @@ export const KONFIG_POPYT_P1: KonfiguracjaPopytP1 = {
     kNaplyw: 0.015, // słabszy współczynnik niż saldo netto (napływ nie mówi o odpływie → niższa pewność)
   },
   progiKomunalne: { wysoki: 3000, sredni: 1000, niski: 300 },
+  // Progi proporcji kohortowej (udział kwalifikujących w segmencie ÷ własna kohorta).
+  // Baza różni się między kaflami przez udziałBezMieszkania, więc progi są per kafel
+  // (kalibrowalne). Domyślne: typowa gmina ≈ umiarkowany; uboższa/rosnąca → wysoki.
+  progiKohortowe: {
+    komunalnyMlodzi: { umiarkowany: 0.1, wysoki: 0.16 },
+    spolecznyMlodzi: { umiarkowany: 0.07, wysoki: 0.13 },
+    komunalnySeniorzy: { umiarkowany: 0.05, wysoki: 0.085 },
+    spolecznySeniorzy: { umiarkowany: 0.018, wysoki: 0.032 },
+  },
   pasma: { zielony: 65, zolty: 40 },
 };
 

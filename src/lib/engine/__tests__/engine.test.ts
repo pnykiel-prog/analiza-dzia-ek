@@ -121,13 +121,16 @@ test("P2: fallback z sąsiedztwa — wysokość okolicy steruje liczbą kondygna
   assert.equal(o.maxKondygnacje, 4); // z sąsiadów (4 piętra), nie ze stałej
 });
 
-test("P2: dwa kierunki × 3 warianty (6) — senioralny i społeczny dla młodych; wiodący pierwszy", () => {
+test("P2: dwa kierunki × 3 warianty (6) — oba profile; profil wiodący pierwszy", () => {
   const p1 = { ...uruchomPoziom1(senioralna), profilRekomendowany: "seniorzy" as const };
   const p2 = uruchomPoziom2(senioralna, p1);
   assert.equal(p2.warianty.length, 6);
   assert.equal(p2.warianty.filter((w) => w.profil === "seniorzy").length, 3);
   assert.equal(p2.warianty.filter((w) => w.profil === "mlodzi").length, 3);
-  assert.equal(p2.warianty[0].profil, "seniorzy"); // profil wiodący (rekomendowany) pierwszy
+  // Profil wiodący (rekomendacja M2 lub — gdy brak — wyższy score) jest pierwszy.
+  const om2 = p2.ocenaM2;
+  const wiodacy = om2.rekomendacja !== "brak" ? om2.rekomendacja : om2.werdykty.seniorzy.score >= om2.werdykty.mlodzi.score ? "seniorzy" : "mlodzi";
+  assert.equal(p2.warianty[0].profil, wiodacy);
   assert.ok(p2.warianty.every((w) => w.liczbaMieszkan > 0));
 });
 

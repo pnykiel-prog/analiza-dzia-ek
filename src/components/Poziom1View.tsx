@@ -24,11 +24,11 @@ const KROPKA: Record<Werdykt, string> = {
 };
 
 /**
- * Widok Poziomu 1 (wersja pełna): SIATKA 4 WERDYKTÓW dwóch natur —
- * społeczne (ocena projektu vs pojemność) i komunalne (skala potrzeby w gminie
- * per mieszkaniec). Plus atrakcyjność migracyjna i kwalifikacje dochodowe.
- * Prognoza pojemności (PUM/kondygnacje/liczba mieszkań) NIE jest pokazywana na M1 —
- * orientacyjny model bywał zbyt nietrafiony; pojemność wyznacza Poziom 2.
+ * Widok Poziomu 1 (wersja pełna): SIATKA 4 WERDYKTÓW dwóch natur — społeczne i
+ * komunalne. Każdy kafel to POZIOM POTRZEBY (niski/umiarkowany/wysoki) z proporcji
+ * kohortowej (kwalifikujący ÷ własna kohorta), plus korekta migracyjna i kwalifikacje
+ * dochodowe. P1 NIE odnosi się do pojemności/liczby mieszkań — wystarczalność wobec
+ * projektu wyznacza dopiero Poziom 2 (obwiednia + warianty).
  */
 export function Poziom1View({ p1, pelny = true, pokazRekomendacje = true }: { p1: WynikPoziom1; pelny?: boolean; pokazRekomendacje?: boolean }) {
   const ocena = p1.ocenaPopytu;
@@ -61,7 +61,7 @@ export function Poziom1View({ p1, pelny = true, pokazRekomendacje = true }: { p1
       {/* SIATKA 4 WERDYKTÓW */}
       <div>
         <div className="text-[11px] uppercase tracking-wide text-grunt-text-faint mb-2">
-          Społeczne — ocena projektu na działce (wystarczalność vs pojemność)
+          Społeczne — poziom potrzeby w kohorcie klienta (wystarczalność wobec liczby mieszkań: Poziom 2)
         </div>
         <div className="grid md:grid-cols-2 gap-4">
           <KartaWerdyktu w={w.spolecznyMlodzi} rekomendowany={ocena.rekomendowanyKierunek === "spolecznyMlodzi"} />
@@ -70,7 +70,7 @@ export function Poziom1View({ p1, pelny = true, pokazRekomendacje = true }: { p1
       </div>
       <div>
         <div className="text-[11px] uppercase tracking-wide text-grunt-text-faint mb-2">
-          Komunalne — skala potrzeby w gminie (per mieszkaniec vs mediana regionalna)
+          Komunalne — poziom potrzeby w kohorcie klienta (segment komunalny)
         </div>
         <div className="grid md:grid-cols-2 gap-4">
           <KartaWerdyktu w={w.komunalnyMlodzi} rekomendowany={ocena.rekomendowanyKierunek === "komunalnyMlodzi"} />
@@ -143,7 +143,8 @@ function KartaWerdyktu({ w, rekomendowany }: { w: WerdyktP1; rekomendowany: bool
   const spol = w.natura === "spoleczny";
   const mlodzi = w.klucz.includes("Mlodzi");
   const akcent = mlodzi ? "var(--grunt-young)" : "var(--grunt-senior)"; // kolor profilu
-  const natura = spol ? "ocena projektu (vs pojemność)" : "skala potrzeby (per mieszk.)";
+  // Spójność P1/P2: P1 = poziom potrzeby w kohorcie (BEZ pojemności — ta wchodzi w P2).
+  const natura = spol ? "poziom potrzeby (segment społeczny)" : "poziom potrzeby (segment komunalny)";
   return (
     <div
       className={`relative rounded-2xl border overflow-hidden ${rekomendowany ? "border-grunt-ink shadow-raised" : "border-grunt-border shadow-card"}`}
@@ -179,7 +180,16 @@ function KartaWerdyktu({ w, rekomendowany }: { w: WerdyktP1; rekomendowany: bool
                 {statusSlowny[w.werdykt]}
               </span>
             )}
-            <div className="mt-4">
+            {!w.nieoznaczony && w.poziom && (
+              <div className="mt-2 flex items-center gap-2 text-[12px]">
+                <span className="text-grunt-text-muted2">Poziom potrzeby:</span>
+                <span className="font-semibold text-grunt-text capitalize">{w.poziom}</span>
+                {w.proporcjaKohortowaPct != null && (
+                  <span className="mono text-grunt-text-faint2">· {w.proporcjaKohortowaPct}% kohorty</span>
+                )}
+              </div>
+            )}
+            <div className="mt-3">
               <WskaznikPewnosci pewnosc={w.pewnosc} />
             </div>
             <div className="text-[10px] uppercase tracking-wide text-grunt-text-faint mt-2">{natura}</div>
