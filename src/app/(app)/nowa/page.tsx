@@ -364,41 +364,50 @@ export default function NowaAnalizaPage() {
     if (nr >= 1 && nr <= maxKrok) setEkran(EKRANY[nr - 1]);
   }
 
+  // Konfiguracja ciemnego banera nagłówka poziomu (kierunek wizualny §2) per ekran.
+  // Ekran „wejście” ma własny hero → zostaje jasny stepper. Reszta = jeden wzorzec.
+  const pewnP1 = wynik?.poziom1?.pewnosc ?? 100;
+  const BANER: Partial<Record<Ekran, { eyebrow: string; tytul: string; opis?: string; badge?: { ton: "sukces" | "ostrzezenie" | "blad" | "info"; tytul: string; opis?: string } }>> = {
+    poziom1: {
+      eyebrow: "Poziom 1 · Szybki przesiew",
+      tytul: "Wynik wstępnej oceny terenu",
+      opis: pewnP1 < 100 ? "Analiza na dostępnych rejestrach publicznych — część danych niepotwierdzona, pewność odpowiednio obniżona." : "Wstępny przesiew terenu na podstawie rejestrów publicznych.",
+      badge: pewnP1 < 100 ? { ton: "ostrzezenie", tytul: "Wynik częściowy", opis: "pewność obniżona" } : { ton: "sukces", tytul: "Komplet danych", opis: "pełna pewność" },
+    },
+    uzupelnianie: { eyebrow: "Poziom 2 · Uzupełnienie danych", tytul: "Uzupełnij dane do analizy", opis: "Auto pobiera, co się da; podaj to, co znasz — albo pomiń i przejdź do oceny." },
+    poziom2: { eyebrow: "Poziom 2 · Ocena przydatności", tytul: "Ocena działki pod budownictwo społeczne", opis: "Popyt realizowalny, przydatność ekonomiczna i bramki — werdykt per profil." },
+    ankieta: { eyebrow: "Poziom 3 · Ankieta finansowa", tytul: "Profil finansowy inwestycji", opis: "Kto buduje, w jakim reżimie i z jakim wkładem — parametry montażu." },
+    poziom3: { eyebrow: "Poziom 3 · Model finansowy", tytul: "Model finansowy SIM", opis: "Montaż, oś czasu i domknięcie (DSCR) dla wybranego reżimu." },
+    raport: { eyebrow: "Raport · Studium", tytul: "Studium potencjału inwestycyjnego", opis: "Podsumowanie poziomów 1–3 — gotowe do druku." },
+  };
+  const banerCfg = BANER[ekran];
+  const terenKontekst = dane ? (
+    <>
+      <span className="uppercase tracking-wider" style={{ color: "#6E8BB0" }}>Teren</span>
+      <span className="mono" style={{ color: "#CFE0F1" }}>{dane.id}</span>
+      {dane.powierzchniaM2 > 0 && <span className="mono">{liczba(dane.powierzchniaM2, " m²")}</span>}
+      {dane.gmina && <span>{dane.gmina}</span>}
+    </>
+  ) : null;
+
   return (
     <div className="space-y-5">
       <div className="-mx-4 sm:-mx-6 -mt-6">
-        {/* Poziom 1 (flagowy ekran): ciemny baner nagłówka z motywem + stepper w banerze
-            (kierunek wizualny §2). Pozostałe ekrany: jasny stepper + pasek kontekstu. */}
-        {ekran === "poziom1" && wynik?.poziom1 ? (
+        {/* Ciemny baner nagłówka poziomu ze stepperem (kierunek wizualny §2) dla
+            wszystkich ekranów roboczych; „wejście” zachowuje jasny stepper (własny hero). */}
+        {banerCfg ? (
           <BanerPoziomu
-            eyebrow="Poziom 1 · Szybki przesiew"
-            tytul="Wynik wstępnej oceny terenu"
-            opis={
-              wynik.poziom1.pewnosc < 100
-                ? "Analiza na dostępnych rejestrach publicznych — część danych niepotwierdzona, pewność odpowiednio obniżona."
-                : "Wstępny przesiew terenu na podstawie rejestrów publicznych."
-            }
+            eyebrow={banerCfg.eyebrow}
+            tytul={banerCfg.tytul}
+            opis={banerCfg.opis}
+            kontekst={ekran !== "poziom1" ? terenKontekst : undefined}
             krokAktywny={stepAktywny}
             maxOsiagniety={maxKrok}
             onKrok={idzDoKroku}
-            badge={
-              wynik.poziom1.pewnosc < 100
-                ? { ton: "ostrzezenie", tytul: "Wynik częściowy", opis: "pewność obniżona" }
-                : { ton: "sukces", tytul: "Komplet danych", opis: "pełna pewność" }
-            }
+            badge={banerCfg.badge}
           />
         ) : (
-          <>
-            <Stepper aktywny={stepAktywny} maxOsiagniety={maxKrok} onKrok={idzDoKroku} />
-            {dane && ekran !== "wejscie" && (
-              <div className="bg-grunt-surface border-b border-grunt-border px-4 sm:px-6 py-2 flex flex-wrap items-center gap-x-4 sm:gap-x-6 gap-y-1">
-                <span className="text-[10px] uppercase tracking-wider text-grunt-text-faint">Teren inwestycji</span>
-                <span className="mono text-[12px] text-grunt-text">{dane.id}</span>
-                {dane.powierzchniaM2 > 0 && <span className="mono text-[12px] text-grunt-text-muted">{liczba(dane.powierzchniaM2, " m²")}</span>}
-                {dane.gmina && <span className="text-[12px] text-grunt-text-muted">{dane.gmina}</span>}
-              </div>
-            )}
-          </>
+          <Stepper aktywny={stepAktywny} maxOsiagniety={maxKrok} onKrok={idzDoKroku} />
         )}
       </div>
 

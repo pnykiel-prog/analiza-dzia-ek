@@ -1,6 +1,6 @@
 import type { BrakDanych, OcenaM2, PoleWskaznika, Profil, ProfilRekomendowany, Sygnal, WariantZabudowy, Werdykt, WerdyktProfiluM2, WynikPoziom2, ZrodloWskaznika } from "@/lib/types";
 import { Karta, Statystyka } from "./ui";
-import { WskaznikPewnosci } from "./grunt";
+import { WskaznikPewnosci, Gauge } from "./grunt";
 import { etykietaTypologii, liczba, statusSlowny } from "@/lib/format";
 
 const ZRODLO_OBWIEDNI: Record<string, string> = {
@@ -25,6 +25,16 @@ const KOLOR_WERD: Record<Werdykt, string> = {
   zielony: "text-grunt-green",
   zolty: "text-grunt-amber",
   czerwony: "text-grunt-red",
+};
+// Hex do łuku gauge (SVG stroke).
+const KOLOR_HEX: Record<Werdykt, string> = {
+  zielony: "#1C8A5A",
+  zolty: "#B5790B",
+  czerwony: "#C0392B",
+};
+const AKCENT_PROFIL: Record<Profil, string> = {
+  mlodzi: "var(--grunt-young)",
+  seniorzy: "var(--grunt-senior)",
 };
 
 /** Werdykt M2 per profil (domknięcie kanałów A–F) + rekomendacja / „BRAK". */
@@ -64,33 +74,38 @@ function WerdyktM2Karta({ ocena }: { ocena: OcenaM2 }) {
 function ProfilM2({ w, rekomendowany }: { w: WerdyktProfiluM2; rekomendowany: boolean }) {
   const wyklu = !w.obsluzalny || !w.dopuszczalny;
   return (
-    <div className={`rounded-card border p-4 ${rekomendowany ? "border-grunt-ink shadow-raised" : "border-grunt-border"}`}>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[13px] font-semibold text-grunt-text">{ETYK_PROFIL[w.profil]}</span>
-        {rekomendowany && <span className="badge bg-grunt-ink text-white text-[10px]">★ REKOMENDOWANY</span>}
-      </div>
-      <div className="flex items-end justify-between mt-2">
-        <span className={`text-[18px] font-semibold ${wyklu ? "text-grunt-red" : KOLOR_WERD[w.werdykt]}`}>
-          {wyklu ? (!w.dopuszczalny ? "Niedopuszczalny" : "Nieobsługiwalny") : statusSlowny[w.werdykt]}
+    <div className={`relative rounded-2xl border overflow-hidden ${rekomendowany ? "border-grunt-ink shadow-raised" : "border-grunt-border shadow-card"}`} style={{ background: "var(--grunt-surface)" }}>
+      <div style={{ height: 4, background: AKCENT_PROFIL[w.profil] }} />
+      {rekomendowany && (
+        <span className="absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full text-white text-[11px] font-semibold uppercase" style={{ background: "var(--grunt-ink)", padding: "5px 11px", letterSpacing: ".03em" }}>
+          ★ Rekomendowany
         </span>
-        <span className="mono text-[26px] font-semibold leading-none text-grunt-text">
-          {w.score}
-          <span className="text-[13px] text-grunt-text-faint2">/100</span>
-        </span>
-      </div>
-      <div className="grid grid-cols-2 gap-2 mt-3 text-[11px]">
+      )}
+      <div className="px-5 pt-4 pb-5">
+        <div className="flex items-center gap-2.5 mb-3">
+          <span className="w-[11px] h-[11px] rounded-full" style={{ background: AKCENT_PROFIL[w.profil] }} />
+          <span className="text-[13px] font-semibold text-grunt-text-3">{ETYK_PROFIL[w.profil]}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className={`text-[20px] font-semibold ${wyklu ? "text-grunt-red" : KOLOR_WERD[w.werdykt]}`} style={{ letterSpacing: "-.01em" }}>
+            {wyklu ? (!w.dopuszczalny ? "Niedopuszczalny" : "Nieobsługiwalny") : statusSlowny[w.werdykt]}
+          </span>
+          <Gauge wartosc={w.score} kolor={wyklu ? "#C0392B" : KOLOR_HEX[w.werdykt]} rozmiar={88} nieoznaczony={wyklu && w.score === 0} />
+        </div>
+        <div className="grid grid-cols-2 gap-2 mt-4 text-[11px]">
         <MiniM2 e="Popyt realizowalny" v={`${w.popytRealizowalny}/100`} />
         <MiniM2 e="Przydatność ekon. (B)" v={`${w.przydatnoscEkonomiczna}/100`} />
         <MiniM2 e="Dostępność usług (A)" v={`× ${w.dostepnoscA.toFixed(2)}`} />
         <MiniM2 e="Modyfikator popytu (C)" v={`× ${w.modyfikatorC.toFixed(2)}`} />
       </div>
-      {w.powody.length > 0 && (
-        <ul className="mt-2 space-y-1">
-          {w.powody.slice(0, 4).map((r, i) => (
-            <li key={i} className="text-[11px] text-grunt-text-muted2">• {r}</li>
-          ))}
-        </ul>
-      )}
+        {w.powody.length > 0 && (
+          <ul className="mt-2 space-y-1">
+            {w.powody.slice(0, 4).map((r, i) => (
+              <li key={i} className="text-[11px] text-grunt-text-muted2">• {r}</li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
@@ -341,7 +356,9 @@ function KartaWariantu({
         : { txt: "ZRÓWNOWAŻONY", klasa: "bg-grunt-surface-3 text-grunt-text-muted" };
   const dotProfil = w.profil === "mlodzi" ? "bg-grunt-young" : "bg-grunt-senior";
   return (
-    <div className={`rounded-card border p-4 ${rekomendowany ? "border-grunt-ink shadow-raised" : "border-grunt-border"}`}>
+    <div className={`relative rounded-2xl border overflow-hidden ${rekomendowany ? "border-grunt-ink shadow-raised" : "border-grunt-border shadow-card"}`} style={{ background: "var(--grunt-surface)" }}>
+      {rekomendowany && <div style={{ height: 4, background: AKCENT_PROFIL[w.profil] }} />}
+      <div className="p-4">
       <div className="flex items-start justify-between">
         <div>
           <span className="text-[15px] font-semibold text-grunt-text">Wariant {litera}</span>
@@ -386,6 +403,7 @@ function KartaWariantu({
       </div>
 
       <p className="text-[11px] text-grunt-text-muted mt-3 leading-relaxed bg-grunt-surface-3 rounded-md px-2.5 py-1.5">{w.uzasadnienie}</p>
+      </div>
     </div>
   );
 }
