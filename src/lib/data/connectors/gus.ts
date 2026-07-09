@@ -179,9 +179,10 @@ async function pobierzDynamike(unitId: string): Promise<DynamikaGminy | null> {
     const lata = Array.from({ length: gus.dynamikaLata }, (_, i) => rokDo - (gus.dynamikaLata - 1) + i);
     const idLudnosc = totalIdWieku();
     const idPodmioty = gus.zmienneId.podmiotyNa10k ?? "60530";
-    const idMieszkania = await idZmiennejPoFrazie(gus.zapytania.mieszkaniaOddane);
-    const idDochody = await idZmiennejPoFrazie(gus.zapytania.dochodyWlasne);
-    const idBezrobotni = await idZmiennejPoFrazie(gus.zapytania.bezrobotniLiczba);
+    // Potwierdzone ID mają pierwszeństwo; inaczej dobór odporny (poziom gminy + jednostka).
+    const idMieszkania = gus.zmienneId.mieszkaniaOddane ?? (await idDynamiki(gus.zapytania.mieszkaniaOddane, "mieszkanie"));
+    const idDochody = gus.zmienneId.dochodyWlasne ?? (await idDynamiki(gus.zapytania.dochodyWlasne, "zł"));
+    const idBezrobotni = gus.zmienneId.bezrobotniLiczba ?? (await idDynamiki(gus.zapytania.bezrobotniLiczba, "osoba"));
     const ids = [idLudnosc, idPodmioty, idMieszkania, idDochody, idBezrobotni].filter(Boolean) as string[];
     const m = await szeregiWielu(unitId, ids, lata);
     const wez = (id: string | null): PunktSzeregu[] | null => (id ? m.get(id) ?? null : null);
@@ -326,6 +327,37 @@ async function idZmiennejPoFrazie(fraza: string): Promise<string | null> {
   });
   const id = pierwszaZmienna(odp);
   cacheIdFraza.set(fraza, id);
+  return id;
+}
+
+/**
+ * Dobór ID zmiennej BDL dla panelu dynamiki — ODPORNY na wieloznaczność frazy:
+ * spośród wyników preferuje poziom GMINY (6) i pasującą JEDNOSTKĘ (np. „zł", „osoba"),
+ * a przy remisie krótszą nazwę (zwykle „· ogółem", nie przekrój). Fallback: pierwszy wynik.
+ */
+const cacheIdDynamiki = new Map<string, string | null>();
+async function idDynamiki(fraza: string, jednostkaZawiera?: string): Promise<string | null> {
+  if (!fraza) return null;
+  const klucz = `${fraza}::${jednostkaZawiera ?? ""}`;
+  if (cacheIdDynamiki.has(klucz)) return cacheIdDynamiki.get(klucz)!;
+  const odp = await fetchJson<{ results?: { id?: number | string; n1?: string; n2?: string; n3?: string; level?: number | string; measureUnitName?: string }[] }>(
+    url("variables/search", { name: fraza, "page-size": "50" }),
+    { ...KONFIG_KONEKTORY.siec, naglowki: naglowki() }
+  );
+  const wyniki = odp?.results ?? [];
+  const naGminie = wyniki.filter((r) => Number(r.level) === gus.poziomGmina);
+  const pula = naGminie.length ? naGminie : wyniki;
+  const nazwa = (r: (typeof pula)[number]) => [r.n1, r.n2, r.n3].filter(Boolean).join(" ").toLowerCase();
+  const pasujeJedn = (r: (typeof pula)[number]) =>
+    !jednostkaZawiera || (r.measureUnitName ?? "").toLowerCase().includes(jednostkaZawiera.toLowerCase());
+  const kandydaci = pula.filter(pasujeJedn);
+  const zbior = kandydaci.length ? kandydaci : pula;
+  // Preferuj „ogółem" (total), a przy braku — najkrótszą nazwę (najmniej przekrojów).
+  const wybrany =
+    zbior.find((r) => nazwa(r).includes("ogółem")) ??
+    [...zbior].sort((a, b) => nazwa(a).length - nazwa(b).length)[0];
+  const id = wybrany?.id != null ? String(wybrany.id) : null;
+  cacheIdDynamiki.set(klucz, id);
   return id;
 }
 
