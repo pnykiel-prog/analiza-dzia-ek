@@ -187,14 +187,20 @@ async function pobierzDynamike(unitId: string): Promise<DynamikaGminy | null> {
     const m = await szeregiWielu(unitId, ids, lata);
     const wez = (id: string | null): PunktSzeregu[] | null => (id ? m.get(id) ?? null : null);
     const ludnosc = wez(idLudnosc);
-    // Dochody własne BDL to KWOTA CAŁKOWITA gminy (zł). Przeliczamy na 1 mieszkańca
-    // (total ÷ ludność wg zgodnego roku), bo wartość bezwzględna zależy od wielkości
-    // gminy i uniemożliwia porównanie trendu. Brak ludności dla roku → punkt null (luka).
+    // Dochody własne: BDL potrafi zwrócić KWOTĘ CAŁKOWITĄ gminy (zł, rzędu 10^8–10^9)
+    // ALBO wartość już na 1 mieszkańca (rzędu 10^3). Wykrywamy skalę: gdy total ≫ ludność
+    // → dzielimy na 1 mieszkańca; gdy jest już małą kwotą per capita → zostawiamy bez zmian.
+    // Dzięki temu panel pokazuje sensowny trend niezależnie od doboru zmiennej. Brak
+    // ludności dla roku → punkt null (luka, nie zero).
     const dochodyTotal = wez(idDochody);
     const dochodyWlasne = dochodyTotal
       ? dochodyTotal.map((p) => {
-          const lud = ludnosc?.find((x) => x.rok === p.rok)?.wartosc;
-          return { rok: p.rok, wartosc: p.wartosc != null && lud ? Math.round(p.wartosc / lud) : null };
+          const lud = ludnosc?.find((x) => x.rok === p.rok)?.wartosc ?? null;
+          if (p.wartosc == null) return { rok: p.rok, wartosc: null };
+          // Total (znacznie większy od liczby ludności) → przelicz na 1 mieszkańca.
+          if (lud && p.wartosc > lud * 10) return { rok: p.rok, wartosc: Math.round(p.wartosc / lud) };
+          // Już per capita (mała kwota) → pokaż bez dzielenia.
+          return { rok: p.rok, wartosc: Math.round(p.wartosc) };
         })
       : null;
     const dyn: DynamikaGminy = {
@@ -388,6 +394,37 @@ export async function diagZmienne(fraza: string): Promise<unknown> {
     jednostka: r.measureUnitName ?? null,
     poziom: r.level ?? null,
   }));
+}
+
+/**
+ * Diagnostyka: SUROWE szeregi (bez przeliczeń) wybranych ID na jednostce gminy
+ * ORAZ na jednostce nadrzędnej (powiat) — pokazuje DOKŁADNIE co BDL zwraca, na
+ * którym poziomie i z jaką skalą. Do rozstrzygnięcia, czemu zmienna daje null/0.
+ */
+export async function diagSzeregiGminy(gmina: string, teryt: string, ids: string[]): Promise<unknown> {
+  const jedn = await fetchJson(url("units/search", { name: gmina, level: String(gus.poziomGmina) }), {
+    ...KONFIG_KONEKTORY.siec,
+    naglowki: naglowki(),
+  });
+  let jednostka = wybierzJednostke(jedn, gmina, teryt);
+  if (!jednostka) {
+    const jedn2 = await fetchJson(url("units/search", { name: gmina }), { ...KONFIG_KONEKTORY.siec, naglowki: naglowki() });
+    jednostka = wybierzJednostke(jedn2, gmina, teryt);
+  }
+  if (!jednostka) return { gmina, blad: "Nie znaleziono jednostki BDL." };
+  const rokDo = gus.rok;
+  const lata = Array.from({ length: gus.dynamikaLata }, (_, i) => rokDo - (gus.dynamikaLata - 1) + i);
+  const czyste = ids.filter(Boolean);
+  const naGminie = await szeregiWielu(jednostka.id, czyste, lata);
+  const naPowiecie = jednostka.parentId ? await szeregiWielu(jednostka.parentId, czyste, lata) : new Map();
+  const wyc = (m: Map<string, PunktSzeregu[]>) => Object.fromEntries(czyste.map((id) => [id, m.get(id) ?? null]));
+  return {
+    gmina,
+    jednostkaGmina: { id: jednostka.id, name: jednostka.name, level: jednostka.level },
+    jednostkaPowiat: jednostka.parentId ?? null,
+    szeregiNaGminie: wyc(naGminie),
+    szeregiNaPowiecie: wyc(naPowiecie as Map<string, PunktSzeregu[]>),
+  };
 }
 
 export const konektorGUS: Konektor = {
