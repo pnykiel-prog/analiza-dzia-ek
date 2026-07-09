@@ -205,18 +205,28 @@ export function liczBraki(d: DaneDzialki, szczegoly: WynikBramki[]): BrakDanych[
     braki.push({ tytul, opis: `Niepotwierdzone automatycznie; sprawdź: ${gdzie}`, wplyw });
 
   // Środowisko/grunt/droga niezweryfikowane automatycznie (status „do weryfikacji").
+  // Uwaga: deklaracja klienta z ankiety trafia w te same pola (droga/powódź/osuwisko),
+  // więc rozstrzygnięta bramka NIE ma tu statusu „do_weryfikacji" — dana schodzi z listy.
   for (const b of szczegoly)
     if (b.status === "do_weryfikacji") dodaj(b.nazwa, b.zrodlo);
 
-  // Podstawa planistyczna (plan miejscowy / WZ) — kluczowa, gdy brak MPZP mieszkaniowego.
-  if (d.statusPlanistyczny !== "mpzp_mieszkaniowy")
+  // Lista „do weryfikacji" pokazuje, czego nie wiemy z ŻADNEGO źródła — w tym z ANKIETY.
+  // Dana wprowadzona i POTWIERDZONA przez klienta (wskaznikiPotwierdzone) jest zweryfikowana
+  // przez klienta i wchodzi do modelu (kaskadaWskaznikow) → nie jest już niewiadomą.
+  const planistykaOdKlienta = d.wskaznikiPotwierdzone === true;
+  const wskaznikiOdKlienta = d.wskaznikiPotwierdzone === true && d.wskaznikiReczne != null;
+
+  // Podstawa planistyczna (plan miejscowy / WZ) — kluczowa, gdy brak MPZP mieszkaniowego
+  // I gdy klient nie potwierdził danych planistycznych w ankiecie.
+  if (d.statusPlanistyczny !== "mpzp_mieszkaniowy" && !planistykaOdKlienta)
     dodaj(
       "Przeznaczenie w planie (MPZP) lub warunki zabudowy (WZ)",
       "geoportal gminy / wydział architektury (wypis i wyrys z MPZP albo decyzja WZ)"
     );
 
-  // Wskaźniki zabudowy — gdy nie z planu (obwiednia z sąsiedztwa, niższa pewność).
-  if (!d.wskaznikiPlanistyczne)
+  // Wskaźniki zabudowy — gdy nieznane z żadnego źródła: ani z planu (wskaznikiPlanistyczne),
+  // ani z potwierdzonej deklaracji klienta (wskaznikiReczne + wskaznikiPotwierdzone).
+  if (!d.wskaznikiPlanistyczne && !wskaznikiOdKlienta)
     dodaj(
       "Wskaźniki zabudowy (intensywność, wysokość, PZ, PBC)",
       "MPZP / plan ogólny — bez nich obwiednia oszacowana z sąsiedztwa"
