@@ -179,14 +179,10 @@ async function pobierzDynamike(unitId: string): Promise<DynamikaGminy | null> {
     const lata = Array.from({ length: gus.dynamikaLata }, (_, i) => rokDo - (gus.dynamikaLata - 1) + i);
     const idLudnosc = totalIdWieku();
     const idPodmioty = gus.zmienneId.podmiotyNa10k ?? "60530";
-    // Potwierdzone ID mają pierwszeństwo; inaczej dobór odporny (POZIOM GMINY + jednostka).
-    // GUS nie publikuje „mieszkań oddanych" ani LICZBY bezrobotnych na poziomie gminy
-    // (tylko powiat), więc panel gminny używa gminnych odpowiedników: nasycenie mieszkaniami
-    // (mieszkania na 1000 ludności) oraz stopa bezrobocia (udział w ludności produkcyjnej).
-    const idMieszkania = gus.zmienneId.mieszkaniaOddane ?? (await idDynamiki(gus.zapytania.mieszkaniaOddane));
+    // Tylko wskaźniki pewnie dostępne na POZIOMIE GMINY. Mieszkania oddane i liczbę
+    // bezrobotnych GUS publikuje dopiero od powiatu — świadomie ich nie pobieramy.
     const idDochody = gus.zmienneId.dochodyWlasne ?? (await idDynamiki(gus.zapytania.dochodyWlasne, "zł"));
-    const idBezrobotni = gus.zmienneId.bezrobotniLiczba ?? (await idDynamiki(gus.zapytania.bezrobocie, "%"));
-    const ids = [idLudnosc, idPodmioty, idMieszkania, idDochody, idBezrobotni].filter(Boolean) as string[];
+    const ids = [idLudnosc, idPodmioty, idDochody].filter(Boolean) as string[];
     const m = await szeregiWielu(unitId, ids, lata);
     const wez = (id: string | null): PunktSzeregu[] | null => (id ? m.get(id) ?? null : null);
     const ludnosc = wez(idLudnosc);
@@ -208,10 +204,8 @@ async function pobierzDynamike(unitId: string): Promise<DynamikaGminy | null> {
       : null;
     const dyn: DynamikaGminy = {
       ludnosc,
-      mieszkaniaOddane: wez(idMieszkania),
       podmioty: wez(idPodmioty),
       dochodyWlasne,
-      bezrobotni: wez(idBezrobotni),
     };
     // Panel ma sens tylko z kotwicą (ludność) lub jakimkolwiek szeregiem.
     const cokolwiek = Object.values(dyn).some((s) => s && s.length > 0);
@@ -401,37 +395,6 @@ export async function diagZmienne(fraza: string): Promise<unknown> {
     jednostka: r.measureUnitName ?? null,
     poziom: r.level ?? null,
   }));
-}
-
-/**
- * Diagnostyka: SUROWE szeregi (bez przeliczeń) wybranych ID na jednostce gminy
- * ORAZ na jednostce nadrzędnej (powiat) — pokazuje DOKŁADNIE co BDL zwraca, na
- * którym poziomie i z jaką skalą. Do rozstrzygnięcia, czemu zmienna daje null/0.
- */
-export async function diagSzeregiGminy(gmina: string, teryt: string, ids: string[]): Promise<unknown> {
-  const jedn = await fetchJson(url("units/search", { name: gmina, level: String(gus.poziomGmina) }), {
-    ...KONFIG_KONEKTORY.siec,
-    naglowki: naglowki(),
-  });
-  let jednostka = wybierzJednostke(jedn, gmina, teryt);
-  if (!jednostka) {
-    const jedn2 = await fetchJson(url("units/search", { name: gmina }), { ...KONFIG_KONEKTORY.siec, naglowki: naglowki() });
-    jednostka = wybierzJednostke(jedn2, gmina, teryt);
-  }
-  if (!jednostka) return { gmina, blad: "Nie znaleziono jednostki BDL." };
-  const rokDo = gus.rok;
-  const lata = Array.from({ length: gus.dynamikaLata }, (_, i) => rokDo - (gus.dynamikaLata - 1) + i);
-  const czyste = ids.filter(Boolean);
-  const naGminie = await szeregiWielu(jednostka.id, czyste, lata);
-  const naPowiecie = jednostka.parentId ? await szeregiWielu(jednostka.parentId, czyste, lata) : new Map();
-  const wyc = (m: Map<string, PunktSzeregu[]>) => Object.fromEntries(czyste.map((id) => [id, m.get(id) ?? null]));
-  return {
-    gmina,
-    jednostkaGmina: { id: jednostka.id, name: jednostka.name, level: jednostka.level },
-    jednostkaPowiat: jednostka.parentId ?? null,
-    szeregiNaGminie: wyc(naGminie),
-    szeregiNaPowiecie: wyc(naPowiecie as Map<string, PunktSzeregu[]>),
-  };
 }
 
 export const konektorGUS: Konektor = {

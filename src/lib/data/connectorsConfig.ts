@@ -34,12 +34,8 @@ export interface KonfiguracjaKonektorow {
       gospodarstwaOgolem: string;
       /** NSP 2021 — gospodarstwa zajmujące mieszkanie na zasadzie WŁASNOŚCI (licznik). */
       gospodarstwaWlasnosc: string;
-      /** Panel dynamiki gminy — nasycenie mieszkaniami (mieszkania na 1000 ludności), poziom gminy. */
-      mieszkaniaOddane: string;
       /** Panel dynamiki gminy — dochody własne gminy na 1 mieszkańca [zł]. */
       dochodyWlasne: string;
-      /** Panel dynamiki gminy — stopa bezrobocia (fallback; realnie używamy frazy `bezrobocie`). */
-      bezrobotniLiczba: string;
     };
     /** Panel dynamiki gminy — liczba lat wstecz w szeregach czasowych. */
     dynamikaLata: number;
@@ -114,9 +110,7 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       wymeldowania: "wymeldowania w ruchu wewnętrznym",
       gospodarstwaOgolem: "gospodarstwa domowe według tytułu prawnego do zajmowanego mieszkania ogółem",
       gospodarstwaWlasnosc: "gospodarstwa domowe według tytułu prawnego do zajmowanego mieszkania własność",
-      mieszkaniaOddane: "mieszkania na 1000 ludności",
       dochodyWlasne: "dochody własne",
-      bezrobotniLiczba: "bezrobotni ogółem",
     },
     dynamikaLata: 10,
     nspRok: 2021,
@@ -133,10 +127,8 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
     // Panel dynamiki (diagnostyka /api/diag-gus, Katowice):
     //   dochody własne (poziom 6 „gminy łącznie z m. na pr. powiatu", zł na 1 mieszkańca) = 76976.
     // UWAGA: „mieszkania oddane" i LICZBA bezrobotnych istnieją w BDL tylko od poziomu
-    // POWIATU (level 5) — w jednostce gminy zwracają null (potwierdzone: poziom6 = []).
-    // Dlatego panel gminny NIE pinuje ich ID, tylko dobiera gminne odpowiedniki po frazie:
-    //   „mieszkania na 1000 ludności" (nasycenie, level 6) oraz stopa bezrobocia
-    //   „udział bezrobotnych… w ludności produkcyjnym" (fraza `bezrobocie`, level 6).
+    // POWIATU (level 5) — w jednostce gminy zwracają null (potwierdzone: poziom6 = []),
+    // dlatego panel dynamiki ich NIE pokazuje (ludność, podmioty REGON, dochody własne).
     zmienneId: {
       podmiotyNa10k: "60530",
       saldoMigracji: "1365234",

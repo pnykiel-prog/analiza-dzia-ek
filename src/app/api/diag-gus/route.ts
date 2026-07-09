@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { KONFIG_KONEKTORY } from "@/lib/data/connectorsConfig";
-import { konektorGUS, diagJednostki, diagZmienne, diagSzeregiGminy } from "@/lib/data/connectors/gus";
+import { konektorGUS, diagJednostki, diagZmienne } from "@/lib/data/connectors/gus";
 import type { Teren } from "@/lib/data/connectors/types";
 import { rozwiazDzialki } from "@/lib/data/resolver";
 
@@ -82,32 +82,6 @@ export async function GET(req: Request) {
   const dane = wynik.dane ?? {};
   const liczbaPol = Object.keys(dane).length;
 
-  // Diagnostyka doboru zmiennych panelu dynamiki (mieszkania oddane / dochody własne /
-  // bezrobotni) — kandydaci z variables/search, do przypięcia potwierdzonych ID.
-  const dynFrazy: Record<string, string> = {
-    mieszkaniaOddane: gus.zapytania.mieszkaniaOddane,
-    dochodyWlasne: gus.zapytania.dochodyWlasne,
-    bezrobotni: gus.zapytania.bezrobotniLiczba,
-  };
-  const diagnostykaDynamiki: Record<string, unknown> = {};
-  for (const [k, fraza] of Object.entries(dynFrazy)) {
-    const kandydaci = (await diagZmienne(fraza)) as { poziom?: number | null }[];
-    // Tylko kandydaci na poziomie GMINY (level 6) mają dane w jednostce gminy —
-    // zmienne poziom ≤ 5 są dostępne dopiero od powiatu i w gminie zwracają null.
-    const poziom6 = kandydaci.filter((c) => Number(c.poziom) === 6);
-    diagnostykaDynamiki[k] = { fraza, poziom6, liczbaKandydatow: kandydaci.length, kandydaci };
-  }
-
-  // SUROWE szeregi przypiętych ID (bez przeliczeń) na gminie i na powiecie — rozstrzyga,
-  // czemu dana zmienna daje null (poziom powiatu) lub 0 (skala/jednostka po przeliczeniu).
-  const przypiete = [
-    gus.zmienneId.mieszkaniaOddane,
-    gus.zmienneId.dochodyWlasne,
-    gus.zmienneId.bezrobotniLiczba,
-    gus.zmienneId.podmiotyNa10k,
-  ].filter(Boolean) as string[];
-  const suroweSzeregi = await diagSzeregiGminy(gmina, "", przypiete);
-
   const wniosek =
     wynik.status === "ok" && liczbaPol >= 4
       ? "✅ GUS DZIAŁA — konektor zwraca komplet demografii (to samo, co dostaje aplikacja). " +
@@ -123,9 +97,7 @@ export async function GET(req: Request) {
     rok: gus.rok,
     status: wynik.status,
     liczbaPolDanych: liczbaPol,
-    dane, // udzialAktywniPct, udzial65PlusPct, bezrobociePct, trend65Plus, trendLudnosc, saldoMigracjiMlodzi, …
-    diagnostykaDynamiki, // kandydaci na ID 3 szeregów panelu dynamiki (poziom6 = dostępne w gminie)
-    suroweSzeregi, // surowe wartości przypiętych ID na gminie vs powiecie (rozstrzyga null/0)
+    dane, // udzialAktywniPct, udzial65PlusPct, bezrobociePct, trend65Plus, trendLudnosc, saldoMigracjiMlodzi, dynamikaGminy …
     debug: wynik.debug ?? null,
     wniosek,
   };
