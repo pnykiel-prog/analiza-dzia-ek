@@ -128,6 +128,9 @@ export function PytaniaM2({
     });
   }
 
+  // Czy wpisano jakikolwiek wskaźnik planistyczny (do czytelnej podpowiedzi o potwierdzeniu).
+  const czyWpisanoPlan = Boolean(plan.intensywnosc || plan.maxWysokoscM || plan.maxPowZabudowyPct || plan.minPbcPct);
+
   return (
     <Karta
       tytul="Uzupełnij dane do analizy (opcjonalnie)"
@@ -317,13 +320,12 @@ export function PytaniaM2({
         </button>
         {planOtwarte && (
           <div className="mt-3">
-            <p className="text-[11px] text-grunt-text-faint2 mb-2">
-              Domyślnie korzystamy z danych z Poziomu 1 (KIMPZP + prognoza). Podanie wskaźników z wypisu uściśla model zabudowy i podnosi pewność.
+            <p className="text-[11px] text-grunt-text-faint2 mb-3">
+              Domyślnie korzystamy z danych z Poziomu 1 (KIMPZP + prognoza). Podanie wskaźników z wypisu uściśla model zabudowy i podnosi pewność. Wymaga <strong>dwóch kroków</strong>: wpisz wartości, a następnie <strong>potwierdź</strong>, że pochodzą z dokumentu.
             </p>
-            <label className="flex items-center gap-2 mb-2 text-[12px] text-grunt-text-muted">
-              <input type="checkbox" checked={potwierdzona} onChange={(e) => setPotwierdzona(e.target.checked)} />
-              Potwierdzam: to realne dane z MPZP / dokumentu urzędowego (bez potwierdzenia model użyje prognozy).
-            </label>
+
+            {/* KROK 1 — wpisz wskaźniki z wypisu */}
+            <div className="text-[11px] uppercase tracking-wide text-grunt-text-faint mb-1.5">Krok 1 — wpisz wskaźniki</div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {[
                 ["intensywnosc", "Intensywność zabudowy", "0.1"],
@@ -343,6 +345,31 @@ export function PytaniaM2({
                 </label>
               ))}
             </div>
+
+            {/* KROK 2 — świadome potwierdzenie (warunek wejścia danej do oceny) */}
+            <div className="text-[11px] uppercase tracking-wide text-grunt-text-faint mt-3 mb-1.5">Krok 2 — potwierdź źródło</div>
+            <label className="flex items-start gap-2 text-[12px] text-grunt-text-muted">
+              <input type="checkbox" className="mt-0.5" checked={potwierdzona} onChange={(e) => setPotwierdzona(e.target.checked)} />
+              <span>Potwierdzam: to realne dane z MPZP / dokumentu urzędowego (bez potwierdzenia model użyje prognozy).</span>
+            </label>
+
+            {/* Podpowiedź stanu — jawnie mówi, czy wpis wpływa na ocenę i JAK go aktywować. */}
+            {czyWpisanoPlan && !potwierdzona && (
+              <div className="mt-2 flex items-start gap-2 rounded-md border border-grunt-amber/30 bg-grunt-amber-bg px-3 py-2">
+                <span className="mono grid place-items-center shrink-0 w-5 h-5 rounded-full bg-grunt-amber text-white text-[11px] font-bold">!</span>
+                <span className="text-[12px] text-grunt-amber-text">
+                  Wpisane, <strong>niepotwierdzone</strong> — nie wpływa jeszcze na ocenę. Zaznacz „Potwierdzam", żeby dane weszły do oceny i zdjęły pozycję z listy „Do weryfikacji".
+                </span>
+              </div>
+            )}
+            {czyWpisanoPlan && potwierdzona && (
+              <div className="mt-2 flex items-start gap-2 rounded-md border border-grunt-green/30 bg-grunt-green-bg px-3 py-2">
+                <span className="mono grid place-items-center shrink-0 w-5 h-5 rounded-full bg-grunt-green text-white text-[11px] font-bold">✓</span>
+                <span className="text-[12px] text-grunt-green">
+                  Potwierdzone — wejdą do oceny i zdejmą pozycję „Wskaźniki zabudowy" oraz „Przeznaczenie w planie" z listy „Do weryfikacji" (podnosi pewność).
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>
