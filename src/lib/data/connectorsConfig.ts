@@ -130,7 +130,21 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
     // konektor przelicza na zł przez `wynagrodzenieKrajoweMies`.
     // Potwierdzone diagnostyką /api/diag-gus?vars=… (poziom gminy, „· ogółem"):
     //   zameldowania (napływ) = 80121 [osoba]; wymeldowania (odpływ) = 80123 [osoba].
-    zmienneId: { podmiotyNa10k: "60530", saldoMigracji: "1365234", wynagrodzenie: "64429", zameldowania: "80121", wymeldowania: "80123" },
+    // Panel dynamiki (diagnostykaDynamiki, Katowice):
+    //   mieszkania oddane suma roczna „styczeń-grudzień · … · ogółem" = 217317;
+    //   dochody własne (poziom 6, uniwersalny „gminy łącznie z m. na pr. powiatu") = 76976
+    //     → konektor przelicza na 1 mieszkańca przez szereg ludności;
+    //   bezrobotni „zarejestrowani ogółem − suma stanów miesięcznych" = 1702030.
+    zmienneId: {
+      podmiotyNa10k: "60530",
+      saldoMigracji: "1365234",
+      wynagrodzenie: "64429",
+      zameldowania: "80121",
+      wymeldowania: "80123",
+      mieszkaniaOddane: "217317",
+      dochodyWlasne: "76976",
+      bezrobotniLiczba: "1702030",
+    },
     medianaWiekAktywniPct: 25,
     rokBazowyTrend: 2015,
     // „grudzień" i „czerwiec" stopy bezrobocia rejestrowanego (poziom powiatu).

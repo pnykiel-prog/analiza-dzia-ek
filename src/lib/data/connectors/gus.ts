@@ -186,11 +186,22 @@ async function pobierzDynamike(unitId: string): Promise<DynamikaGminy | null> {
     const ids = [idLudnosc, idPodmioty, idMieszkania, idDochody, idBezrobotni].filter(Boolean) as string[];
     const m = await szeregiWielu(unitId, ids, lata);
     const wez = (id: string | null): PunktSzeregu[] | null => (id ? m.get(id) ?? null : null);
+    const ludnosc = wez(idLudnosc);
+    // Dochody własne BDL to KWOTA CAŁKOWITA gminy (zł). Przeliczamy na 1 mieszkańca
+    // (total ÷ ludność wg zgodnego roku), bo wartość bezwzględna zależy od wielkości
+    // gminy i uniemożliwia porównanie trendu. Brak ludności dla roku → punkt null (luka).
+    const dochodyTotal = wez(idDochody);
+    const dochodyWlasne = dochodyTotal
+      ? dochodyTotal.map((p) => {
+          const lud = ludnosc?.find((x) => x.rok === p.rok)?.wartosc;
+          return { rok: p.rok, wartosc: p.wartosc != null && lud ? Math.round(p.wartosc / lud) : null };
+        })
+      : null;
     const dyn: DynamikaGminy = {
-      ludnosc: wez(idLudnosc),
+      ludnosc,
       mieszkaniaOddane: wez(idMieszkania),
       podmioty: wez(idPodmioty),
-      dochodyWlasne: wez(idDochody),
+      dochodyWlasne,
       bezrobotni: wez(idBezrobotni),
     };
     // Panel ma sens tylko z kotwicą (ludność) lub jakimkolwiek szeregiem.
