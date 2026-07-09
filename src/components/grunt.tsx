@@ -172,6 +172,7 @@ export function BanerPoziomu({
   eyebrow,
   tytul,
   opis,
+  kontekst,
   krokAktywny,
   maxOsiagniety,
   onKrok,
@@ -181,6 +182,7 @@ export function BanerPoziomu({
   eyebrow: string;
   tytul: string;
   opis?: string;
+  kontekst?: React.ReactNode;
   krokAktywny?: number;
   maxOsiagniety?: number;
   onKrok?: (nr: number) => void;
@@ -240,6 +242,9 @@ export function BanerPoziomu({
             <div className="text-[12px] font-semibold uppercase mb-2" style={{ letterSpacing: ".12em", color: "#6FE3C4" }}>{eyebrow}</div>
             <h1 className="text-white font-semibold m-0" style={{ fontSize: 30, letterSpacing: "-.015em" }}>{tytul}</h1>
             {opis && <p className="m-0 mt-2 text-[14px] leading-relaxed max-w-xl" style={{ color: "#AFC0D6" }}>{opis}</p>}
+            {kontekst && (
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px]" style={{ color: "#8FA3BE" }}>{kontekst}</div>
+            )}
           </div>
           {badge && <BadgeSzklany {...badge} />}
         </div>
