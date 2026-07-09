@@ -827,18 +827,13 @@ function EkranM1({ p1, onDalej, onKoniec }: { p1: WynikPoziom1; onDalej: () => v
     );
   }
 
+  // Punkt decyzyjny opłacalności = MODAL (osobne okno) nad modelem zabudowy; zatrzymuje
+  // przed pełną analizą i pyta „analizować dalej?". Bez stałej etykiety/noty w widoku.
   if (pytanie) {
     return (
       <div className="space-y-4">
         <KartaFormy bramka={br} />
-        <BannerBramki
-          tytul={br.konfliktProgow ? "Punkt decyzyjny — kierunek zabudowy" : "Punkt decyzyjny — mniejsza skala inwestycji"}
-          opis={br.komunikat}
-          akcja={() => setSkalaOk(true)}
-          akcjaLabel="Tak, analizuj dalej"
-          secondary={onKoniec}
-          secondaryLabel="Zakończ"
-        />
+        <ModalOplacalnosc bramka={br} onTak={() => setSkalaOk(true)} onKoniec={onKoniec} />
       </div>
     );
   }
@@ -846,9 +841,6 @@ function EkranM1({ p1, onDalej, onKoniec }: { p1: WynikPoziom1; onDalej: () => v
   return (
     <div className="space-y-4">
       <KartaFormy bramka={br} />
-      {br.ponizejProguOplacalnosci && br.notaSkali && (
-        <p className="text-[11px] text-grunt-text-muted2 bg-grunt-surface-3 border border-grunt-border rounded px-3 py-1.5">ℹ {br.notaSkali}</p>
-      )}
       <Poziom1View p1={p1} pelny pokazRekomendacje={false} />
       <BannerBramki
         tytul="Poziom 1 zaliczony — przejdź do oceny działki"
@@ -877,16 +869,17 @@ function KartaFormy({ bramka }: { bramka: BramkaWielkosci }) {
   return (
     <Karta tytul="Model zabudowy — orientacyjna skala" podtytul="Dwie formy liczone tym samym łańcuchem; rekomendowana daje najwięcej lokali">
       <div className="grid sm:grid-cols-2 gap-3">
-        <FormaBox etykieta="Zabudowa niska (do 2 kond.)" f={bramka.niska} prog={20} rekomendowana={bramka.formaRekomendowana === "niska"} />
-        <FormaBox etykieta="Zabudowa wysoka (powyżej 2 kond.)" f={bramka.wysoka} prog={40} rekomendowana={bramka.formaRekomendowana === "wysoka"} />
+        <FormaBox etykieta="Zabudowa niska (do 2 kond.)" f={bramka.niska} rekomendowana={bramka.formaRekomendowana === "niska"} />
+        <FormaBox etykieta="Zabudowa wysoka (powyżej 2 kond.)" f={bramka.wysoka} rekomendowana={bramka.formaRekomendowana === "wysoka"} />
       </div>
       <p className="text-[11px] text-grunt-text-faint2 mt-2">Skala orientacyjna z kształtu działki i zabudowy sąsiedztwa — nie zastępuje ustaleń MPZP/WZ (potwierdzenie na Poziomie 2).</p>
     </Karta>
   );
 }
 
-function FormaBox({ etykieta, f, prog, rekomendowana }: { etykieta: string; f: PojemnoscForma; prog: number; rekomendowana: boolean }) {
-  const wProgu = f.lokali >= prog;
+// Etykieta „w progu opłacalności" USUNIĘTA ze stałego widoku — próg opłacalności
+// ujawnia się WYŁĄCZNIE jako modal (osobne okno), gdy skala < próg (wytyczne §2.2/§5).
+function FormaBox({ etykieta, f, rekomendowana }: { etykieta: string; f: PojemnoscForma; rekomendowana: boolean }) {
   return (
     <div className={`rounded-card border p-3 ${rekomendowana ? "border-grunt-ink shadow-raised" : "border-grunt-border"}`}>
       <div className="flex items-center justify-between gap-2">
@@ -898,15 +891,30 @@ function FormaBox({ etykieta, f, prog, rekomendowana }: { etykieta: string; f: P
         <span className="text-[12px] text-grunt-text-faint2 mb-0.5">lokali</span>
       </div>
       <div className="text-[11px] text-grunt-text-muted2 mt-1">{f.kondygnacje} kond. · PUM ~{liczba(f.pumM2, " m²")}</div>
-      {/* Ocenę progu opłacalności pokazujemy TYLKO przy rekomendowanej formie — to ona
-          decyduje o wyniku; przy alternatywnej dajemy neutralny opis (bez „poniżej progu"). */}
-      {rekomendowana ? (
-        <div className={`text-[11px] mt-1 ${wProgu ? "text-grunt-green" : "text-grunt-amber-text"}`}>
-          {wProgu ? `w progu opłacalności (≥${prog})` : `poniżej progu opłacalności (${prog})`}
+      {!rekomendowana && <div className="text-[11px] mt-1 text-grunt-text-faint2">forma alternatywna</div>}
+    </div>
+  );
+}
+
+// Modal (osobne okno) punktu decyzyjnego opłacalności — pojawia się RAZ, gdy skala
+// < próg. Obserwacja z zaproszeniem, nie wyrok. Po „Tak" analiza toczy się dalej.
+function ModalOplacalnosc({ bramka, onTak, onKoniec }: { bramka: BramkaWielkosci; onTak: () => void; onKoniec: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center p-4 bg-black/40" role="dialog" aria-modal="true">
+      <div className="w-full max-w-md rounded-panel bg-grunt-surface shadow-sheet border border-grunt-border p-5">
+        <div className="text-[14px] font-semibold text-grunt-text mb-1">
+          {bramka.konfliktProgow ? "Kierunek zabudowy — Twoja decyzja" : "Zwróć uwagę na skalę"}
         </div>
-      ) : (
-        <div className="text-[11px] mt-1 text-grunt-text-faint2">forma alternatywna</div>
-      )}
+        <p className="text-[13px] text-grunt-text-muted leading-relaxed">{bramka.komunikat}</p>
+        <div className="flex flex-wrap gap-2 justify-end mt-5">
+          <button onClick={onKoniec} className="px-3.5 py-2 rounded-md text-[13px] border border-grunt-border text-grunt-text-muted hover:bg-grunt-surface-3">
+            Zakończ
+          </button>
+          <button onClick={onTak} className="px-3.5 py-2 rounded-md text-[13px] bg-grunt-ink text-white font-medium hover:opacity-90">
+            Tak, analizuj dalej
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
