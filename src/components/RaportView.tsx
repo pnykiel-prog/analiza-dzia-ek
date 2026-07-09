@@ -87,20 +87,29 @@ export function RaportView({
         );
       })()}
 
-      {/* 02 Poziom potrzeby (Poziom 1) — portret popytowy gminy: poziom słowny z
-          proporcji kohortowej. BEZ pojemności/liczby mieszkań — to wyznacza Poziom 2. */}
+      {/* 02 Popyt — portret w liczbach (Poziom 1): lejek populacja → kohorty →
+          kwalifikujący per segment. BEZ oceny słownej — wystarczalność wobec liczby
+          planowanych mieszkań (werdykt) wyznacza Poziom 2. */}
       {(() => {
-        const wm = p1.ocenaPopytu.werdykty.spolecznyMlodzi;
-        const ws = p1.ocenaPopytu.werdykty.spolecznySeniorzy;
-        const opis = (w: typeof wm) =>
-          w.nieoznaczony ? "nieoznaczona" : `${w.poziom ?? "—"}${w.proporcjaKohortowaPct != null ? ` · ${w.proporcjaKohortowaPct}% kohorty` : ""}`;
+        const kw = p1.ocenaPopytu.kwalifikacje;
+        const werd = p1.ocenaPopytu.werdykty;
+        const nlub = (n: number | null | undefined) => (n == null ? "nieoznaczona" : liczba(n));
+        const wiersz = (etyk: string, nGrupa: number | null, kom: typeof werd.komunalnyMlodzi, spo: typeof werd.spolecznyMlodzi) => (
+          <div className="grid grid-cols-3 gap-2 py-1.5 border-b border-grunt-divider-row last:border-0">
+            <div className="text-grunt-text-muted2">{etyk} <span className="text-grunt-text-faint">· kohorta {nlub(nGrupa)}</span></div>
+            <div className="text-grunt-text-muted2">Komunalny: <span className="mono text-grunt-text font-medium">{kom.nieoznaczony ? "nieoznaczona" : `${nlub(kom.liczbaKwalifikujacych)} os.`}</span></div>
+            <div className="text-grunt-text-muted2">Społeczny: <span className="mono text-grunt-text font-medium">{spo.nieoznaczony ? "nieoznaczona" : `${nlub(spo.liczbaKwalifikujacych)} gosp.`}</span></div>
+          </div>
+        );
         return (
-          <SekcjaRap numer="02" tytul="Poziom potrzeby — portret popytowy gminy (Poziom 1)">
+          <SekcjaRap numer="02" tytul="Popyt — portret w liczbach (Poziom 1)">
             <div className="text-[12px]">
-              <div className="text-[10px] uppercase tracking-wide text-grunt-text-faint mb-1">Poziom potrzeby społecznej (proporcja kohortowa)</div>
-              <div className="text-grunt-text-muted2">Aktywni: <span className="text-grunt-text font-medium capitalize">{opis(wm)}</span></div>
-              <div className="text-grunt-text-muted2">Seniorzy: <span className="text-grunt-text font-medium capitalize">{opis(ws)}</span></div>
-              <p className="mt-2 text-[10px] text-grunt-text-faint">Wystarczalność wobec planowanej liczby mieszkań (pojemność) — Poziom 2.</p>
+              {dane.liczbaMieszkancowGminy != null && (
+                <div className="text-grunt-text-muted2 mb-1.5">Populacja gminy: <span className="mono text-grunt-text font-medium">{liczba(dane.liczbaMieszkancowGminy)} os.</span></div>
+              )}
+              {wiersz("Aktywni (20–64)", kw.mlodzi.nGrupa, werd.komunalnyMlodzi, werd.spolecznyMlodzi)}
+              {wiersz("Seniorzy (65+)", kw.seniorzy.nGrupa, werd.komunalnySeniorzy, werd.spolecznySeniorzy)}
+              <p className="mt-2 text-[10px] text-grunt-text-faint">Liczby-fakty (bez oceny). Wystarczalność wobec planowanej liczby mieszkań — Poziom 2.</p>
             </div>
           </SekcjaRap>
         );
