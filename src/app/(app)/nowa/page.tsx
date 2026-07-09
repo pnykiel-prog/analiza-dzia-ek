@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import type { BramkaWielkosci, DaneDzialki, PojemnoscForma, WynikAnalizy, WynikPoziom1, KluczWerdyktu } from "@/lib/types";
+import type { BramkaWielkosci, DaneDzialki, PojemnoscForma, WynikAnalizy, WynikPoziom1 } from "@/lib/types";
 import type { ProfilFinansowy } from "@/lib/finanse/typy";
 import { domyslnaKonfiguracja, KONFIG_M2, KONFIG_FINANSE, type Konfiguracja } from "@/lib/config";
 import { WOJEWODZTWA } from "@/lib/wojewodztwa";
@@ -19,20 +19,8 @@ import { Stepper, BannerBramki, BanerPoziomu } from "@/components/grunt";
 import { SYMBOLE_MPZP, statusZeSymbolu } from "@/lib/mpzp";
 import { PodgladTerenu, type TrybMapy, type WarstwyMapy } from "@/components/GruntMap";
 import { RaportView } from "@/components/RaportView";
-import { liczba, statusSlowny } from "@/lib/format";
+import { liczba } from "@/lib/format";
 import { zapiszWynik } from "@/lib/archiwum";
-
-const ETYK_WERDYKT_KIER: Record<KluczWerdyktu, string> = {
-  spolecznyMlodzi: "Społeczny — młodzi",
-  spolecznySeniorzy: "Społeczny — seniorzy",
-  komunalnyMlodzi: "Komunalny — młodzi",
-  komunalnySeniorzy: "Komunalny — seniorzy",
-};
-const KOLOR_WERD: Record<string, string> = {
-  zielony: "text-grunt-green",
-  zolty: "text-grunt-amber",
-  czerwony: "text-grunt-red",
-};
 
 interface MetaRozw {
   pozycje: { id: string; znaleziona: boolean; znanyTeryt: boolean; zrodlo: "demo" | "uldk" | "brak" }[];
@@ -369,13 +357,13 @@ export default function NowaAnalizaPage() {
   const pewnP1 = wynik?.poziom1?.pewnosc ?? 100;
   const BANER: Partial<Record<Ekran, { eyebrow: string; tytul: string; opis?: string; badge?: { ton: "sukces" | "ostrzezenie" | "blad" | "info"; tytul: string; opis?: string } }>> = {
     poziom1: {
-      eyebrow: "Poziom 1 · Szybki przesiew",
-      tytul: "Wynik wstępnej oceny terenu",
-      opis: pewnP1 < 100 ? "Analiza na dostępnych rejestrach publicznych — część danych niepotwierdzona, pewność odpowiednio obniżona." : "Wstępny przesiew terenu na podstawie rejestrów publicznych.",
+      eyebrow: "Poziom 1 · Portret w liczbach",
+      tytul: "Dane o gminie i działce",
+      opis: pewnP1 < 100 ? "Portret w liczbach z rejestrów publicznych — bez oceny. Część danych niepotwierdzona, pewność odpowiednio obniżona." : "Portret w liczbach z rejestrów publicznych — bez oceny. Werdykt przydatności liczy Poziom 2.",
       badge: pewnP1 < 100 ? { ton: "ostrzezenie", tytul: "Wynik częściowy", opis: "pewność obniżona" } : { ton: "sukces", tytul: "Komplet danych", opis: "pełna pewność" },
     },
     uzupelnianie: { eyebrow: "Poziom 2 · Uzupełnienie danych", tytul: "Uzupełnij dane do analizy", opis: "Auto pobiera, co się da; podaj to, co znasz — albo pomiń i przejdź do oceny." },
-    poziom2: { eyebrow: "Poziom 2 · Ocena przydatności", tytul: "Ocena działki pod budownictwo społeczne", opis: "Popyt realizowalny, przydatność ekonomiczna i bramki — werdykt per profil." },
+    poziom2: { eyebrow: "Poziom 2 · Pełna ocena", tytul: "Pełna ocena działki pod budownictwo społeczne", opis: "Tu powstaje werdykt przydatności: popyt jako wystarczalność wobec liczby mieszkań, przydatność ekonomiczna i bramki." },
     ankieta: { eyebrow: "Poziom 3 · Ankieta finansowa", tytul: "Profil finansowy inwestycji", opis: "Kto buduje, w jakim reżimie i z jakim wkładem — parametry montażu." },
     poziom3: { eyebrow: "Poziom 3 · Model finansowy", tytul: "Model finansowy SIM", opis: "Montaż, oś czasu i domknięcie (DSCR) dla wybranego reżimu." },
     raport: { eyebrow: "Raport · Studium", tytul: "Studium potencjału inwestycyjnego", opis: "Podsumowanie poziomów 1–3 — gotowe do druku." },
@@ -516,6 +504,7 @@ export default function NowaAnalizaPage() {
             <EkranM1
               key={wynik.poziom1.dzialkaId}
               p1={wynik.poziom1}
+              populacja={dane?.liczbaMieszkancowGminy ?? null}
               onDalej={wejdzP2}
               onKoniec={() => { setWynik(null); setEkran("wejscie"); setMaxKrok(1); }}
             />
@@ -844,7 +833,7 @@ function PunktWejscia({ ikona, tytul, opis }: { ikona: "check" | "dot" | "sigma"
 //  • nieprzydatna/scalenie → sam komunikat (bez werdyktów, bez przejścia do M2);
 //  • niższa opłacalność/konflikt → punkt decyzyjny (obserwacja + „analizować dalej?");
 //  • ok → model zabudowy + werdykty + przejście do M2.
-function EkranM1({ p1, onDalej, onKoniec }: { p1: WynikPoziom1; onDalej: () => void; onKoniec: () => void }) {
+function EkranM1({ p1, populacja, onDalej, onKoniec }: { p1: WynikPoziom1; populacja?: number | null; onDalej: () => void; onKoniec: () => void }) {
   const br = p1.bramkaWielkosci;
   const [skalaOk, setSkalaOk] = useState(false);
   const blokuje = br.wynik === "nieprzydatna" || br.wynik === "scalenie";
@@ -880,7 +869,7 @@ function EkranM1({ p1, onDalej, onKoniec }: { p1: WynikPoziom1; onDalej: () => v
 
   return (
     <div className="space-y-4">
-      <Poziom1View p1={p1} pelny pokazRekomendacje={false} />
+      <Poziom1View p1={p1} pelny populacja={populacja} />
       <BannerBramki
         tytul="Poziom 1 zaliczony — przejdź do oceny działki"
         opis="Poziom 2 odsłania model zabudowy i warianty."
@@ -927,10 +916,8 @@ function ModalOplacalnosc({ bramka, onTak, onKoniec }: { bramka: BramkaWielkosci
   );
 }
 
-function PotwierdzenieDanych({ dane, meta, p1 }: { dane: DaneDzialki; meta: MetaRozw; p1?: WynikPoziom1 }) {
+function PotwierdzenieDanych({ dane, meta }: { dane: DaneDzialki; meta: MetaRozw; p1?: WynikPoziom1 }) {
   const trybMapy: TrybMapy = dane.powierzchniaM2 === 0 ? "notfound" : meta.przylegajace === false ? "nonadjacent" : "ok";
-  const ocena = p1?.ocenaPopytu;
-  const rek = ocena ? ocena.werdykty[ocena.rekomendowanyKierunek] : null;
   return (
     <div className="grid lg:grid-cols-2 gap-4 items-start">
     <Karta tytul="Teren inwestycji (A°, potwierdzenie wczytania)" podtytul="Scalona geometria z ULDK — dane automatyczne pobrane w tle">
@@ -941,16 +928,7 @@ function PotwierdzenieDanych({ dane, meta, p1 }: { dane: DaneDzialki; meta: Meta
         {dane.powierzchniaM2 > 0 && <span className="mono text-[12px] text-grunt-text-muted">{liczba(dane.powierzchniaM2, " m²")}</span>}
         {dane.gmina && <span className="text-[12px] text-grunt-text-muted">{dane.gmina}</span>}
       </div>
-      {/* Rekomendowany kierunek — ukryty, gdy bramka wielkości zatrzymuje działkę (bez werdyktów). */}
-      {rek && ocena && p1?.bramkaWielkosci?.fizycznieWykonalna !== false && (
-        <div className="flex items-center justify-between gap-3 mb-3 rounded-md border border-grunt-ink/15 bg-grunt-surface-3 px-3.5 py-2.5">
-          <div className="text-[13px] text-grunt-text-muted">
-            Rekomendowany kierunek: <strong className="text-grunt-text">{ETYK_WERDYKT_KIER[ocena.rekomendowanyKierunek]}</strong>
-            <span className={`ml-2 font-semibold ${KOLOR_WERD[rek.werdykt]}`}>{statusSlowny[rek.werdykt]} · {rek.score}/100</span>
-          </div>
-          <span className="text-[11px] text-grunt-text-faint2 whitespace-nowrap">pewność ogólna {ocena.pewnoscOgolna}%</span>
-        </div>
-      )}
+      {/* P1 = dane, BEZ werdyktu — rekomendacja kierunku/przydatność pojawiają się na Poziomie 2. */}
       <div className="flex flex-wrap gap-2 mb-3 text-xs">
         {meta.pozycje.map((p, i) => (
           <span key={i} className={`badge ${p.znaleziona ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
