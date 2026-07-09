@@ -11,7 +11,7 @@
  * Funkcje parsujące są czyste (testowane offline). Brak danych → status „brak".
  */
 
-import type { DaneDzialki } from "../../types";
+import type { DaneDzialki, DynamikaGminy, PunktSzeregu } from "../../types";
 import type { Konektor, Teren, WynikKonektora, MetaPola } from "./types";
 import { brakWyniku } from "./types";
 import { fetchJson } from "./net";
@@ -138,6 +138,66 @@ async function wartosciWielu(unitId: string, varIds: string[], rok: number = gus
     }
   }
   return map;
+}
+
+/**
+ * SZEREGI CZASOWE wielu zmiennych (panel dynamiki gminy). data/by-unit z wieloma
+ * `year` (ostatnie `lata` roczniki) → mapa id → [{rok, wartość|null}] posortowana
+ * rosnąco. Braki (attrId===0) jako null (luka w wykresie, NIE zero). Jedna paczka
+ * (≤12 zmiennych), bez pinowania jednego roku.
+ */
+async function szeregiWielu(unitId: string, varIds: string[], lata: number[]): Promise<Map<string, PunktSzeregu[]>> {
+  const map = new Map<string, PunktSzeregu[]>();
+  const ids = varIds.filter(Boolean);
+  if (ids.length === 0) return map;
+  const qs = new URLSearchParams({ format: "json" });
+  if (gus.clientId) qs.set("client-id", gus.clientId);
+  for (const r of lata) qs.append("year", String(r));
+  for (const id of ids.slice(0, 12)) qs.append("var-id", id);
+  const odp = await fetchJson<{ results?: { id?: string | number; values?: { year?: string | number; val?: number; attrId?: number }[] }[] }>(
+    `${gus.endpoint}/data/by-unit/${encodeURIComponent(unitId)}?${qs.toString()}`,
+    { ...KONFIG_KONEKTORY.siec, naglowki: naglowki() }
+  );
+  for (const r of odp?.results ?? []) {
+    const punkty: PunktSzeregu[] = (r.values ?? [])
+      .map((v) => ({ rok: Number(v.year), wartosc: v.attrId === 0 || typeof v.val !== "number" ? null : v.val }))
+      .filter((p) => Number.isFinite(p.rok))
+      .sort((a, b) => a.rok - b.rok);
+    if (punkty.length) map.set(String(r.id), punkty);
+  }
+  return map;
+}
+
+/**
+ * Panel dynamiki gminy — 5 szeregów rocznych (~10 lat), CZYSTY KONTEKST (nie zmienia
+ * popytu). Degradacja łagodna: brak szeregu → pole null (wykres znika), nigdy nie
+ * wywraca panelu. Jedna próba; wyjątek → cały panel null (ludność jest kotwicą UI).
+ */
+async function pobierzDynamike(unitId: string): Promise<DynamikaGminy | null> {
+  try {
+    const rokDo = gus.rok;
+    const lata = Array.from({ length: gus.dynamikaLata }, (_, i) => rokDo - (gus.dynamikaLata - 1) + i);
+    const idLudnosc = totalIdWieku();
+    const idPodmioty = gus.zmienneId.podmiotyNa10k ?? "60530";
+    const idMieszkania = await idZmiennejPoFrazie(gus.zapytania.mieszkaniaOddane);
+    const idDochody = await idZmiennejPoFrazie(gus.zapytania.dochodyWlasne);
+    const idBezrobotni = await idZmiennejPoFrazie(gus.zapytania.bezrobotniLiczba);
+    const ids = [idLudnosc, idPodmioty, idMieszkania, idDochody, idBezrobotni].filter(Boolean) as string[];
+    const m = await szeregiWielu(unitId, ids, lata);
+    const wez = (id: string | null): PunktSzeregu[] | null => (id ? m.get(id) ?? null : null);
+    const dyn: DynamikaGminy = {
+      ludnosc: wez(idLudnosc),
+      mieszkaniaOddane: wez(idMieszkania),
+      podmioty: wez(idPodmioty),
+      dochodyWlasne: wez(idDochody),
+      bezrobotni: wez(idBezrobotni),
+    };
+    // Panel ma sens tylko z kotwicą (ludność) lub jakimkolwiek szeregiem.
+    const cokolwiek = Object.values(dyn).some((s) => s && s.length > 0);
+    return cokolwiek ? dyn : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -450,6 +510,14 @@ export const konektorGUS: Konektor = {
           dodaj("dochodPrzecietnyGmina", zl * gus.dochodMnoznikWynagrodzenie, 68);
         }
       }
+    }
+
+    // Panel dynamiki gminy — szeregi ~10 lat (czysty kontekst; degradacja łagodna,
+    // wyjątek → null, nie wywraca reszty wyniku). Nie liczy się do `dane` progu poniżej.
+    const dynamika = await pobierzDynamike(jednostka.id);
+    if (dynamika) {
+      dane.dynamikaGminy = dynamika;
+      meta.push({ pole: "dynamikaGminy", zrodlo: this.zrodlo, czas, pewnosc: 80, status: "ok", tryb: "A" });
     }
 
     if (Object.keys(dane).length === 0) {

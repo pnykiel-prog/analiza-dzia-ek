@@ -34,7 +34,15 @@ export interface KonfiguracjaKonektorow {
       gospodarstwaOgolem: string;
       /** NSP 2021 — gospodarstwa zajmujące mieszkanie na zasadzie WŁASNOŚCI (licznik). */
       gospodarstwaWlasnosc: string;
+      /** Panel dynamiki gminy — mieszkania oddane do użytkowania / rok. */
+      mieszkaniaOddane: string;
+      /** Panel dynamiki gminy — dochody własne gminy na 1 mieszkańca [zł]. */
+      dochodyWlasne: string;
+      /** Panel dynamiki gminy — liczba bezrobotnych zarejestrowanych. */
+      bezrobotniLiczba: string;
     };
+    /** Panel dynamiki gminy — liczba lat wstecz w szeregach czasowych. */
+    dynamikaLata: number;
     /** Rok spisu (NSP) — dane o tytule prawnym do mieszkania (per gmina). */
     nspRok: number;
     /** Mnożnik: przeciętne wynagrodzenie brutto (powiat) → proxy dochodu gosp. dom. [zł/mc]. */
@@ -106,7 +114,11 @@ export const KONFIG_KONEKTORY: KonfiguracjaKonektorow = {
       wymeldowania: "wymeldowania w ruchu wewnętrznym",
       gospodarstwaOgolem: "gospodarstwa domowe według tytułu prawnego do zajmowanego mieszkania ogółem",
       gospodarstwaWlasnosc: "gospodarstwa domowe według tytułu prawnego do zajmowanego mieszkania własność",
+      mieszkaniaOddane: "mieszkania oddane do użytkowania ogółem",
+      dochodyWlasne: "dochody własne na 1 mieszkańca",
+      bezrobotniLiczba: "bezrobotni zarejestrowani ogółem",
     },
+    dynamikaLata: 10,
     nspRok: 2021,
     dochodMnoznikWynagrodzenie: 1.0,
     wynagrodzenieKrajoweMies: 7155,
