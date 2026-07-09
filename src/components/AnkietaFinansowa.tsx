@@ -165,7 +165,7 @@ export function AnkietaFinansowa({
         <div className="grid sm:grid-cols-2 gap-3">
           <PoleLiczbowe label={etykietaDzialki} value={wartoscDzialki} onChange={setWartoscDzialki} sufiks="zł" />
         </div>
-        <p className="text-[11px] text-grunt-text-faint2 -mt-2">
+        <p className="text-[12px] text-grunt-text-faint2 -mt-2">
           Partycypacja najemców i wkład domykający są liczone automatycznie (partycypacja przysługuje tylko przy zasobie społecznym czynszowym).
         </p>
 
@@ -213,7 +213,7 @@ export function AnkietaFinansowa({
           )}
           <ProfilRow k="Pozwolenie na budowę" v={pozwolenieNaBudowe ? "Tak" : "Nie"} />
         </dl>
-        <p className="text-[11px] text-grunt-text-faint2 mt-3">Montaż finansowy pokaże się po zatwierdzeniu profilu.</p>
+        <p className="text-[12px] text-grunt-text-faint2 mt-3">Montaż finansowy pokaże się po zatwierdzeniu profilu.</p>
       </Karta>
     </div>
     </div>
@@ -223,7 +223,7 @@ export function AnkietaFinansowa({
 function ProfilRow({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-2">
-      <dt className="text-[11px] text-grunt-text-muted2 shrink-0">{k}</dt>
+      <dt className="text-[12.5px] text-grunt-text-muted2 shrink-0">{k}</dt>
       <dd className={`text-[12.5px] font-medium text-grunt-text text-right ${mono ? "mono" : ""}`}>{v}</dd>
     </div>
   );
@@ -232,9 +232,10 @@ function ProfilRow({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
 function Grupa({ label, podpis, children }: { label: string; podpis?: string; children: React.ReactNode }) {
   return (
     <div>
-      <span className="text-[11px] font-medium text-grunt-text-muted2">{label}</span>
+      {/* Etykieta interaktywna — min 13px (normalizacja §1). */}
+      <span className="text-[13px] font-medium text-grunt-text-muted2">{label}</span>
       <div className="flex flex-wrap gap-2 mt-1.5">{children}</div>
-      {podpis && <span className="text-[10px] text-grunt-text-faint2 mt-1 block">{podpis}</span>}
+      {podpis && <span className="text-[12px] text-grunt-text-faint2 mt-1 block">{podpis}</span>}
     </div>
   );
 }
@@ -242,10 +243,10 @@ function Grupa({ label, podpis, children }: { label: string; podpis?: string; ch
 function PoleLiczbowe({ label, value, onChange, sufiks }: { label: string; value: string; onChange: (v: string) => void; sufiks?: string }) {
   return (
     <label className="text-sm block">
-      <span className="text-[11px] font-medium text-grunt-text-muted2">{label}</span>
+      <span className="text-[13px] font-medium text-grunt-text-muted2">{label}</span>
       <div className="relative mt-1">
         <input type="number" inputMode="numeric" value={value} onChange={(e) => onChange(e.target.value)} className="inp mono" placeholder="—" />
-        {sufiks && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-grunt-text-faint2 pointer-events-none">{sufiks}</span>}
+        {sufiks && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-grunt-text-faint2 pointer-events-none">{sufiks}</span>}
       </div>
     </label>
   );
