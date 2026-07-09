@@ -180,7 +180,7 @@ async function pobierzDynamike(unitId: string): Promise<DynamikaGminy | null> {
     const idLudnosc = totalIdWieku();
     const idPodmioty = gus.zmienneId.podmiotyNa10k ?? "60530";
     // Potwierdzone ID mają pierwszeństwo; inaczej dobór odporny (poziom gminy + jednostka).
-    const idMieszkania = gus.zmienneId.mieszkaniaOddane ?? (await idDynamiki(gus.zapytania.mieszkaniaOddane, "mieszkanie"));
+    const idMieszkania = gus.zmienneId.mieszkaniaOddane ?? (await idDynamiki(gus.zapytania.mieszkaniaOddane)); // jedn. „-"
     const idDochody = gus.zmienneId.dochodyWlasne ?? (await idDynamiki(gus.zapytania.dochodyWlasne, "zł"));
     const idBezrobotni = gus.zmienneId.bezrobotniLiczba ?? (await idDynamiki(gus.zapytania.bezrobotniLiczba, "osoba"));
     const ids = [idLudnosc, idPodmioty, idMieszkania, idDochody, idBezrobotni].filter(Boolean) as string[];
@@ -321,7 +321,7 @@ const cacheIdFraza = new Map<string, string | null>();
 async function idZmiennejPoFrazie(fraza: string): Promise<string | null> {
   if (!fraza) return null;
   if (cacheIdFraza.has(fraza)) return cacheIdFraza.get(fraza)!;
-  const odp = await fetchJson(url("variables/search", { name: fraza, "page-size": "30" }), {
+  const odp = await fetchJson(url("variables/search", { name: fraza, "page-size": "100" }), {
     ...KONFIG_KONEKTORY.siec,
     naglowki: naglowki(),
   });
@@ -341,20 +341,24 @@ async function idDynamiki(fraza: string, jednostkaZawiera?: string): Promise<str
   const klucz = `${fraza}::${jednostkaZawiera ?? ""}`;
   if (cacheIdDynamiki.has(klucz)) return cacheIdDynamiki.get(klucz)!;
   const odp = await fetchJson<{ results?: { id?: number | string; n1?: string; n2?: string; n3?: string; level?: number | string; measureUnitName?: string }[] }>(
-    url("variables/search", { name: fraza, "page-size": "50" }),
+    url("variables/search", { name: fraza, "page-size": "100" }),
     { ...KONFIG_KONEKTORY.siec, naglowki: naglowki() }
   );
   const wyniki = odp?.results ?? [];
-  const naGminie = wyniki.filter((r) => Number(r.level) === gus.poziomGmina);
-  const pula = naGminie.length ? naGminie : wyniki;
-  const nazwa = (r: (typeof pula)[number]) => [r.n1, r.n2, r.n3].filter(Boolean).join(" ").toLowerCase();
-  const pasujeJedn = (r: (typeof pula)[number]) =>
+  const nazwa = (r: (typeof wyniki)[number]) => [r.n1, r.n2, r.n3].filter(Boolean).join(" ").toLowerCase();
+  const pasujeJedn = (r: (typeof wyniki)[number]) =>
     !jednostkaZawiera || (r.measureUnitName ?? "").toLowerCase().includes(jednostkaZawiera.toLowerCase());
-  const kandydaci = pula.filter(pasujeJedn);
-  const zbior = kandydaci.length ? kandydaci : pula;
-  // Preferuj „ogółem" (total), a przy braku — najkrótszą nazwę (najmniej przekrojów).
+  // Odrzuć przekroje miesięczne/wskaźnikowe — chcemy ROCZNĄ sumę (lub roczny wskaźnik).
+  const MIESIACE = /(stycze|lut|marz|kwiec|maj|czerw|lip|sierp|wrze|paździe|listopad|grud)/;
+  const OKRESY = /(styczeń-|-luty|-marzec|-kwiecień|-maj|-czerwiec|-lipiec|-sierpień|-wrzesień|-październik|-listopad)/;
+  const roczne = wyniki.filter((r) => !MIESIACE.test(nazwa(r)) || nazwa(r).includes("styczeń-grudzień"));
+  const zbiorBaza = roczne.length ? roczne : wyniki;
+  const kandydaci = zbiorBaza.filter(pasujeJedn);
+  const zbior = kandydaci.length ? kandydaci : zbiorBaza;
+  // Preferuj „ogółem"/roczne, a przy braku — najkrótszą nazwę (najmniej przekrojów).
   const wybrany =
-    zbior.find((r) => nazwa(r).includes("ogółem")) ??
+    zbior.find((r) => nazwa(r).includes("styczeń-grudzień") && nazwa(r).includes("ogółem")) ??
+    zbior.find((r) => nazwa(r).includes("ogółem") && !OKRESY.test(nazwa(r))) ??
     [...zbior].sort((a, b) => nazwa(a).length - nazwa(b).length)[0];
   const id = wybrany?.id != null ? String(wybrany.id) : null;
   cacheIdDynamiki.set(klucz, id);
@@ -364,7 +368,7 @@ async function idDynamiki(fraza: string, jednostkaZawiera?: string): Promise<str
 /** Diagnostyka: wyszukiwanie zmiennych BDL po frazie (id, nazwa, jednostka, poziom). */
 export async function diagZmienne(fraza: string): Promise<unknown> {
   const odp = await fetchJson<{ results?: Record<string, unknown>[] }>(
-    url("variables/search", { name: fraza, "page-size": "30" }),
+    url("variables/search", { name: fraza, "page-size": "100" }),
     { ...KONFIG_KONEKTORY.siec, naglowki: naglowki() }
   );
   return (odp?.results ?? []).map((r) => ({
