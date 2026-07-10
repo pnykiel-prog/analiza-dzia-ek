@@ -76,10 +76,14 @@ test("montaż: SIM gminny społ. czynszowy (current) — grant BSK 20–35%, kre
   assert.ok(a.ostrzezenia.some((o) => o.includes("Grant nie finansuje nabycia gruntu")));
 });
 
-test("montaż: SIM prywatny społ. czynszowy — reżim odwraca dostęp do grantu (current trudny → future bezpośredni)", () => {
+test("montaż: SIM prywatny społ. czynszowy — umowa z gminą odblokowuje dotację; future bezpośredni", () => {
   const teraz = zlozMontaz(profil({ typInwestora: "SIM_PRYWATNY", rezim: "current", wspolpracaGmina: "UMOWA_PARTNERSKA" }));
+  const bezUmowy = zlozMontaz(profil({ typInwestora: "SIM_PRYWATNY", rezim: "current", wspolpracaGmina: "BRAK" }));
   const przyszly = zlozMontaz(profil({ typInwestora: "SIM_PRYWATNY", rezim: "future", dataWniosku: "2030-01-01" }));
-  assert.ok(teraz.ostrzezenia.some((o) => o.includes("trudno dostępny")));
+  // Umowa partycypacyjna z gminą → dotacja przez gminę (odblokowana), nie „trudno dostępna".
+  assert.ok(teraz.ostrzezenia.some((o) => o.includes("przez gminę")));
+  // Bez umowy z gminą prywatny SIM zostaje przy niższym/utrudnionym dostępie do dotacji.
+  assert.ok(bezUmowy.ostrzezenia.some((o) => /niedostępny|trudno/i.test(o)));
   // Przyszły reżim: kredyt 50 lat, stała stopa, flagi tbc.
   assert.equal(przyszly.kredyt!.okresLat, 50);
   assert.equal(przyszly.kredyt!.typStopy, "stałe");

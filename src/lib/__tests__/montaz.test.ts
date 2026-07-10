@@ -46,6 +46,46 @@ test("montaż: społeczny czynszowy → grant niski (~20–35%), partycypacja pr
   assert.ok(k.zrodla.partycypacjaNajemcow > 0, "partycypacja przysługuje przy społecznym czynszowym");
 });
 
+test("montaż: prywatny SIM + społ. czynszowy + umowa z gminą → grant 20% baza (nie 10%)", () => {
+  const k = zlozKolumne(
+    profil({ typInwestora: "SIM_PRYWATNY", typZasobu: "SPOLECZNY_CZYNSZOWY", wspolpracaGmina: "UMOWA_PARTNERSKA", efektywnoscEnergetyczna: false }),
+    "current",
+    wej()
+  );
+  assert.equal(Math.round(k.zalozenia.grantPct), 20, `dotacja przez gminę = baza 20%, jest ${k.zalozenia.grantPct}`);
+});
+
+test("montaż: prywatny SIM + społ. czynszowy + umowa + efektywność → grant do 35%", () => {
+  const k = zlozKolumne(
+    profil({ typInwestora: "SIM_PRYWATNY", typZasobu: "SPOLECZNY_CZYNSZOWY", wspolpracaGmina: "UMOWA_PARTNERSKA", efektywnoscEnergetyczna: true }),
+    "current",
+    wej()
+  );
+  assert.equal(Math.round(k.zalozenia.grantPct), 35, `warunki efektywności → 35%, jest ${k.zalozenia.grantPct}`);
+});
+
+test("montaż: prywatny SIM + społ. czynszowy BEZ umowy z gminą → niższy dostęp (< 20%)", () => {
+  const zUmowa = zlozKolumne(
+    profil({ typInwestora: "SIM_PRYWATNY", typZasobu: "SPOLECZNY_CZYNSZOWY", wspolpracaGmina: "UMOWA_PARTNERSKA" }),
+    "current",
+    wej()
+  );
+  const bezUmowy = zlozKolumne(
+    profil({ typInwestora: "SIM_PRYWATNY", typZasobu: "SPOLECZNY_CZYNSZOWY", wspolpracaGmina: "BRAK" }),
+    "current",
+    wej()
+  );
+  assert.ok(bezUmowy.zalozenia.grantPct < 20, `bez umowy zostaje przy niższym dostępie, jest ${bezUmowy.zalozenia.grantPct}`);
+  assert.ok(bezUmowy.zalozenia.grantPct < zUmowa.zalozenia.grantPct, "umowa z gminą podnosi stawkę");
+});
+
+test("montaż: reżim przyszły + społ. czynszowy → droga do 35% (efektywność podnosi z 20)", () => {
+  const bez = zlozKolumne(profil({ typZasobu: "SPOLECZNY_CZYNSZOWY", rezim: "future", efektywnoscEnergetyczna: false }), "future", wej());
+  const zEf = zlozKolumne(profil({ typZasobu: "SPOLECZNY_CZYNSZOWY", rezim: "future", efektywnoscEnergetyczna: true }), "future", wej());
+  assert.equal(Math.round(bez.zalozenia.grantPct), 20, `przyszły baza 20%, jest ${bez.zalozenia.grantPct}`);
+  assert.equal(Math.round(zEf.zalozenia.grantPct), 35, `przyszły z efektywnością → 35%, jest ${zEf.zalozenia.grantPct}`);
+});
+
 test("montaż: partycypacja auto = 0 dla komunalnego (nie przysługuje)", () => {
   const k = zlozKolumne(profil({ typZasobu: "KOMUNALNY" }), "current", wej());
   assert.equal(k.zrodla.partycypacjaNajemcow, 0);
