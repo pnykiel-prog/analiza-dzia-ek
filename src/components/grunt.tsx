@@ -191,19 +191,11 @@ export function BanerPoziomu({
   kroki?: KrokStepper[];
   badge?: BadgeStanuBaner;
 }) {
+  // PRZEZROCZYSTY na globalnym ciemnym shellu (wytyczne „Tło aplikacji"): nagłówek
+  // poziomu (stepper + eyebrow/H1/lead) leży bezpośrednio na granatowym tle aplikacji,
+  // bez własnego kafla — teksty jasne, eyebrow mięta. Tło (szkic) daje layout.
   return (
-    <div className="relative overflow-hidden" style={{ backgroundColor: "#16263F", backgroundImage: "radial-gradient(1000px 420px at 78% -40%,#264063 0%,#16263F 60%)" }}>
-      <MotywKataster />
-      <div
-        className="absolute inset-0"
-        style={{
-          opacity: 0.4,
-          backgroundImage: "linear-gradient(#ffffff08 1px,transparent 1px),linear-gradient(90deg,#ffffff08 1px,transparent 1px)",
-          backgroundSize: "44px 44px",
-          maskImage: "linear-gradient(90deg,transparent,#000 40%)",
-          WebkitMaskImage: "linear-gradient(90deg,transparent,#000 40%)",
-        }}
-      />
+    <div className="relative">
       <div className="relative mx-auto px-4 sm:px-6" style={{ maxWidth: "var(--grunt-page-max)", paddingTop: 24, paddingBottom: 30 }}>
         {krokAktywny != null && (
           <div className="flex items-center overflow-x-auto no-scrollbar mb-5">
