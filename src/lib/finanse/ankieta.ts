@@ -163,6 +163,32 @@ type ProfilFilter = Pick<ProfilFinansowy, "typZasobu" | "rezim">;
 /** Granty z gotowego montażu (funding_stacks). */
 function grantZeStacku(stack: Record<string, unknown>, profil: ProfilFinansowy): { z: Zakres; tbc: boolean; uwagi: string[] } {
   const grants = (stack.grants ?? {}) as Record<string, unknown>;
+
+  // ── REGUŁA DOTACYJNA: społeczny czynszowy → do 35% (baza 20%) ─────────────────
+  // Dotacja z Funduszu Dopłat dla społecznego czynszowego to BAZA 20%, do 35% przy
+  // partycypacji gminy / warunkach efektywności (BSK_GRANT.funding_percentage.spoleczny_czynszowy).
+  // Stosujemy pełną stawkę, gdy:
+  //  • reżim PRZYSZŁY (nowy grant bezpośredni ma drogę do 35% — inaczej „płaskie 20%" nigdy nie
+  //    dochodzi do 35%), LUB
+  //  • reżim OBECNY + prywatny SIM z UMOWĄ PARTYCYPACYJNĄ z gminą — beneficjentem dotacji jest
+  //    gmina, która przekazuje środki SIM-owi; umowa odblokowuje pełną stawkę (vs prywatne {0,0.20}).
+  // Warunek MAX (35%) = efektywność energetyczna / OZE / FEnIKS. Bez umowy z gminą prywatny SIM
+  // zostaje przy niższym dostępie {0, 0.20} (przechodzi do generycznego składania niżej).
+  const spolCzynszowy = profil.typZasobu === "SPOLECZNY_CZYNSZOWY";
+  const umowaPartycypacyjnaGminy = profil.wspolpracaGmina !== "BRAK";
+  const prywatnySim = profil.typInwestora === "SIM_PRYWATNY";
+  if (spolCzynszowy && (profil.rezim === "future" || (prywatnySim && umowaPartycypacyjnaGminy))) {
+    const bazaPct = 0.2;
+    const maxPct = 0.35;
+    const stawka = profil.efektywnoscEnergetyczna ? maxPct : bazaPct;
+    const uwagiReg: string[] = [];
+    if (profil.rezim === "current" && prywatnySim && umowaPartycypacyjnaGminy)
+      uwagiReg.push("Dotacja przez gminę (beneficjent): umowa partycypacyjna z gminą odblokowuje stawkę do 35% (baza 20%).");
+    if (!profil.efektywnoscEnergetyczna)
+      uwagiReg.push("Do 35% kosztów przy efektywności energetycznej / OZE / FEnIKS.");
+    return { z: { min: stawka, max: stawka }, tbc: profil.rezim === "future", uwagi: uwagiReg };
+  }
+
   let min = 0;
   let max = 0;
   let tbc = false;
