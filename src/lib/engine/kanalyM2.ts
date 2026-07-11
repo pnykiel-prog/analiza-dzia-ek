@@ -232,7 +232,15 @@ export function modyfikatorPopytuC(d: DaneDzialki, profil: Profil, cfg: Konfigur
     const ba = d.bliskoscAglomeracji;
     m *= ba.modyfikator[profil];
     const czolo = ba.miastaWPoblizu[0];
-    if (czolo) powody.push(`Bliskość aglomeracji: ${czolo.nazwa} ${czolo.odlegloscKm} km (${czolo.pierscien === 0 ? "rdzeń" : "pierścień " + czolo.pierscien}), sygnał ${ba.sygnal} → ×${ba.modyfikator[profil]}.`);
+    if (czolo) {
+      // Rdzeń (pierścień 0) = działka W aglomeracji, nie „X km dojazdu do niej" — inaczej
+      // parcela w centrum miasta czytana jest jak odległa o kilka km (mylące dla klienta).
+      powody.push(
+        czolo.pierscien === 0
+          ? `Działka w rdzeniu aglomeracji ${czolo.nazwa} (${czolo.odlegloscKm} km od centrum) — pełny sygnał lokalizacji ${ba.sygnal} → ×${ba.modyfikator[profil]}.`
+          : `Bliskość aglomeracji: ${czolo.nazwa} ${czolo.odlegloscKm} km (pierścień ${czolo.pierscien}), sygnał ${ba.sygnal} → ×${ba.modyfikator[profil]}.`
+      );
+    }
     else powody.push(`Poza zasięgiem dużych ośrodków (sygnał ${ba.sygnal}) — tłumi popyt${profil === "mlodzi" ? " młodych" : ""}.`);
   } else if (d.czasDojazdAglomeracjaMin != null) {
     // Fallback (gdy brak modelu): proxy czasu dojazdu.
