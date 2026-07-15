@@ -59,13 +59,25 @@
       const shape = (this.getAttribute('shape') || '').trim(); // realny kontur działki (punkty SVG)
 
       // Realna mapa: gdy mamy geometrię WGS84 i status pozwala pokazać działkę.
+      // `geo` obsługuje DWA formaty: pojedynczy pierścień [[lon,lat]…] (starsze/archiwum)
+      // oraz tablicę pierścieni [[[lon,lat]…], …] (wiele działek). Normalizujemy do listy pierścieni.
       if (mode !== 'notfound') {
-        let geoPts = null;
+        let rings = null;
         try {
           const arr = JSON.parse(this.getAttribute('geo') || 'null');
-          if (Array.isArray(arr) && arr.length >= 3) geoPts = arr;
-        } catch (e) { geoPts = null; }
-        if (geoPts) { this.renderMapa(geoPts); return; }
+          if (Array.isArray(arr) && arr.length) {
+            const first = arr[0];
+            if (Array.isArray(first) && typeof first[0] === 'number') {
+              // pojedynczy pierścień [[lon,lat]…]
+              if (arr.length >= 3) rings = [arr];
+            } else if (Array.isArray(first) && Array.isArray(first[0])) {
+              // tablica pierścieni [[[lon,lat]…], …]
+              const filtr = arr.filter((r) => Array.isArray(r) && r.length >= 3);
+              if (filtr.length) rings = filtr;
+            }
+          }
+        } catch (e) { rings = null; }
+        if (rings) { this.renderMapa(rings); return; }
       }
       this.zniszczMape(); // powrót do schematu — porządkujemy ewentualną mapę
 
@@ -210,11 +222,11 @@
     }
 
     /**
-     * Rysuje realny wielokąt działki na kaflowej mapie OpenStreetMap (Leaflet),
-     * dopasowując widok do granic działki. `pts` = [[lon,lat]…] (WGS84).
+     * Rysuje realne wielokąty działek na kaflowej mapie OpenStreetMap (Leaflet),
+     * dopasowując widok do granic WSZYSTKICH działek. `rings` = [[[lon,lat]…], …] (WGS84).
      */
-    renderMapa(pts) {
-      const key = JSON.stringify(pts);
+    renderMapa(rings) {
+      const key = JSON.stringify(rings);
       if (this.mapa && this.geoKey === key) return; // ta sama geometria — nie odtwarzamy
       this.zniszczMape();
       this.geoKey = key;
@@ -224,7 +236,6 @@
       ladujLeaflet()
         .then((L) => {
           if (this.geoKey !== key || !host || !host.isConnected) return; // zdezaktualizowane
-          const latlngs = pts.map((p) => [p[1], p[0]]); // Leaflet: [lat, lon]
           const map = L.map(host, {
             scrollWheelZoom: false, // nie przejmujemy scrolla strony
             zoomControl: true,
@@ -235,20 +246,25 @@
             maxZoom: 19,
             attribution: '© OpenStreetMap',
           }).addTo(map);
-          const poly = L.polygon(latlngs, {
-            color: '#16263F',
-            weight: 2.4,
-            fillColor: '#16263F',
-            fillOpacity: 0.14,
-            lineJoin: 'round',
-          }).addTo(map);
-          poly.bindTooltip('Teren inwestycji', {
-            permanent: true,
-            direction: 'top',
-            className: 'gm-tip',
-            opacity: 1,
+          // Każda działka = osobny wielokąt; grupa do dopasowania widoku do kompletu.
+          const grupa = L.featureGroup().addTo(map);
+          rings.forEach((ring, i) => {
+            const latlngs = ring.map((p) => [p[1], p[0]]); // Leaflet: [lat, lon]
+            const poly = L.polygon(latlngs, {
+              color: '#16263F',
+              weight: 2.4,
+              fillColor: '#16263F',
+              fillOpacity: 0.14,
+              lineJoin: 'round',
+            }).addTo(grupa);
+            poly.bindTooltip(rings.length > 1 ? 'Działka ' + (i + 1) : 'Teren inwestycji', {
+              permanent: true,
+              direction: 'top',
+              className: 'gm-tip',
+              opacity: 1,
+            });
           });
-          try { map.fitBounds(poly.getBounds(), { padding: [26, 26], maxZoom: 18 }); }
+          try { map.fitBounds(grupa.getBounds(), { padding: [26, 26], maxZoom: 18 }); }
           catch (e) {}
           // kontener bywa mierzony przed layoutem — wymuszamy przeliczenie rozmiaru
           setTimeout(() => { try { map.invalidateSize(); } catch (e) {} }, 60);

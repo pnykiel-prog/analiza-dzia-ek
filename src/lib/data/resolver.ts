@@ -298,8 +298,12 @@ export async function rozwiazDzialki(pozycje: PozycjaDzialki[]): Promise<Rozwiaz
   };
 
   const ksztaltSvg = wktZnalezione[0] ? konturSvg(wktZnalezione[0]) : null;
-  const geoPkt = wktZnalezione[0] ? konturGeo(wktZnalezione[0]) : null;
-  const ksztaltGeo = geoPkt && geoPkt.length >= 3 ? JSON.stringify(geoPkt) : null;
+  // WSZYSTKIE geometrie działek (nie tylko pierwsza) — tablica pierścieni [[ [lon,lat]… ], …],
+  // żeby mapa pokazała komplet wprowadzonych działek, a nie wyłącznie pierwszą.
+  const kontury = wktZnalezione
+    .map((w) => konturGeo(w))
+    .filter((g): g is [number, number][] => Array.isArray(g) && g.length >= 3);
+  const ksztaltGeo = kontury.length ? JSON.stringify(kontury) : null;
 
   return {
     dane,
