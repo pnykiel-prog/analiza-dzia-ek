@@ -172,6 +172,11 @@ function KolumnaRezimu({ k, etykietaWniesienia }: { k: KolumnaMontazu; etykietaW
         <div>
           <div className="text-[10px] uppercase tracking-wide text-grunt-text-faint mb-1">Źródła finansowania</div>
           <Pozycja label={`Grant / dotacja (${k.zalozenia.grantPct}%)`} kwota={k.zrodla.grant} razem={razem} />
+          {k.zalozenia.grantSufitPct != null && (
+            <div className="text-[10.5px] text-grunt-amber-text2 -mt-0.5 mb-1 pl-0.5">
+              ↑ do {k.zalozenia.grantSufitPct}% po zadeklarowaniu efektywności energetycznej / OZE (FEnIKS) w ankiecie
+            </div>
+          )}
           <Pozycja label="Kredyt (ze zdolności czynszowej)" kwota={k.zrodla.kredyt} razem={razem} />
           {k.zrodla.aport > 0 && <Pozycja label={`Aport działki (${etykietaWniesienia})`} kwota={k.zrodla.aport} razem={razem} />}
           {k.zrodla.partycypacjaNajemcow > 0 && <Pozycja label="Partycypacja najemców" kwota={k.zrodla.partycypacjaNajemcow} razem={razem} />}
