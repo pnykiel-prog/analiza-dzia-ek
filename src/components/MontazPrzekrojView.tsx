@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { WariantZabudowy, WartoscOdtworzeniowaMeta } from "@/lib/types";
+import type { WariantZabudowy } from "@/lib/types";
 import type { ProfilFinansowy } from "@/lib/finanse/typy";
 import { KONFIG_FINANSE } from "@/lib/config";
 import { przekrojMontazu, rolaZeSposobu, udzialPct, uzbrojenieProxy, type KolumnaMontazu, type WejscieMontazu } from "@/lib/finanse/montaz";
@@ -23,25 +23,21 @@ function pln(k: number): string {
 export function MontazPrzekrojView({
   wariant,
   wartoscOdtworzeniowaM2,
-  onWO,
-  woMeta,
   odlegloscDoSieciM,
   profil,
   kosztBudowyM2,
   onKoszt,
   oprocPct,
-  onOproc,
 }: {
   wariant: WariantZabudowy;
-  wartoscOdtworzeniowaM2: number; // kontrolowane przez stronę (współdzielone z raportem)
-  onWO: (v: number) => void;
-  woMeta?: WartoscOdtworzeniowaMeta | null;
+  // Wartość odtworzeniowa i oprocentowanie NIE są już edytowalne w panelu klienta —
+  // model używa wartości domyślnych (WO z obwieszczenia/benchmarku, oprocentowanie wg reżimu).
+  wartoscOdtworzeniowaM2: number; // domyślna (współdzielona z raportem)
   odlegloscDoSieciM: number | null;
   profil: ProfilFinansowy;
   kosztBudowyM2: number; // suwak — kontrolowany przez stronę
   onKoszt: (v: number) => void;
-  oprocPct: number | null; // override oprocentowania [%], null = wg reżimu
-  onOproc: (v: number | null) => void;
+  oprocPct: number | null; // override oprocentowania [%], null = wg reżimu (obecnie zawsze null)
 }) {
   const suwak = KONFIG_FINANSE.kosztBudowySuwak;
   const wo = wartoscOdtworzeniowaM2;
@@ -63,31 +59,8 @@ export function MontazPrzekrojView({
     return przekrojMontazu(profil, wej);
   }, [wariant, wo, oprocOverride, odlegloscDoSieciM, profil, kosztBudowyM2, rola, powierzchniaBudowy]);
 
-  const okres = woMeta?.okresOd && woMeta?.okresDo ? `${woMeta.okresOd} – ${woMeta.okresDo}` : null;
-  const przeterm = !!woMeta?.okresDo && woMeta.okresDo < "2026-07-07";
-
   return (
     <div className="space-y-4">
-      {/* Jawne założenia — WO (z okresu obwieszczenia) + oprocentowanie, edytowalne */}
-      <Karta tytul="Założenia montażu (edytowalne)" podtytul="Dwie liczby najmocniej ruszają wynik — wartość odtworzeniowa i oprocentowanie">
-        <div className="grid sm:grid-cols-2 gap-3">
-          <label className="text-sm block">
-            <span className="text-[11px] font-medium text-grunt-text-muted2">Wartość odtworzeniowa [zł/m²]</span>
-            <input type="number" value={wartoscOdtworzeniowaM2 || ""} onChange={(e) => onWO(Number(e.target.value) || 0)} className="inp mono mt-1" />
-            <span className="text-[10px] text-grunt-text-faint2 block mt-1">
-              {woMeta?.benchmark
-                ? `benchmark (brak obwieszczenia dla tej lokalizacji) — ${woMeta.jednostka}`
-                : `${woMeta?.jednostka ?? ""}${okres ? ` · okres ${okres}` : ""}${woMeta?.obwieszczenie ? ` · ${woMeta.obwieszczenie}` : ""}`}
-              {przeterm && <span className="text-grunt-amber-text"> · ⚑ stawka przeterminowana — sprawdź obwieszczenie</span>}
-            </span>
-          </label>
-          <label className="text-sm block">
-            <span className="text-[11px] font-medium text-grunt-text-muted2">Oprocentowanie kredytu [%] — oba reżimy</span>
-            <input type="number" step="0.25" value={oprocPct ?? ""} onChange={(e) => onOproc(e.target.value === "" ? null : Number(e.target.value))} placeholder="wg reżimu (np. 3)" className="inp mono mt-1" />
-            <span className="text-[10px] text-grunt-text-faint2 block mt-1">Puste → obecny środek zakresu SBC 2–4%; przyszły wg programu (do potwierdzenia).</span>
-          </label>
-        </div>
-      </Karta>
       {/* Suwak kosztu budowy */}
       <Karta tytul="Koszt budowy — dźwignia montażu" podtytul={`zł/m² × powierzchnia (${Math.round(powierzchniaBudowy)} m²) · przelicza oba reżimy na żywo`}>
         <div className="flex items-center gap-4">

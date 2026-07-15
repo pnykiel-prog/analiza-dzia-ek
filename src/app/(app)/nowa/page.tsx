@@ -530,15 +530,12 @@ export default function NowaAnalizaPage() {
               <>
                 <MontazPrzekrojView
                   wariant={wariant}
-                  woMeta={dane?.woMeta ?? null}
                   odlegloscDoSieciM={dane?.odlegloscDoSieciM ?? null}
                   profil={profilFin}
                   kosztBudowyM2={m3Koszt}
                   onKoszt={setM3Koszt}
                   wartoscOdtworzeniowaM2={m3WO}
-                  onWO={setM3WO}
                   oprocPct={m3Oproc}
-                  onOproc={setM3Oproc}
                 />
                 <BannerBramki
                   tytul="Studium gotowe — wygeneruj raport"
