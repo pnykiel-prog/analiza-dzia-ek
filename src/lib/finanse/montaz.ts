@@ -83,6 +83,9 @@ export interface KolumnaMontazu {
   czynszM2: number;
   zalozenia: {
     grantPct: number;
+    /** Osiągalny pułap grantu [%] powyżej zastosowanej stawki (np. 35% dla społ. czynszowego
+     *  przy efektywności energetycznej/OZE) — do pokazania „do X%". Brak → nie ma zapasu. */
+    grantSufitPct?: number;
     oprocentowaniePct: number;
     okresLat: number;
     stopaCzynszuPct: number;
@@ -131,6 +134,13 @@ export function zlozKolumne(
   const grantSk = a.montaz.find((m) => m.klucz === "grant");
   const partSk = a.montaz.find((m) => m.klucz === "partycypacja");
   const grantPct = grantSk ? srodek(grantSk.udzialPct) : null; // % (proc() już przeliczył)
+  // Pułap grantu dla społ. czynszowego: 35% osiągalne przy efektywności energetycznej/OZE.
+  // Gdy stawka jest na bazie (bez efektywności) → pokaż zapas „do 35%", by nie sugerować,
+  // że 20% to sufit. (Warunek zgodny z regułą w grantZeStacku.)
+  const regulaSpol =
+    profil.typZasobu === "SPOLECZNY_CZYNSZOWY" &&
+    (rezimFin === "future" || (profil.typInwestora === "SIM_PRYWATNY" && profil.wspolpracaGmina !== "BRAK"));
+  const grantSufitPct = regulaSpol && !profil.efektywnoscEnergetyczna && (grantPct ?? 0) < 35 ? 35 : undefined;
   const partPct = partSk ? partSk.udzialPct.max : 0; // auto: max gdzie przysługuje
   const maxKredytPct = a.kredyt ? a.kredyt.maxUdzialCapexPct.max : 0;
   const oprocBazowe = a.kredyt ? srodek(a.kredyt.oprocentowanie) : rp.oprocentowanie;
@@ -196,6 +206,7 @@ export function zlozKolumne(
     czynszM2: Math.round(czynszM2 * 10) / 10,
     zalozenia: {
       grantPct: grantPct != null ? Math.round(grantPct * 10) / 10 : 0,
+      grantSufitPct,
       oprocentowaniePct: Math.round(oproc * 1000) / 10,
       okresLat: okres,
       stopaCzynszuPct: Math.round(rp.stopaPulapuCzynszu * 1000) / 10,
